@@ -129,6 +129,10 @@ Si `git clone` es lento o se agota el tiempo:
 | **Descargar archivo Release** (sin git) | Ir a [Releases](https://github.com/dataelement/Clawith/releases), descargar `.tar.gz` |
 | **Configurar proxy git** | `git config --global http.proxy socks5://127.0.0.1:1080` |
 
+## 🤝 Contribuir
+
+¡Damos la bienvenida a contribuciones de todo tipo! Ya sea corregir errores, añadir funciones, mejorar documentación o traducir — consulta nuestra [Guía de Contribución](CONTRIBUTING.md) para empezar. Busca [`good first issue`](https://github.com/dataelement/Clawith/labels/good%20first%20issue) si eres nuevo.
+
 ## 🔒 Lista de Seguridad
 
 Cambiar contraseñas predeterminadas · Configurar `SECRET_KEY` / `JWT_SECRET_KEY` fuertes · Habilitar HTTPS · Usar PostgreSQL en producción · Hacer copias de seguridad regularmente · Restringir acceso al socket Docker.

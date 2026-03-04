@@ -188,6 +188,10 @@ git clone https://gitclone.com/github.com/dataelement/Clawith.git
 
 ---
 
+## 🤝 参与贡献
+
+欢迎各种形式的贡献！无论是修复 Bug、添加功能、改进文档还是翻译——请查看我们的[贡献指南](CONTRIBUTING.md)开始参与。新手可以关注 [`good first issue`](https://github.com/dataelement/Clawith/labels/good%20first%20issue) 标签。
+
 ## 🔒 安全清单
 
 修改默认密码 · 设置强 `SECRET_KEY` / `JWT_SECRET_KEY` · 启用 HTTPS · 生产环境使用 PostgreSQL · 定期备份 · 限制 Docker socket 访问。

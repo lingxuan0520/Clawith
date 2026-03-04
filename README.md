@@ -182,6 +182,10 @@ If `git clone` is slow or times out:
 
 ---
 
+## 🤝 Contributing
+
+We welcome contributions of all kinds! Whether it's fixing bugs, adding features, improving docs, or translating — check out our [Contributing Guide](CONTRIBUTING.md) to get started. Look for [`good first issue`](https://github.com/dataelement/Clawith/labels/good%20first%20issue) if you're new.
+
 ## 🔒 Security Checklist
 
 Change default passwords · Set strong `SECRET_KEY` / `JWT_SECRET_KEY` · Enable HTTPS · Use PostgreSQL in production · Back up regularly · Restrict Docker socket access.

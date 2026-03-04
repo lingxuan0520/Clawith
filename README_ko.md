@@ -129,6 +129,10 @@ bash restart.sh   # 서비스 시작
 | **Release 아카이브 다운로드** (git 불필요) | [Releases](https://github.com/dataelement/Clawith/releases)에서 `.tar.gz` 다운로드 |
 | **git 프록시 설정** | `git config --global http.proxy socks5://127.0.0.1:1080` |
 
+## 🤝 기여하기
+
+모든 종류의 기여를 환영합니다! 버그 수정, 새 기능, 문서 개선, 번역 등——[기여 가이드](CONTRIBUTING.md)를 확인하세요. 처음이신 분은 [`good first issue`](https://github.com/dataelement/Clawith/labels/good%20first%20issue)를 확인해 주세요.
+
 ## 🔒 보안 체크리스트
 
 기본 비밀번호 변경 · 강력한 `SECRET_KEY` / `JWT_SECRET_KEY` 설정 · HTTPS 활성화 · 프로덕션에서 PostgreSQL 사용 · 정기 백업 · Docker 소켓 접근 제한.
