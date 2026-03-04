@@ -403,7 +403,7 @@ async def _call_agent_llm(db: AsyncSession, agent_id: uuid.UUID, user_text: str,
     messages.append({"role": "user", "content": user_text})
 
     # Determine base URL
-    from app.services.llm_utils import get_provider_base_url, get_tool_params
+    from app.services.llm_utils import get_provider_base_url, get_tool_params, get_max_tokens
     base_url = get_provider_base_url(model.provider, model.base_url)
 
     if not base_url:
@@ -429,7 +429,7 @@ async def _call_agent_llm(db: AsyncSession, agent_id: uuid.UUID, user_text: str,
         for round_i in range(5):
             payload = _json.dumps({
                 "model": model.model, "messages": messages,
-                "temperature": 0.7, "max_tokens": 2048,
+                "temperature": 0.7, "max_tokens": get_max_tokens(model.provider, model.model),
                 "tools": tools_for_llm,
                 **get_tool_params(model.provider),
             }, ensure_ascii=False)
@@ -467,14 +467,23 @@ async def _call_agent_llm(db: AsyncSession, agent_id: uuid.UUID, user_text: str,
             for tc in tool_calls:
                 fn = tc["function"]
                 tool_name = fn["name"]
-                try:
-                    args = _json.loads(fn.get("arguments", "{}"))
-                except _json.JSONDecodeError:
-                    args = {}
+                # Robustly parse arguments — Claude/OpenRouter may return pre-parsed dicts or ints
+                raw_args = fn.get("arguments", {})
+                if isinstance(raw_args, dict):
+                    args = raw_args
+                elif isinstance(raw_args, str):
+                    try:
+                        args = _json.loads(raw_args) if raw_args else {}
+                    except _json.JSONDecodeError:
+                        args = {}
+                else:
+                    args = {}  # int or other unexpected type
+                # Ensure tool_call_id is always a string
+                tc_id = str(tc.get("id", ""))
                 print(f"[LLM] Tool: {tool_name}({args})")
                 result = await execute_tool(tool_name, args, agent_id=agent_id, user_id=creator_id)
                 print(f"[LLM] Result: {result[:100]}")
-                messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+                messages.append({"role": "tool", "tool_call_id": tc_id, "content": result})
 
         return "⚠️ 工具调用轮次过多"
     except Exception as e:
