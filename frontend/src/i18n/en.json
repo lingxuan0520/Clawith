@@ -26,7 +26,15 @@
     "goLogin": "Login",
     "selectCompany": "Company",
     "selectCompanyPlaceholder": "— Select a company —",
-    "loginFailed": "Login failed"
+    "loginFailed": "Login failed",
+    "subtitleLogin": "Welcome back. Sign in to continue.",
+    "subtitleRegister": "Create your account to get started.",
+    "invitationCode": "Invitation Code",
+    "invitationCodePlaceholder": "Enter invitation code",
+    "invitationHint": "Token consumption is significant, so invitation codes are required. We recommend deploying your own instance and configuring leading models for the best experience.",
+    "usernamePlaceholder": "Enter username",
+    "passwordPlaceholder": "Enter password",
+    "emailPlaceholder": "you@example.com"
   },
   "roles": {
     "platformAdmin": "Platform Admin",

@@ -5,21 +5,30 @@ import { useAuthStore } from '../stores';
 import { authApi, tenantApi } from '../services/api';
 
 export default function Login() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const setAuth = useAuthStore((s) => s.setAuth);
     const [isRegister, setIsRegister] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [tenants, setTenants] = useState<{ id: string; name: string; slug: string }[]>([]);
+    const [invitationRequired, setInvitationRequired] = useState(false);
 
     const [form, setForm] = useState({
         username: '',
         password: '',
         email: '',
-        display_name: '',
         tenant_id: '',
+        invitation_code: '',
     });
+
+    // Check if invitation code is required
+    useEffect(() => {
+        fetch('/api/auth/registration-config')
+            .then(r => r.json())
+            .then(d => setInvitationRequired(d.invitation_code_required))
+            .catch(() => { });
+    }, []);
 
     // Load available companies when switching to register mode
     useEffect(() => {
@@ -38,6 +47,10 @@ export default function Login() {
         document.documentElement.setAttribute('data-theme', 'dark');
     }, []);
 
+    const toggleLang = () => {
+        i18n.changeLanguage(i18n.language === 'zh' ? 'en' : 'zh');
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -46,7 +59,10 @@ export default function Login() {
         try {
             let res;
             if (isRegister) {
-                res = await authApi.register(form);
+                res = await authApi.register({
+                    ...form,
+                    display_name: form.username, // auto-set display_name to username
+                });
             } else {
                 res = await authApi.login({ username: form.username, password: form.password });
             }
@@ -104,6 +120,17 @@ export default function Login() {
 
             {/* ── Right: Form Panel ── */}
             <div className="login-form-panel">
+                {/* Language Switcher */}
+                <div style={{
+                    position: 'absolute', top: '16px', right: '16px',
+                    cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)',
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                    padding: '6px 12px', borderRadius: '8px',
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)',
+                }} onClick={toggleLang}>
+                    🌐 {i18n.language === 'zh' ? 'EN' : '中文'}
+                </div>
+
                 <div className="login-form-wrapper">
                     <div className="login-form-header">
                         <div className="login-form-logo"><img src="/logo.png" alt="" style={{ width: 28, height: 28, marginRight: 8, verticalAlign: 'middle' }} />Clawith</div>
@@ -111,9 +138,7 @@ export default function Login() {
                             {isRegister ? t('auth.register') : t('auth.login')}
                         </h2>
                         <p className="login-form-subtitle">
-                            {isRegister
-                                ? 'Create your account to get started'
-                                : 'Welcome back. Sign in to continue.'}
+                            {isRegister ? t('auth.subtitleRegister') : t('auth.subtitleLogin')}
                         </p>
                     </div>
 
@@ -131,7 +156,7 @@ export default function Login() {
                                 onChange={(e) => setForm({ ...form, username: e.target.value })}
                                 required
                                 autoFocus
-                                placeholder="Enter username"
+                                placeholder={t('auth.usernamePlaceholder')}
                             />
                         </div>
 
@@ -144,16 +169,7 @@ export default function Login() {
                                         value={form.email}
                                         onChange={(e) => setForm({ ...form, email: e.target.value })}
                                         required
-                                        placeholder="you@example.com"
-                                    />
-                                </div>
-                                <div className="login-field">
-                                    <label>{t('auth.displayName')}</label>
-                                    <input
-                                        value={form.display_name}
-                                        onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-                                        required
-                                        placeholder="Your display name"
+                                        placeholder={t('auth.emailPlaceholder')}
                                     />
                                 </div>
                                 <div className="login-field">
@@ -164,11 +180,28 @@ export default function Login() {
                                         required
                                     >
                                         <option value="">{t('auth.selectCompanyPlaceholder')}</option>
-                                        {tenants.map((t) => (
-                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        {tenants.map((tenant) => (
+                                            <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
                                         ))}
                                     </select>
                                 </div>
+                                {invitationRequired && (
+                                    <div className="login-field">
+                                        <label>{t('auth.invitationCode')}</label>
+                                        <input
+                                            value={form.invitation_code}
+                                            onChange={(e) => setForm({ ...form, invitation_code: e.target.value })}
+                                            required
+                                            placeholder={t('auth.invitationCodePlaceholder')}
+                                        />
+                                        <p style={{
+                                            fontSize: '11px', color: 'var(--text-tertiary)',
+                                            marginTop: '6px', lineHeight: '1.5',
+                                        }}>
+                                            {t('auth.invitationHint')}
+                                        </p>
+                                    </div>
+                                )}
                             </>
                         )}
 
@@ -179,7 +212,7 @@ export default function Login() {
                                 value={form.password}
                                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                                 required
-                                placeholder="••••••••"
+                                placeholder={t('auth.passwordPlaceholder')}
                             />
                         </div>
 

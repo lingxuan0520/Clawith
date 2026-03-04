@@ -26,7 +26,15 @@
     "goLogin": "去登录",
     "selectCompany": "所属公司",
     "selectCompanyPlaceholder": "— 请选择公司 —",
-    "loginFailed": "登录失败"
+    "loginFailed": "登录失败",
+    "subtitleLogin": "欢迎回来，请登录继续。",
+    "subtitleRegister": "创建你的账号开始使用。",
+    "invitationCode": "邀请码",
+    "invitationCodePlaceholder": "请输入邀请码",
+    "invitationHint": "由于 Token 消耗较大，本平台需要邀请码注册。推荐大家自行部署并配置最前沿的模型，体验最佳效果。",
+    "usernamePlaceholder": "请输入用户名",
+    "passwordPlaceholder": "请输入密码",
+    "emailPlaceholder": "your@email.com"
   },
   "roles": {
     "platformAdmin": "超级管理员",
