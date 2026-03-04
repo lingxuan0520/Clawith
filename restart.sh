@@ -145,11 +145,20 @@ else
     curl -s http://localhost:8008/api/health && echo ""
 fi
 
+# Detect server IP
+SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -z "$SERVER_IP" ] && SERVER_IP=$(ifconfig 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}')
+[ -z "$SERVER_IP" ] && SERVER_IP="<your-server-ip>"
+
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}  Clawith running!${NC}"
-echo -e "${GREEN}  Frontend: http://localhost:3008${NC}"
-echo -e "${GREEN}  Backend:  http://localhost:8008${NC}"
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo ""
+echo -e "  ${CYAN}Local:${NC}   http://localhost:3008"
+echo -e "  ${CYAN}Network:${NC} http://${SERVER_IP}:3008"
+echo -e "  ${CYAN}API:${NC}     http://${SERVER_IP}:8008"
+echo ""
 echo -e "  Backend log:  tail -f $BACKEND_LOG"
 echo -e "  Frontend log: tail -f $FRONTEND_LOG"
+

@@ -8,6 +8,16 @@ set -e
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
+# --- Helper: detect server IP ---
+get_server_ip() {
+    # Try hostname -I (Linux), then ifconfig (macOS), then fallback
+    local ip
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    [ -z "$ip" ] && ip=$(ifconfig 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}')
+    [ -z "$ip" ] && ip="<your-server-ip>"
+    echo "$ip"
+}
+
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
 echo -e "${CYAN}  🦞 Clawith — First-time Setup${NC}"
@@ -300,8 +310,13 @@ if [ ! -d ".venv" ]; then
 fi
 
 echo "  Installing dependencies..."
-.venv/bin/pip install -e ".[dev]" -q 2>&1 | tail -1
-echo -e "  ${GREEN}✓${NC} Backend dependencies installed"
+if .venv/bin/pip install -e ".[dev]" 2>&1 | tail -5; then
+    echo -e "  ${GREEN}✓${NC} Backend dependencies installed"
+else
+    echo -e "  ${RED}✗${NC} Failed to install backend dependencies."
+    echo "  Try manually: cd backend && .venv/bin/pip install -e '.[dev]'"
+    exit 1
+fi
 
 # ── 4. Frontend setup ────────────────────────────
 echo ""
@@ -347,6 +362,8 @@ else
 fi
 
 # ── Summary ──────────────────────────────────────
+SERVER_IP=$(get_server_ip)
+
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}  🎉 Setup complete!${NC}"
@@ -359,13 +376,17 @@ echo "    bash restart.sh"
 echo ""
 echo -e "  ${CYAN}Option B: Manual start${NC}"
 echo "    # Terminal 1 — Backend"
-echo "    cd backend && .venv/bin/uvicorn app.main:app --reload --port 8008"
+echo "    cd backend && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8008"
 echo ""
 echo "    # Terminal 2 — Frontend"
-echo "    cd frontend && npm run dev -- --port 3008"
+echo "    cd frontend && npx vite --host 0.0.0.0 --port 3008"
 echo ""
 echo -e "  ${CYAN}Option C: Docker${NC}"
 echo "    docker compose up -d"
+echo ""
+echo -e "  ${CYAN}Access URLs:${NC}"
+echo "    Local:   http://localhost:3008"
+echo "    Network: http://${SERVER_IP}:3008"
 echo ""
 echo "  The first user to register becomes the platform admin."
 echo ""
