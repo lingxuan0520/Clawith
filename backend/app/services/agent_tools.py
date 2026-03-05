@@ -755,14 +755,41 @@ async def _read_webpage(arguments: dict) -> str:
                     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
                 },
             )
-        html = resp.text
+
+        # Detect encoding — many Chinese gov sites use GBK/GB2312
+        content_type = resp.headers.get("content-type", "")
+        charset_m = re.search(r'charset=([^\s;]+)', content_type, re.IGNORECASE)
+        charset = charset_m.group(1).lower() if charset_m else ''
+        if not charset:
+            # Try to detect from meta tag in raw bytes
+            raw_head = resp.content[:2000].decode('ascii', errors='ignore')
+            meta_m = re.search(r'charset=["\']?([^"\'\s;>]+)', raw_head, re.IGNORECASE)
+            charset = meta_m.group(1).lower() if meta_m else 'utf-8'
+
+        # Normalize encoding name
+        if charset in ('gb2312', 'gbk', 'gb18030', 'x-gbk'):
+            html = resp.content.decode('gbk', errors='replace')
+        else:
+            try:
+                html = resp.content.decode(charset, errors='replace')
+            except (LookupError, UnicodeDecodeError):
+                html = resp.content.decode('utf-8', errors='replace')
 
         # Remove scripts, styles, nav elements
         html = re.sub(r'<(script|style|nav|header|footer|aside)[^>]*>.*?</\1>', '', html, flags=re.DOTALL | re.IGNORECASE)
-        # Extract main content hints: article, main, content div
-        main_m = re.search(r'<(article|main)[^>]*>(.*?)</\1>', html, re.DOTALL | re.IGNORECASE)
-        if main_m:
-            html = main_m.group(2)
+        # Extract main content: try multiple common selectors
+        extracted = None
+        for pattern in [
+            r'<(article)[^>]*>(.*?)</\1>',
+            r'<(main)[^>]*>(.*?)</\1>',
+            r'<div[^>]+class="[^"]*(?:TRS_Content|article[-_]?content|content[-_]?body|news[-_]?content|detail[-_]?content|main[-_]?content|post[-_]?content)[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]+id="[^"]*(?:content|article|main|detail)[^"]*"[^>]*>(.*?)</div>',
+        ]:
+            m = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
+            if m:
+                extracted = m.group(m.lastindex)
+                break
+        html = extracted if extracted else html
 
         # Strip all remaining HTML tags
         text = re.sub(r'<[^>]+>', ' ', html)
@@ -772,7 +799,7 @@ async def _read_webpage(arguments: dict) -> str:
         text = re.sub(r'[ \t]{3,}', ' ', text)
         text = text.strip()
 
-        if not text or len(text) < 50:
+        if not text or len(text) < 20:
             return f"❌ Could not extract meaningful content from {url}"
 
         if len(text) > max_chars:

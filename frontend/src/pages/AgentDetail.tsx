@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { agentApi, taskApi, fileApi, channelApi, enterpriseApi, activityApi, scheduleApi, skillApi } from '../services/api';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuthStore } from '../stores';
 import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -1520,9 +1521,9 @@ export default function AgentDetail() {
                                                         <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: msg.role === 'assistant' ? 'rgba(224,238,238,0.15)' : 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>
                                                             {msg.role === 'user' ? 'U' : 'A'}
                                                         </div>
-                                                        <div style={{ maxWidth: '70%', padding: '8px 12px', borderRadius: '12px', background: msg.role === 'assistant' ? 'var(--bg-secondary)' : 'rgba(224,238,238,0.15)', fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                                        <div style={{ maxWidth: '70%', padding: '8px 12px', borderRadius: '12px', background: msg.role === 'assistant' ? 'var(--bg-secondary)' : 'rgba(224,238,238,0.15)', fontSize: '13px', lineHeight: '1.5', wordBreak: 'break-word' }}>
                                                             {msg.fileName && <div style={{ fontSize: '10px', color: 'var(--accent)', marginBottom: '2px' }}>⌇ {msg.fileName}</div>}
-                                                            {msg.content}
+                                                            {msg.role === 'assistant' ? <MarkdownRenderer content={msg.content} /> : <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>}
                                                         </div>
                                                     </div>
                                                 );
@@ -1578,9 +1579,9 @@ export default function AgentDetail() {
                                                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: m.role === 'assistant' ? 'rgba(224,238,238,0.15)' : 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>
                                                     {m.role === 'assistant' ? 'A' : 'U'}
                                                 </div>
-                                                <div style={{ maxWidth: '70%', padding: '8px 12px', borderRadius: '12px', background: m.role === 'assistant' ? 'var(--bg-secondary)' : 'rgba(224,238,238,0.15)', fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                                <div style={{ maxWidth: '70%', padding: '8px 12px', borderRadius: '12px', background: m.role === 'assistant' ? 'var(--bg-secondary)' : 'rgba(224,238,238,0.15)', fontSize: '13px', lineHeight: '1.5', wordBreak: 'break-word' }}>
                                                     {m.sender_name && <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '2px' }}>{m.sender_name}</div>}
-                                                    {m.content}
+                                                    {m.role === 'assistant' ? <MarkdownRenderer content={m.content} /> : <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>}
                                                     <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{m.created_at ? new Date(m.created_at).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}</div>
                                                 </div>
                                             </div>
@@ -2188,8 +2189,8 @@ export default function AgentDetail() {
                                                 </div>
                                             </div>
                                             {channelConfig && (
-                                                <span className={`badge ${channelConfig.is_connected ? 'badge-success' : 'badge-warning'}`}>
-                                                    {channelConfig.is_connected ? t('agent.settings.channel.configured') : t('agent.settings.channel.notConfigured')}
+                                                <span className={`badge ${channelConfig.is_configured ? 'badge-success' : 'badge-warning'}`}>
+                                                    {channelConfig.is_configured ? t('agent.settings.channel.configured') : t('agent.settings.channel.notConfigured')}
                                                 </span>
                                             )}
                                         </div>
@@ -2199,13 +2200,13 @@ export default function AgentDetail() {
                                                 <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '8px' }}>App ID: <code>{channelConfig.app_id}</code></div>
                                                 <div style={{ background: 'var(--bg-secondary)', borderRadius: '6px', padding: '10px', fontSize: '12px', fontFamily: 'var(--font-mono)', marginBottom: '12px' }}>
                                                     <div style={{ color: 'var(--text-tertiary)', marginBottom: '6px' }}>Webhook URL</div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <div style={{ wordBreak: 'break-all', color: 'var(--accent-primary)', flex: 1 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                                        <div style={{ wordBreak: 'break-all', color: 'var(--accent-primary)', flex: 1, lineHeight: 1.5 }}>
                                                             {webhookData?.webhook_url || `${window.location.origin}/api/channel/feishu/${id}/webhook`}
                                                         </div>
                                                         <button
-                                                            title="Copy URL"
-                                                            style={{ flexShrink: 0, padding: '4px 8px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}
+                                                            title="Copy"
+                                                            style={{ flexShrink: 0, padding: '2px 6px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-secondary)', whiteSpace: 'nowrap', marginTop: '1px' }}
                                                             onClick={() => {
                                                                 const url = webhookData?.webhook_url || `${window.location.origin}/api/channel/feishu/${id}/webhook`;
                                                                 navigator.clipboard.writeText(url).then(() => {
@@ -2213,7 +2214,7 @@ export default function AgentDetail() {
                                                                     if (btn) { const orig = btn.textContent; btn.textContent = '✅'; setTimeout(() => { btn.textContent = orig; }, 1500); }
                                                                 });
                                                             }}
-                                                        >📋 复制</button>
+                                                        >📋</button>
                                                     </div>
                                                 </div>
                                                 <button className="btn btn-danger" style={{ fontSize: '12px', padding: '4px 12px' }} onClick={async () => { await channelApi.delete(id!); queryClient.invalidateQueries({ queryKey: ['channel', id] }); }}>Disconnect</button>
