@@ -219,40 +219,60 @@ BUILTIN_TOOLS = [
         },
     },
     {
-        "name": "bing_search",
-        "display_name": "Bing Search",
-        "description": "Search the internet via Bing. Works reliably in China and worldwide. No API key required.",
+        "name": "jina_search",
+        "display_name": "Jina Search",
+        "description": "Search the internet using Jina AI (s.jina.ai). Returns high-quality results with full content. Requires Jina AI API key for higher rate limits.",
         "category": "search",
-        "icon": "🔍",
+        "icon": "🔮",
         "is_default": True,
         "parameters_schema": {
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Search keywords"},
-                "max_results": {"type": "integer", "description": "Number of results to return (default 5, max 10)"},
+                "max_results": {"type": "integer", "description": "Number of results (default 5, max 10)"},
             },
             "required": ["query"],
         },
         "config": {},
-        "config_schema": {},
+        "config_schema": {
+            "fields": [
+                {
+                    "key": "api_key",
+                    "label": "Jina AI API Key",
+                    "type": "password",
+                    "default": "",
+                    "placeholder": "jina_xxxxxxxxxxxxxxxx (get one at jina.ai)",
+                },
+            ]
+        },
     },
     {
-        "name": "read_webpage",
-        "display_name": "Read Webpage 🌐",
-        "description": "Read and extract the main text content from a web page URL. Uses Jina Reader for clean markdown output, with direct fetch as fallback.",
+        "name": "jina_read",
+        "display_name": "Jina Read",
+        "description": "Read and extract full content from a URL using Jina AI Reader (r.jina.ai). Returns clean markdown. Requires Jina AI API key for higher rate limits.",
         "category": "search",
-        "icon": "🌐",
+        "icon": "📖",
         "is_default": True,
         "parameters_schema": {
             "type": "object",
             "properties": {
-                "url": {"type": "string", "description": "The full URL of the web page to read"},
-                "max_chars": {"type": "integer", "description": "Max characters to return (default 4000)"},
+                "url": {"type": "string", "description": "Full URL to read"},
+                "max_chars": {"type": "integer", "description": "Max characters to return (default 8000)"},
             },
             "required": ["url"],
         },
         "config": {},
-        "config_schema": {},
+        "config_schema": {
+            "fields": [
+                {
+                    "key": "api_key",
+                    "label": "Jina AI API Key",
+                    "type": "password",
+                    "default": "",
+                    "placeholder": "jina_xxxxxxxxxxxxxxxx (get one at jina.ai)",
+                },
+            ]
+        },
     },
     {
         "name": "plaza_get_new_posts",
