@@ -407,6 +407,19 @@ export default function AgentCreate() {
                                 </div>
                                 {slackOpen && (
                                     <div style={{ padding: '16px' }}>
+                                        <details style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            <summary style={{ cursor: 'pointer', fontWeight: 500, color: 'var(--text-primary)', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '10px' }}>▶</span> {t('channelGuide.setupGuide')}
+                                            </summary>
+                                            <ol style={{ paddingLeft: '16px', margin: '8px 0', lineHeight: 1.9 }}>
+                                                <li>{t('channelGuide.slack.step1')}</li>
+                                                <li>{t('channelGuide.slack.step2')}</li>
+                                                <li>{t('channelGuide.slack.step3')}</li>
+                                                <li>{t('channelGuide.slack.step4')}</li>
+                                                <li>{t('channelGuide.slack.step5')}</li>
+                                            </ol>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px' }}>💡 {t('channelGuide.slack.note')}</div>
+                                        </details>
                                         <div className="form-group">
                                             <label className="form-label">Bot Token</label>
                                             <input className="form-input" value={form.slack_bot_token}
@@ -442,6 +455,20 @@ export default function AgentCreate() {
                                 </div>
                                 {discordOpen && (
                                     <div style={{ padding: '16px' }}>
+                                        <details style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            <summary style={{ cursor: 'pointer', fontWeight: 500, color: 'var(--text-primary)', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '10px' }}>▶</span> {t('channelGuide.setupGuide')}
+                                            </summary>
+                                            <ol style={{ paddingLeft: '16px', margin: '8px 0', lineHeight: 1.9 }}>
+                                                <li>{t('channelGuide.discord.step1')}</li>
+                                                <li>{t('channelGuide.discord.step2')}</li>
+                                                <li>{t('channelGuide.discord.step3')}</li>
+                                                <li>{t('channelGuide.discord.step4')}</li>
+                                                <li>{t('channelGuide.discord.step5')}</li>
+                                                <li>{t('channelGuide.discord.step6')}</li>
+                                            </ol>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px' }}>💡 {t('channelGuide.discord.note')}</div>
+                                        </details>
                                         <div className="form-group">
                                             <label className="form-label">Application ID</label>
                                             <input className="form-input" value={form.discord_application_id}
@@ -491,6 +518,19 @@ export default function AgentCreate() {
                                                 <li>{t('wizard.step5.step4Feishu')}</li>
                                             </ol>
                                         </div>
+                                        <details style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            <summary style={{ cursor: 'pointer', fontWeight: 500, color: 'var(--text-primary)', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '10px' }}>▶</span> {t('channelGuide.setupGuide')}
+                                            </summary>
+                                            <ol style={{ paddingLeft: '16px', margin: '8px 0', lineHeight: 1.9 }}>
+                                                <li>{t('channelGuide.feishu.step1')}</li>
+                                                <li>{t('channelGuide.feishu.step2')}</li>
+                                                <li>{t('channelGuide.feishu.step3')}</li>
+                                                <li>{t('channelGuide.feishu.step4')}</li>
+                                                <li>{t('channelGuide.feishu.step5')}</li>
+                                            </ol>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px' }}>💡 {t('channelGuide.feishu.note')}</div>
+                                        </details>
                                         <div className="form-group">
                                             <label className="form-label">App ID</label>
                                             <input className="form-input" value={form.feishu_app_id}

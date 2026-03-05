@@ -521,5 +521,33 @@
     "no": "否",
     "all": "全部",
     "none": "无"
+  },
+  "channelGuide": {
+    "setupGuide": "配置说明",
+    "slack": {
+      "step1": "打开 api.slack.com/apps → Create New App → From Scratch",
+      "step2": "OAuth & Permissions → Bot Token Scopes → 添加权限：chat:write、im:history、app_mentions:read",
+      "step3": "Install to Workspace → 复制 Bot Token（以 xoxb- 开头）",
+      "step4": "Basic Information → Signing Secret → Show → 复制",
+      "step5": "Event Subscriptions → 开启 → 粘贴 Webhook URL（自动验证）→ Subscribe to bot events：message.im + app_mention → Save → 重新安装 App",
+      "note": "确保服务器可被公网访问，Slack 才能将消息推送到 Webhook。"
+    },
+    "discord": {
+      "step1": "打开 discord.com/developers/applications → New Application",
+      "step2": "Bot 页 → Reset Token → 复制 Bot Token；开启 Message Content Intent",
+      "step3": "General Information → 复制 Application ID 和 Public Key",
+      "step4": "OAuth2 → URL Generator → 勾选 bot + applications.commands → 邀请 Bot 进入你的服务器",
+      "step5": "General Information → Interactions Endpoint URL → 粘贴 Webhook URL → Save",
+      "step6": "在 Discord 中使用 /ask message:<你的问题> 与 Agent 对话",
+      "note": "Discord 保存时会自动验证 Endpoint，服务器需处于运行状态且可公网访问。"
+    },
+    "feishu": {
+      "step1": "打开 open.feishu.cn → 开发者后台 → 创建企业自建应用",
+      "step2": "应用能力 → 开启「机器人」",
+      "step3": "凭证与基础信息 → 复制 App ID 和 App Secret",
+      "step4": "事件订阅 → 开启事件 → 粘贴 Webhook URL → 订阅 im.message.receive_v1 事件",
+      "step5": "权限管理 → 申请：im:message、im:message:send_as_bot → 发布应用",
+      "note": "发布后，将机器人拉入飞书群或让用户添加为联系人即可开始对话。"
+    }
   }
 }

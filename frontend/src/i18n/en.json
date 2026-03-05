@@ -511,5 +511,33 @@
     "no": "No",
     "all": "All",
     "none": "None"
+  },
+  "channelGuide": {
+    "setupGuide": "Setup Guide",
+    "slack": {
+      "step1": "Go to api.slack.com/apps → Create New App → From Scratch",
+      "step2": "OAuth & Permissions → Bot Token Scopes → Add: chat:write, im:history, app_mentions:read",
+      "step3": "Install to Workspace → copy the Bot Token (starts with xoxb-)",
+      "step4": "Basic Information → Signing Secret → Show → copy",
+      "step5": "Event Subscriptions → Enable → paste Webhook URL (auto-verified) → Subscribe to bot events: message.im + app_mention → Save → Reinstall app",
+      "note": "Make sure your server is publicly accessible so Slack can reach the webhook."
+    },
+    "discord": {
+      "step1": "Go to discord.com/developers/applications → New Application",
+      "step2": "Bot tab → Reset Token → copy Bot Token; enable Message Content Intent",
+      "step3": "General Information → copy Application ID and Public Key",
+      "step4": "OAuth2 → URL Generator → scope: bot + applications.commands → invite bot to your server",
+      "step5": "General Information → Interactions Endpoint URL → paste the Webhook URL → Save",
+      "step6": "Use /ask message:<your question> in Discord to talk to the agent",
+      "note": "Discord will verify the endpoint upon saving. Your server must be running and publicly accessible."
+    },
+    "feishu": {
+      "step1": "Go to open.feishu.cn → Console → Create Enterprise App",
+      "step2": "Capabilities → Enable Bot",
+      "step3": "Credentials & Basic Info → copy App ID and App Secret",
+      "step4": "Event Subscriptions → Enable Events → paste Webhook URL → subscribe to im.message.receive_v1",
+      "step5": "Permissions → Request: im:message, im:message:send_as_bot → publish the app",
+      "note": "After publishing, invite the bot to a Feishu group or let users add it as a contact to start chatting."
+    }
   }
 }

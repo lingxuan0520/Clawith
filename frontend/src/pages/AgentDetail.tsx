@@ -2278,6 +2278,19 @@ export default function AgentDetail() {
                                                     <label style={{ fontSize: '12px', fontWeight: 500, display: 'block', marginBottom: '4px' }}>Signing Secret *</label>
                                                     <input className="input" type="password" value={slackForm.signing_secret} onChange={e => setSlackForm({ ...slackForm, signing_secret: e.target.value })} style={{ fontSize: '12px' }} />
                                                 </div>
+                                                <details style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                    <summary style={{ cursor: 'pointer', fontWeight: 500, color: 'var(--text-primary)', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ fontSize: '10px' }}>▶</span> {t('channelGuide.setupGuide')}
+                                                    </summary>
+                                                    <ol style={{ paddingLeft: '16px', margin: '8px 0', lineHeight: 1.9 }}>
+                                                        <li>{t('channelGuide.slack.step1')}</li>
+                                                        <li>{t('channelGuide.slack.step2')}</li>
+                                                        <li>{t('channelGuide.slack.step3')}</li>
+                                                        <li>{t('channelGuide.slack.step4')}</li>
+                                                        <li>{t('channelGuide.slack.step5')}</li>
+                                                    </ol>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px' }}>💡 {t('channelGuide.slack.note')}</div>
+                                                </details>
                                                 <button className="btn btn-primary" style={{ fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => saveSlack.mutate()} disabled={!slackForm.bot_token || !slackForm.signing_secret || saveSlack.isPending}>
                                                     {saveSlack.isPending ? t('common.loading') : t('agent.settings.channel.saveChannel')}
                                                 </button>
@@ -2323,6 +2336,20 @@ export default function AgentDetail() {
                                                     <label style={{ fontSize: '12px', fontWeight: 500, display: 'block', marginBottom: '4px' }}>Public Key *</label>
                                                     <input className="input" value={discordForm.public_key} onChange={e => setDiscordForm({ ...discordForm, public_key: e.target.value })} style={{ fontSize: '12px' }} />
                                                 </div>
+                                                <details style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                    <summary style={{ cursor: 'pointer', fontWeight: 500, color: 'var(--text-primary)', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ fontSize: '10px' }}>▶</span> {t('channelGuide.setupGuide')}
+                                                    </summary>
+                                                    <ol style={{ paddingLeft: '16px', margin: '8px 0', lineHeight: 1.9 }}>
+                                                        <li>{t('channelGuide.discord.step1')}</li>
+                                                        <li>{t('channelGuide.discord.step2')}</li>
+                                                        <li>{t('channelGuide.discord.step3')}</li>
+                                                        <li>{t('channelGuide.discord.step4')}</li>
+                                                        <li>{t('channelGuide.discord.step5')}</li>
+                                                        <li>{t('channelGuide.discord.step6')}</li>
+                                                    </ol>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px' }}>💡 {t('channelGuide.discord.note')}</div>
+                                                </details>
                                                 <button className="btn btn-primary" style={{ fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => saveDiscord.mutate()} disabled={!discordForm.application_id || !discordForm.bot_token || !discordForm.public_key || saveDiscord.isPending}>
                                                     {saveDiscord.isPending ? t('common.loading') : t('agent.settings.channel.saveChannel')}
                                                 </button>
@@ -2392,6 +2419,19 @@ export default function AgentDetail() {
                                                         <input className="input" value={channelForm.encrypt_key} onChange={e => setChannelForm({ ...channelForm, encrypt_key: e.target.value })} style={{ fontSize: '12px' }} />
                                                     </div>
                                                 </div>
+                                                <details style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                    <summary style={{ cursor: 'pointer', fontWeight: 500, color: 'var(--text-primary)', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ fontSize: '10px' }}>▶</span> {t('channelGuide.setupGuide')}
+                                                    </summary>
+                                                    <ol style={{ paddingLeft: '16px', margin: '8px 0', lineHeight: 1.9 }}>
+                                                        <li>{t('channelGuide.feishu.step1')}</li>
+                                                        <li>{t('channelGuide.feishu.step2')}</li>
+                                                        <li>{t('channelGuide.feishu.step3')}</li>
+                                                        <li>{t('channelGuide.feishu.step4')}</li>
+                                                        <li>{t('channelGuide.feishu.step5')}</li>
+                                                    </ol>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px' }}>💡 {t('channelGuide.feishu.note')}</div>
+                                                </details>
                                                 <button className="btn btn-primary" style={{ fontSize: '12px' }} onClick={() => saveChannel.mutate()} disabled={!channelForm.app_id || !channelForm.app_secret || saveChannel.isPending}>
                                                     {saveChannel.isPending ? t('common.loading') : t('agent.settings.channel.saveChannel')}
                                                 </button>
