@@ -2186,20 +2186,23 @@ export default function AgentDetail() {
                                                 <div style={{ fontWeight: 500, fontSize: '13px' }}>{t('agent.settings.heartbeat.interval', 'Check Interval')}</div>
                                                 <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{t('agent.settings.heartbeat.intervalDesc', 'How often the agent checks for updates')}</div>
                                             </div>
-                                            <select
-                                                className="input"
-                                                value={agent?.heartbeat_interval_minutes ?? 30}
-                                                onChange={async (e) => {
-                                                    await agentApi.update(id!, { heartbeat_interval_minutes: Number(e.target.value) } as any);
-                                                    queryClient.invalidateQueries({ queryKey: ['agent', id] });
-                                                }}
-                                                style={{ width: '140px', fontSize: '12px' }}
-                                            >
-                                                <option value={15}>15 min</option>
-                                                <option value={30}>30 min</option>
-                                                <option value={60}>1 hour</option>
-                                                <option value={120}>2 hours</option>
-                                            </select>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <input
+                                                    type="number"
+                                                    className="input"
+                                                    min={1}
+                                                    defaultValue={agent?.heartbeat_interval_minutes ?? 120}
+                                                    key={agent?.heartbeat_interval_minutes}
+                                                    onBlur={async (e) => {
+                                                        const val = Math.max(1, Number(e.target.value) || 120);
+                                                        e.target.value = String(val);
+                                                        await agentApi.update(id!, { heartbeat_interval_minutes: val } as any);
+                                                        queryClient.invalidateQueries({ queryKey: ['agent', id] });
+                                                    }}
+                                                    style={{ width: '80px', fontSize: '12px' }}
+                                                />
+                                                <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{t('common.minutes', 'min')}</span>
+                                            </div>
                                         </div>
 
                                         {/* Active Hours */}
