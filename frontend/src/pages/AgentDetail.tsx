@@ -507,6 +507,7 @@ export default function AgentDetail() {
     const [allSessions, setAllSessions] = useState<any[]>([]);
     const [activeSession, setActiveSession] = useState<any | null>(null);
     const [chatScope, setChatScope] = useState<'mine' | 'all'>('mine');
+    const [allUserFilter, setAllUserFilter] = useState<string>('');  // filter by username in All Users
     const [historyMsgs, setHistoryMsgs] = useState<any[]>([]);
     const [sessionsLoading, setSessionsLoading] = useState(false);
 
@@ -1720,7 +1721,7 @@ export default function AgentDetail() {
                 })()}
 
                 {activeTab === 'chat' && (
-                    <div style={{ display: 'flex', gap: '0', flex: 1, minHeight: 0, height: 'calc(100vh - 240px)', borderTop: '1px solid var(--border-subtle)', marginTop: '8px' }}>
+                    <div style={{ display: 'flex', gap: '0', flex: 1, minHeight: 0, height: 'calc(100vh - 240px)' }}>
                         {/* ── Left: session sidebar ── */}
                         <div style={{ width: '220px', flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                             {/* Tab row */}
@@ -1779,41 +1780,47 @@ export default function AgentDetail() {
                                         );
                                     })
                                 ) : (
-                                    /* All Users tab — grouped by user */
-                                    (() => {
-                                        const grouped: Record<string, any[]> = {};
-                                        for (const s of allSessions) {
-                                            const k = s.username || s.user_id;
-                                            (grouped[k] = grouped[k] || []).push(s);
-                                        }
-                                        return Object.entries(grouped).map(([username, userSessions]) => (
-                                            <div key={username}>
-                                                <div style={{ padding: '6px 12px 2px', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase' }}>{username}</div>
-                                                {userSessions.map((s: any) => {
-                                                    const isActive = activeSession?.id === s.id;
-                                                    return (
-                                                        <div key={s.id} onClick={() => selectSession(s)}
-                                                            style={{ padding: '6px 12px', cursor: 'pointer', borderLeft: isActive ? '2px solid var(--accent-primary)' : '2px solid transparent', background: isActive ? 'var(--bg-secondary)' : 'transparent' }}
-                                                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--bg-secondary)'; }}
-                                                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '1px' }}>
-                                                                <div style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)', flex: 1 }}>{s.title}</div>
-                                                                {({ feishu: '飞书', discord: 'Discord', slack: 'Slack' } as Record<string, string>)[s.source_channel] && (
-                                                                    <span style={{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                                                                        {({ feishu: '飞书', discord: 'Discord', slack: 'Slack' } as Record<string, string>)[s.source_channel]}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
-                                                                {s.last_message_at ? new Date(s.last_message_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
-                                                                {s.message_count > 0 && ` · ${s.message_count}`}
-                                                            </div>
+                                    /* All Users tab — user filter dropdown + flat list */
+                                    <>
+                                        {/* User filter dropdown */}
+                                        <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                                            <select
+                                                value={allUserFilter}
+                                                onChange={e => setAllUserFilter(e.target.value)}
+                                                style={{ width: '100%', padding: '4px 6px', fontSize: '11px', background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '5px', color: 'var(--text-primary)', cursor: 'pointer' }}
+                                            >
+                                                <option value="">All Users</option>
+                                                {Array.from(new Set(allSessions.map((s: any) => s.username || s.user_id))).filter(Boolean).map((u: any) => (
+                                                    <option key={u} value={u}>{u}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        {/* Filtered session list */}
+                                        {allSessions
+                                            .filter((s: any) => !allUserFilter || (s.username || s.user_id) === allUserFilter)
+                                            .map((s: any) => {
+                                                const isActive = activeSession?.id === s.id;
+                                                return (
+                                                    <div key={s.id} onClick={() => selectSession(s)}
+                                                        style={{ padding: '6px 12px', cursor: 'pointer', borderLeft: isActive ? '2px solid var(--accent-primary)' : '2px solid transparent', background: isActive ? 'var(--bg-secondary)' : 'transparent' }}
+                                                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                                                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '1px' }}>
+                                                            <div style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)', flex: 1 }}>{s.title}</div>
+                                                            {({ feishu: '飞书', discord: 'Discord', slack: 'Slack' } as Record<string, string>)[s.source_channel] && (
+                                                                <span style={{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                                                                    {({ feishu: '飞书', discord: 'Discord', slack: 'Slack' } as Record<string, string>)[s.source_channel]}
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ));
-                                    })()
+                                                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', display: 'flex', gap: '4px' }}>
+                                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.username || ''}</span>
+                                                            <span style={{ flexShrink: 0 }}>{s.last_message_at ? new Date(s.last_message_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}{s.message_count > 0 ? ` · ${s.message_count}` : ''}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                    </>
                                 )}
                             </div>
                         </div>
