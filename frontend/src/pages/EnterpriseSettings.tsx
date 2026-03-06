@@ -507,11 +507,19 @@ export default function EnterpriseSettings() {
     const [mcpTesting, setMcpTesting] = useState(false);
     const [editingToolId, setEditingToolId] = useState<string | null>(null);
     const [editingConfig, setEditingConfig] = useState<Record<string, any>>({});
+    const [toolsView, setToolsView] = useState<'global' | 'agent-installed'>('global');
+    const [agentInstalledTools, setAgentInstalledTools] = useState<any[]>([]);
     const loadAllTools = async () => {
         const data = await fetchJson<any[]>('/tools');
         setAllTools(data);
     };
-    useEffect(() => { if (activeTab === 'tools') loadAllTools(); }, [activeTab]);
+    const loadAgentInstalledTools = async () => {
+        try {
+            const data = await fetchJson<any[]>('/tools/agent-installed');
+            setAgentInstalledTools(data);
+        } catch { }
+    };
+    useEffect(() => { if (activeTab === 'tools') { loadAllTools(); loadAgentInstalledTools(); } }, [activeTab]);
 
     // ─── Jina API Key
     const [jinaKey, setJinaKey] = useState('');
@@ -929,200 +937,245 @@ export default function EnterpriseSettings() {
                 {/* ── Tools Tab ── */}
                 {activeTab === 'tools' && (
                     <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h3>{t('enterprise.tools.title')}</h3>
-                            <button className="btn btn-primary" onClick={() => setShowAddMCP(true)}>+ MCP Server</button>
+                        {/* Sub-tab pills */}
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
+                            {([['global', '🔧 Global Tools'], ['agent-installed', '🤖 Agent-installed']] as const).map(([key, label]) => (
+                                <button key={key} onClick={() => setToolsView(key as any)} style={{
+                                    padding: '4px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: 'none',
+                                    background: toolsView === key ? 'var(--accent-color)' : 'var(--bg-tertiary)',
+                                    color: toolsView === key ? '#fff' : 'var(--text-secondary)', transition: 'all 0.15s',
+                                }}>{label}</button>
+                            ))}
                         </div>
 
-                        {showAddMCP && (
-                            <div className="card" style={{ padding: '16px', marginBottom: '16px' }}>
-                                <h4 style={{ marginBottom: '12px' }}>MCP Server</h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>{t('enterprise.tools.mcpServerName')}</label>
-                                        <input className="form-input" value={mcpForm.server_name} onChange={e => setMcpForm(p => ({ ...p, server_name: e.target.value }))} placeholder="My MCP Server" />
-                                    </div>
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>MCP Server URL</label>
-                                        <input className="form-input" value={mcpForm.server_url} onChange={e => setMcpForm(p => ({ ...p, server_url: e.target.value }))} placeholder="http://localhost:3000/mcp" />
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <button className="btn btn-secondary" disabled={mcpTesting || !mcpForm.server_url} onClick={async () => {
-                                            setMcpTesting(true); setMcpTestResult(null);
-                                            try {
-                                                const r = await fetchJson<any>('/tools/test-mcp', { method: 'POST', body: JSON.stringify({ server_url: mcpForm.server_url }) });
-                                                setMcpTestResult(r);
-                                            } catch (e: any) { setMcpTestResult({ ok: false, error: e.message }); }
-                                            setMcpTesting(false);
-                                        }}>{mcpTesting ? t('enterprise.tools.testing') : t('enterprise.tools.testConnection')}</button>
-                                        <button className="btn btn-secondary" onClick={() => { setShowAddMCP(false); setMcpTestResult(null); }}>{t('common.cancel')}</button>
-                                    </div>
-                                    {mcpTestResult && (
-                                        <div className="card" style={{ padding: '12px', background: mcpTestResult.ok ? 'rgba(0,200,100,0.1)' : 'rgba(255,0,0,0.1)' }}>
-                                            {mcpTestResult.ok ? (
-                                                <div>
-                                                    <div style={{ color: 'var(--success)', fontWeight: 600, marginBottom: '8px' }}>{t('enterprise.tools.connectionSuccess', { count: mcpTestResult.tools?.length || 0 })}</div>
-                                                    {(mcpTestResult.tools || []).map((tool: any, i: number) => (
-                                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
-                                                            <div>
-                                                                <span style={{ fontWeight: 500, fontSize: '13px' }}>{tool.name}</span>
-                                                                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{tool.description?.slice(0, 80)}</div>
-                                                            </div>
-                                                            <button className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={async () => {
-                                                                await fetchJson('/tools', {
-                                                                    method: 'POST', body: JSON.stringify({
-                                                                        name: `mcp_${tool.name}`,
-                                                                        display_name: tool.name,
-                                                                        description: tool.description || '',
-                                                                        type: 'mcp',
-                                                                        category: 'custom',
-                                                                        icon: '·',
-                                                                        mcp_server_url: mcpForm.server_url,
-                                                                        mcp_server_name: mcpForm.server_name || mcpForm.server_url,
-                                                                        mcp_tool_name: tool.name,
-                                                                        parameters_schema: tool.inputSchema || {},
-                                                                        is_default: false,
-                                                                    })
-                                                                });
-                                                                loadAllTools();
-                                                            }}>{t('enterprise.tools.importAll')}</button>
-                                                        </div>
-                                                    ))}
+                        {/* Agent-Installed Tools */}
+                        {toolsView === 'agent-installed' && (
+                            <div>
+                                <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>Tools installed by agents via <code>import_mcp_server</code>. Deleting removes the tool from that agent.</p>
+                                {agentInstalledTools.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>No agent-installed tools yet.</div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {agentInstalledTools.map((row: any) => (
+                                            <div key={row.agent_tool_id} className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px' }}>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ fontWeight: 500, fontSize: '13px' }}>🔌 {row.tool_display_name}</span>
+                                                        {row.mcp_server_name && <span style={{ fontSize: '10px', background: 'var(--primary)', color: '#fff', borderRadius: '4px', padding: '1px 5px' }}>MCP</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                                                        🤖 {row.installed_by_agent_name || 'Unknown Agent'}
+                                                        {row.installed_at && <span> · {new Date(row.installed_at).toLocaleString()}</span>}
+                                                    </div>
                                                 </div>
-                                            ) : (
-                                                <div style={{ color: 'var(--danger)' }}>{t('enterprise.tools.connectionFailed')}: {mcpTestResult.error}</div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                                                <button className="btn btn-ghost" style={{ color: 'var(--error)', fontSize: '12px' }} onClick={async () => {
+                                                    if (!confirm(`Remove "${row.tool_display_name}" from agent?`)) return;
+                                                    await fetchJson(`/tools/agent-tool/${row.agent_tool_id}`, { method: 'DELETE' });
+                                                    loadAgentInstalledTools();
+                                                }}>🗑️ Delete</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {allTools.map((tool: any) => {
-                                const hasConfig = tool.config_schema?.fields?.length > 0;
-                                const isEditing = editingToolId === tool.id;
-                                return (
-                                    <div key={tool.id} className="card" style={{ padding: '0', overflow: 'hidden' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                                                <span style={{ fontSize: '20px' }}>{tool.icon}</span>
-                                                <div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        <span style={{ fontWeight: 500, fontSize: '13px' }}>{tool.display_name}</span>
-                                                        <span style={{ fontSize: '10px', background: tool.type === 'mcp' ? 'var(--primary)' : 'var(--bg-tertiary)', color: tool.type === 'mcp' ? '#fff' : 'var(--text-secondary)', borderRadius: '4px', padding: '1px 5px' }}>
-                                                            {tool.type === 'mcp' ? 'MCP' : 'Built-in'}
-                                                        </span>
-                                                        {tool.is_default && <span style={{ fontSize: '10px', background: 'rgba(0,200,100,0.15)', color: 'var(--success)', borderRadius: '4px', padding: '1px 5px' }}>Default</span>}
-                                                    </div>
-                                                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                                                        {tool.description?.slice(0, 60)}
-                                                        {tool.mcp_server_name && <span> · {tool.mcp_server_name}</span>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {hasConfig && (
-                                                    <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={async () => {
-                                                        if (isEditing) {
-                                                            setEditingToolId(null);
-                                                        } else {
-                                                            setEditingToolId(tool.id);
-                                                            const cfg = { ...tool.config };
-                                                            // Pre-load jina api_key from system_settings
-                                                            if (tool.name === 'jina_search' || tool.name === 'jina_read') {
-                                                                try {
-                                                                    const token = localStorage.getItem('token');
-                                                                    const res = await fetch('/api/enterprise/system-settings/jina_api_key', { headers: { Authorization: `Bearer ${token}` } });
-                                                                    const d = await res.json();
-                                                                    if (d.value?.api_key) cfg.api_key = d.value.api_key;
-                                                                } catch { }
-                                                            }
-                                                            setEditingConfig(cfg);
-                                                        }
-                                                    }}>{isEditing ? t('enterprise.tools.collapse') : t('enterprise.tools.configure')}</button>
-                                                )}
-                                                {tool.type !== 'builtin' && (
-                                                    <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={async () => {
-                                                        if (!confirm(`${t('common.delete')} ${tool.display_name}?`)) return;
-                                                        await fetchJson(`/tools/${tool.id}`, { method: 'DELETE' });
-                                                        loadAllTools();
-                                                    }}>{t('common.delete')}</button>
-                                                )}
-                                                <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', cursor: 'pointer' }}>
-                                                    <input type="checkbox" checked={tool.enabled} onChange={async (e) => {
-                                                        await fetchJson(`/tools/${tool.id}`, { method: 'PUT', body: JSON.stringify({ enabled: e.target.checked }) });
-                                                        loadAllTools();
-                                                    }} style={{ opacity: 0, width: 0, height: 0 }} />
-                                                    <span style={{ position: 'absolute', inset: 0, background: tool.enabled ? '#22c55e' : 'var(--bg-tertiary)', borderRadius: '11px', transition: 'background 0.2s' }}>
-                                                        <span style={{ position: 'absolute', left: tool.enabled ? '20px' : '2px', top: '2px', width: '18px', height: '18px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s' }} />
-                                                    </span>
-                                                </label>
-                                            </div>
-                                        </div>
+                        {toolsView === 'global' && <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <h3>{t('enterprise.tools.title')}</h3>
+                                <button className="btn btn-primary" onClick={() => setShowAddMCP(true)}>+ MCP Server</button>
+                            </div>
 
-                                        {/* Config editing form */}
-                                        {isEditing && hasConfig && (
-                                            <div style={{ borderTop: '1px solid var(--border-color)', padding: '16px', background: 'var(--bg-secondary)' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                    {(tool.config_schema.fields || []).map((field: any) => {
-                                                        // Check depends_on
-                                                        if (field.depends_on) {
-                                                            const visible = Object.entries(field.depends_on).every(([k, vals]: [string, any]) =>
-                                                                vals.includes(editingConfig[k])
-                                                            );
-                                                            if (!visible) return null;
-                                                        }
-                                                        return (
-                                                            <div key={field.key}>
-                                                                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '4px' }}>{field.label}</label>
-                                                                {field.type === 'select' ? (
-                                                                    <select className="form-input" value={editingConfig[field.key] ?? field.default ?? ''} onChange={e => setEditingConfig(p => ({ ...p, [field.key]: e.target.value }))}>
-                                                                        {(field.options || []).map((opt: any) => (
-                                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                                        ))}
-                                                                    </select>
-                                                                ) : field.type === 'number' ? (
-                                                                    <input type="number" className="form-input" value={editingConfig[field.key] ?? field.default ?? ''} min={field.min} max={field.max}
-                                                                        onChange={e => setEditingConfig(p => ({ ...p, [field.key]: Number(e.target.value) }))} />
-                                                                ) : field.type === 'password' ? (
-                                                                    <input type="password" className="form-input" value={editingConfig[field.key] ?? ''} placeholder={field.placeholder || ''}
-                                                                        onChange={e => setEditingConfig(p => ({ ...p, [field.key]: e.target.value }))} />
-                                                                ) : (
-                                                                    <input type="text" className="form-input" value={editingConfig[field.key] ?? field.default ?? ''} placeholder={field.placeholder || ''}
-                                                                        onChange={e => setEditingConfig(p => ({ ...p, [field.key]: e.target.value }))} />
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                                                        <button className="btn btn-primary" onClick={async () => {
-                                                            if (tool.name === 'jina_search' || tool.name === 'jina_read') {
-                                                                // Save api_key to system_settings (shared by both jina tools)
-                                                                if (editingConfig.api_key) {
-                                                                    const token = localStorage.getItem('token');
-                                                                    await fetch('/api/enterprise/system-settings/jina_api_key', {
-                                                                        method: 'PUT',
-                                                                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                                                                        body: JSON.stringify({ value: { api_key: editingConfig.api_key } }),
+                            {showAddMCP && (
+                                <div className="card" style={{ padding: '16px', marginBottom: '16px' }}>
+                                    <h4 style={{ marginBottom: '12px' }}>MCP Server</h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>{t('enterprise.tools.mcpServerName')}</label>
+                                            <input className="form-input" value={mcpForm.server_name} onChange={e => setMcpForm(p => ({ ...p, server_name: e.target.value }))} placeholder="My MCP Server" />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>MCP Server URL</label>
+                                            <input className="form-input" value={mcpForm.server_url} onChange={e => setMcpForm(p => ({ ...p, server_url: e.target.value }))} placeholder="http://localhost:3000/mcp" />
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button className="btn btn-secondary" disabled={mcpTesting || !mcpForm.server_url} onClick={async () => {
+                                                setMcpTesting(true); setMcpTestResult(null);
+                                                try {
+                                                    const r = await fetchJson<any>('/tools/test-mcp', { method: 'POST', body: JSON.stringify({ server_url: mcpForm.server_url }) });
+                                                    setMcpTestResult(r);
+                                                } catch (e: any) { setMcpTestResult({ ok: false, error: e.message }); }
+                                                setMcpTesting(false);
+                                            }}>{mcpTesting ? t('enterprise.tools.testing') : t('enterprise.tools.testConnection')}</button>
+                                            <button className="btn btn-secondary" onClick={() => { setShowAddMCP(false); setMcpTestResult(null); }}>{t('common.cancel')}</button>
+                                        </div>
+                                        {mcpTestResult && (
+                                            <div className="card" style={{ padding: '12px', background: mcpTestResult.ok ? 'rgba(0,200,100,0.1)' : 'rgba(255,0,0,0.1)' }}>
+                                                {mcpTestResult.ok ? (
+                                                    <div>
+                                                        <div style={{ color: 'var(--success)', fontWeight: 600, marginBottom: '8px' }}>{t('enterprise.tools.connectionSuccess', { count: mcpTestResult.tools?.length || 0 })}</div>
+                                                        {(mcpTestResult.tools || []).map((tool: any, i: number) => (
+                                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                                                <div>
+                                                                    <span style={{ fontWeight: 500, fontSize: '13px' }}>{tool.name}</span>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{tool.description?.slice(0, 80)}</div>
+                                                                </div>
+                                                                <button className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={async () => {
+                                                                    await fetchJson('/tools', {
+                                                                        method: 'POST', body: JSON.stringify({
+                                                                            name: `mcp_${tool.name}`,
+                                                                            display_name: tool.name,
+                                                                            description: tool.description || '',
+                                                                            type: 'mcp',
+                                                                            category: 'custom',
+                                                                            icon: '·',
+                                                                            mcp_server_url: mcpForm.server_url,
+                                                                            mcp_server_name: mcpForm.server_name || mcpForm.server_url,
+                                                                            mcp_tool_name: tool.name,
+                                                                            parameters_schema: tool.inputSchema || {},
+                                                                            is_default: false,
+                                                                        })
                                                                     });
-                                                                }
-                                                            } else {
-                                                                await fetchJson(`/tools/${tool.id}`, { method: 'PUT', body: JSON.stringify({ config: editingConfig }) });
-                                                            }
-                                                            setEditingToolId(null);
-                                                            loadAllTools();
-                                                        }}>{t('enterprise.tools.saveConfig')}</button>
-                                                        <button className="btn btn-secondary" onClick={() => setEditingToolId(null)}>{t('common.cancel')}</button>
+                                                                    loadAllTools();
+                                                                }}>{t('enterprise.tools.importAll')}</button>
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                </div>
+                                                ) : (
+                                                    <div style={{ color: 'var(--danger)' }}>{t('enterprise.tools.connectionFailed')}: {mcpTestResult.error}</div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
-                                );
-                            })}
-                            {allTools.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>{t('common.noData')}。请先启动后端以初始化内置工具。</div>}
-                        </div>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {allTools.map((tool: any) => {
+                                    const hasConfig = tool.config_schema?.fields?.length > 0;
+                                    const isEditing = editingToolId === tool.id;
+                                    return (
+                                        <div key={tool.id} className="card" style={{ padding: '0', overflow: 'hidden' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                                                    <span style={{ fontSize: '20px' }}>{tool.icon}</span>
+                                                    <div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <span style={{ fontWeight: 500, fontSize: '13px' }}>{tool.display_name}</span>
+                                                            <span style={{ fontSize: '10px', background: tool.type === 'mcp' ? 'var(--primary)' : 'var(--bg-tertiary)', color: tool.type === 'mcp' ? '#fff' : 'var(--text-secondary)', borderRadius: '4px', padding: '1px 5px' }}>
+                                                                {tool.type === 'mcp' ? 'MCP' : 'Built-in'}
+                                                            </span>
+                                                            {tool.is_default && <span style={{ fontSize: '10px', background: 'rgba(0,200,100,0.15)', color: 'var(--success)', borderRadius: '4px', padding: '1px 5px' }}>Default</span>}
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                                                            {tool.description?.slice(0, 60)}
+                                                            {tool.mcp_server_name && <span> · {tool.mcp_server_name}</span>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {hasConfig && (
+                                                        <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={async () => {
+                                                            if (isEditing) {
+                                                                setEditingToolId(null);
+                                                            } else {
+                                                                setEditingToolId(tool.id);
+                                                                const cfg = { ...tool.config };
+                                                                // Pre-load jina api_key from system_settings
+                                                                if (tool.name === 'jina_search' || tool.name === 'jina_read') {
+                                                                    try {
+                                                                        const token = localStorage.getItem('token');
+                                                                        const res = await fetch('/api/enterprise/system-settings/jina_api_key', { headers: { Authorization: `Bearer ${token}` } });
+                                                                        const d = await res.json();
+                                                                        if (d.value?.api_key) cfg.api_key = d.value.api_key;
+                                                                    } catch { }
+                                                                }
+                                                                setEditingConfig(cfg);
+                                                            }
+                                                        }}>{isEditing ? t('enterprise.tools.collapse') : t('enterprise.tools.configure')}</button>
+                                                    )}
+                                                    {tool.type !== 'builtin' && (
+                                                        <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={async () => {
+                                                            if (!confirm(`${t('common.delete')} ${tool.display_name}?`)) return;
+                                                            await fetchJson(`/tools/${tool.id}`, { method: 'DELETE' });
+                                                            loadAllTools();
+                                                        }}>{t('common.delete')}</button>
+                                                    )}
+                                                    <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', cursor: 'pointer' }}>
+                                                        <input type="checkbox" checked={tool.enabled} onChange={async (e) => {
+                                                            await fetchJson(`/tools/${tool.id}`, { method: 'PUT', body: JSON.stringify({ enabled: e.target.checked }) });
+                                                            loadAllTools();
+                                                        }} style={{ opacity: 0, width: 0, height: 0 }} />
+                                                        <span style={{ position: 'absolute', inset: 0, background: tool.enabled ? '#22c55e' : 'var(--bg-tertiary)', borderRadius: '11px', transition: 'background 0.2s' }}>
+                                                            <span style={{ position: 'absolute', left: tool.enabled ? '20px' : '2px', top: '2px', width: '18px', height: '18px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s' }} />
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            {/* Config editing form */}
+                                            {isEditing && hasConfig && (
+                                                <div style={{ borderTop: '1px solid var(--border-color)', padding: '16px', background: 'var(--bg-secondary)' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                        {(tool.config_schema.fields || []).map((field: any) => {
+                                                            // Check depends_on
+                                                            if (field.depends_on) {
+                                                                const visible = Object.entries(field.depends_on).every(([k, vals]: [string, any]) =>
+                                                                    vals.includes(editingConfig[k])
+                                                                );
+                                                                if (!visible) return null;
+                                                            }
+                                                            return (
+                                                                <div key={field.key}>
+                                                                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '4px' }}>{field.label}</label>
+                                                                    {field.type === 'select' ? (
+                                                                        <select className="form-input" value={editingConfig[field.key] ?? field.default ?? ''} onChange={e => setEditingConfig(p => ({ ...p, [field.key]: e.target.value }))}>
+                                                                            {(field.options || []).map((opt: any) => (
+                                                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    ) : field.type === 'number' ? (
+                                                                        <input type="number" className="form-input" value={editingConfig[field.key] ?? field.default ?? ''} min={field.min} max={field.max}
+                                                                            onChange={e => setEditingConfig(p => ({ ...p, [field.key]: Number(e.target.value) }))} />
+                                                                    ) : field.type === 'password' ? (
+                                                                        <input type="password" className="form-input" value={editingConfig[field.key] ?? ''} placeholder={field.placeholder || ''}
+                                                                            onChange={e => setEditingConfig(p => ({ ...p, [field.key]: e.target.value }))} />
+                                                                    ) : (
+                                                                        <input type="text" className="form-input" value={editingConfig[field.key] ?? field.default ?? ''} placeholder={field.placeholder || ''}
+                                                                            onChange={e => setEditingConfig(p => ({ ...p, [field.key]: e.target.value }))} />
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                                            <button className="btn btn-primary" onClick={async () => {
+                                                                if (tool.name === 'jina_search' || tool.name === 'jina_read') {
+                                                                    // Save api_key to system_settings (shared by both jina tools)
+                                                                    if (editingConfig.api_key) {
+                                                                        const token = localStorage.getItem('token');
+                                                                        await fetch('/api/enterprise/system-settings/jina_api_key', {
+                                                                            method: 'PUT',
+                                                                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                                                            body: JSON.stringify({ value: { api_key: editingConfig.api_key } }),
+                                                                        });
+                                                                    }
+                                                                } else {
+                                                                    await fetchJson(`/tools/${tool.id}`, { method: 'PUT', body: JSON.stringify({ config: editingConfig }) });
+                                                                }
+                                                                setEditingToolId(null);
+                                                                loadAllTools();
+                                                            }}>{t('enterprise.tools.saveConfig')}</button>
+                                                            <button className="btn btn-secondary" onClick={() => setEditingToolId(null)}>{t('common.cancel')}</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                {allTools.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>{t('common.noData')}。请先启动后端以初始化内置工具。</div>}
+                            </div>
+                        </>}
                     </div>
                 )}
 

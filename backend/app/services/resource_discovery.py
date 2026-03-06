@@ -285,8 +285,8 @@ async def import_mcp_from_smithery(
                         )
                     )
                     if not agent_check.scalar_one_or_none():
-                        db.add(AgentTool(agent_id=agent_id, tool_id=existing_tool.id, enabled=True))
-                    continue
+                        db.add(AgentTool(agent_id=agent_id, tool_id=existing_tool.id, enabled=True,
+                                         source="user_installed", installed_by_agent_id=agent_id))
 
                 tool = Tool(
                     name=tool_name,
@@ -306,7 +306,8 @@ async def import_mcp_from_smithery(
                 await db.flush()
 
                 # Assign to requesting agent
-                db.add(AgentTool(agent_id=agent_id, tool_id=tool.id, enabled=True))
+                db.add(AgentTool(agent_id=agent_id, tool_id=tool.id, enabled=True,
+                                 source="user_installed", installed_by_agent_id=agent_id))
                 imported_tools.append(f"✅ {tool_display}")
         else:
             # Create a single generic tool entry for the server
@@ -326,8 +327,8 @@ async def import_mcp_from_smithery(
                         )
                     )
                     if not agent_check.scalar_one_or_none():
-                        db.add(AgentTool(agent_id=agent_id, tool_id=existing_tool.id, enabled=True))
-                    await db.commit()
+                        db.add(AgentTool(agent_id=agent_id, tool_id=existing_tool.id, enabled=True,
+                                         source="user_installed", installed_by_agent_id=agent_id))
                     return f"🔄 {tool_display} config updated. The tool is now ready to use."
                 else:
                     return f"⏭️ {tool_display} is already imported."
@@ -347,7 +348,8 @@ async def import_mcp_from_smithery(
             )
             db.add(tool)
             await db.flush()
-            db.add(AgentTool(agent_id=agent_id, tool_id=tool.id, enabled=True))
+            db.add(AgentTool(agent_id=agent_id, tool_id=tool.id, enabled=True,
+                             source="user_installed", installed_by_agent_id=agent_id))
             imported_tools.append(f"✅ {tool_display} (tools couldn't be listed — server may need configuration)")
 
         await db.commit()

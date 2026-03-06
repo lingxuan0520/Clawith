@@ -556,7 +556,7 @@ async def execute_tool(
             result = await _import_mcp_server(agent_id, arguments)
         else:
             # Try MCP tool execution
-            result = await _execute_mcp_tool(tool_name, arguments)
+            result = await _execute_mcp_tool(tool_name, arguments, agent_id=agent_id)
 
         # Log tool call activity (skip noisy read operations)
         if tool_name not in ("list_files", "read_file", "read_document"):
@@ -828,15 +828,26 @@ async def _search_bing(query: str, api_key: str, max_results: int, language: str
     return f'🔍 Bing search for "{query}" ({len(results)} items):\n\n' + "\n\n---\n\n".join(results)
 
 
-async def _execute_mcp_tool(tool_name: str, arguments: dict) -> str:
+async def _execute_mcp_tool(tool_name: str, arguments: dict, agent_id=None) -> str:
     """Execute a tool via MCP if it exists in the DB as an MCP tool."""
     try:
-        from app.models.tool import Tool
+        from app.models.tool import Tool, AgentTool
         from app.services.mcp_client import MCPClient
 
         async with async_session() as db:
             result = await db.execute(select(Tool).where(Tool.name == tool_name, Tool.type == "mcp"))
             tool = result.scalar_one_or_none()
+            # Load per-agent config override
+            agent_config = {}
+            if tool and agent_id:
+                at_r = await db.execute(
+                    select(AgentTool).where(
+                        AgentTool.agent_id == agent_id,
+                        AgentTool.tool_id == tool.id,
+                    )
+                )
+                at = at_r.scalar_one_or_none()
+                agent_config = (at.config or {}) if at else {}
 
         if not tool:
             return f"Unknown tool: {tool_name}"
@@ -844,7 +855,22 @@ async def _execute_mcp_tool(tool_name: str, arguments: dict) -> str:
         if not tool.mcp_server_url:
             return f"❌ MCP tool {tool_name} has no server URL configured"
 
-        client = MCPClient(tool.mcp_server_url)
+        # Merge global config + agent override
+        merged_config = {**(tool.config or {}), **agent_config}
+
+        # Rebuild MCP URL with merged config if needed
+        mcp_url = tool.mcp_server_url
+        if merged_config and "apiKey" in mcp_url:
+            import json, base64, urllib.parse
+            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+            parsed = urlparse(mcp_url)
+            qs = parse_qs(parsed.query, keep_blank_values=True)
+            config_b64 = base64.b64encode(json.dumps(merged_config).encode()).decode()
+            qs["config"] = [urllib.parse.quote(config_b64)]
+            new_query = urlencode({k: v[0] for k, v in qs.items()})
+            mcp_url = urlunparse(parsed._replace(query=new_query))
+
+        client = MCPClient(mcp_url)
         mcp_name = tool.mcp_tool_name or tool_name
         return await client.call_tool(mcp_name, arguments)
 

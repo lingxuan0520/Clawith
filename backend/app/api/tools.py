@@ -228,3 +228,151 @@ async def test_mcp_connection(
         return {"ok": True, "tools": tools}
     except Exception as e:
         return {"ok": False, "error": str(e)[:300]}
+
+
+# ─── Agent-installed Tools Management (admin) ───────────────
+
+@router.get("/agent-installed")
+async def list_agent_installed_tools(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin endpoint: list all user-installed (per-agent) tools with source agent info."""
+    from app.models.agent import Agent
+    result = await db.execute(
+        select(AgentTool, Tool, Agent)
+        .join(Tool, AgentTool.tool_id == Tool.id)
+        .outerjoin(Agent, AgentTool.installed_by_agent_id == Agent.id)
+        .where(AgentTool.source == "user_installed")
+        .order_by(AgentTool.created_at.desc())
+    )
+    rows = result.all()
+    return [
+        {
+            "agent_tool_id": str(at.id),
+            "agent_id": str(at.agent_id),
+            "tool_id": str(t.id),
+            "tool_name": t.name,
+            "tool_display_name": t.display_name,
+            "mcp_server_name": t.mcp_server_name,
+            "installed_by_agent_id": str(at.installed_by_agent_id) if at.installed_by_agent_id else None,
+            "installed_by_agent_name": a.name if a else None,
+            "enabled": at.enabled,
+            "installed_at": at.created_at.isoformat() if at.created_at else None,
+        }
+        for at, t, a in rows
+    ]
+
+
+@router.delete("/agent-tool/{agent_tool_id}")
+async def delete_agent_tool(
+    agent_tool_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin: remove an agent-tool assignment. Also deletes the tool record if no other agents use it."""
+    at_r = await db.execute(select(AgentTool).where(AgentTool.id == agent_tool_id))
+    at = at_r.scalar_one_or_none()
+    if not at:
+        raise HTTPException(status_code=404, detail="Agent tool assignment not found")
+    tool_id = at.tool_id
+    await db.delete(at)
+    await db.flush()
+    # If no other agent uses this tool, delete the tool record too (for MCP tools)
+    remaining_r = await db.execute(select(AgentTool).where(AgentTool.tool_id == tool_id).limit(1))
+    if not remaining_r.scalar_one_or_none():
+        tool_r = await db.execute(select(Tool).where(Tool.id == tool_id))
+        tool = tool_r.scalar_one_or_none()
+        if tool and tool.type == "mcp":
+            await db.delete(tool)
+    await db.commit()
+    return {"ok": True}
+
+
+# ─── Per-Agent Tool Config ───────────────────────────────────
+
+class AgentToolConfigUpdate(BaseModel):
+    config: dict
+
+
+@router.get("/agents/{agent_id}/tool-config/{tool_id}")
+async def get_agent_tool_config(
+    agent_id: uuid.UUID,
+    tool_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get merged tool config (global defaults + agent overrides) and config_schema."""
+    tool_r = await db.execute(select(Tool).where(Tool.id == tool_id))
+    tool = tool_r.scalar_one_or_none()
+    if not tool:
+        raise HTTPException(status_code=404, detail="Tool not found")
+    at_r = await db.execute(
+        select(AgentTool).where(AgentTool.agent_id == agent_id, AgentTool.tool_id == tool_id)
+    )
+    at = at_r.scalar_one_or_none()
+    agent_config = at.config if at else {}
+    merged = {**(tool.config or {}), **(agent_config or {})}
+    return {
+        "global_config": tool.config or {},
+        "agent_config": agent_config or {},
+        "merged_config": merged,
+        "config_schema": tool.config_schema or {},
+    }
+
+
+@router.put("/agents/{agent_id}/tool-config/{tool_id}")
+async def update_agent_tool_config(
+    agent_id: uuid.UUID,
+    tool_id: uuid.UUID,
+    data: AgentToolConfigUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save per-agent config override for a tool."""
+    at_r = await db.execute(
+        select(AgentTool).where(AgentTool.agent_id == agent_id, AgentTool.tool_id == tool_id)
+    )
+    at = at_r.scalar_one_or_none()
+    if at:
+        at.config = data.config
+    else:
+        # Create assignment if not exists
+        db.add(AgentTool(agent_id=agent_id, tool_id=tool_id, enabled=True, config=data.config))
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/agents/{agent_id}/with-config")
+async def get_agent_tools_with_config(
+    agent_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get agent's enabled tools with per-agent config info and config_schema for settings UI."""
+    all_tools_r = await db.execute(select(Tool).where(Tool.enabled == True).order_by(Tool.category, Tool.name))
+    all_tools = all_tools_r.scalars().all()
+    agent_tools_r = await db.execute(select(AgentTool).where(AgentTool.agent_id == agent_id))
+    assignments = {str(at.tool_id): at for at in agent_tools_r.scalars().all()}
+
+    result = []
+    for t in all_tools:
+        tid = str(t.id)
+        at = assignments.get(tid)
+        enabled = at.enabled if at else t.is_default
+        if not enabled:
+            continue
+        result.append({
+            "id": tid,
+            "name": t.name,
+            "display_name": t.display_name,
+            "description": t.description,
+            "type": t.type,
+            "category": t.category,
+            "icon": t.icon,
+            "config_schema": t.config_schema or {},
+            "global_config": t.config or {},
+            "agent_config": (at.config if at else {}) or {},
+            "source": at.source if at else "system",
+        })
+    return result
