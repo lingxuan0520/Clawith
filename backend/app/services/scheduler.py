@@ -78,6 +78,9 @@ async def _execute_schedule(schedule_id: uuid.UUID, agent_id: uuid.UUID, instruc
             base_url = get_provider_base_url(model.provider, model.base_url)
 
             url = f"{base_url.rstrip('/')}/chat/completions"
+            # Normalize: strip /chat/completions if already included in base_url
+            if base_url.rstrip('/').endswith('/chat/completions'):
+                url = base_url.rstrip('/')
             api_key = model.api_key_encrypted
             from app.services.agent_tools import execute_tool, get_agent_tools_for_llm
 
@@ -91,13 +94,16 @@ async def _execute_schedule(schedule_id: uuid.UUID, agent_id: uuid.UUID, instruc
                     "messages": messages,
                     "temperature": 0.7,
                     "max_tokens": 2048,
-                    "tools": tools_for_llm,
+                    "tools": tools_for_llm if tools_for_llm else None,
                     **get_tool_params(model.provider),
                 }
+                if not payload.get("tools"):
+                    payload.pop("tools", None)
 
                 payload_str = _json.dumps(payload, ensure_ascii=False)
                 proc = await asyncio.create_subprocess_exec(
-                    "curl", "-s", "-X", "POST", url,
+                    "curl", "-s", "--max-time", "120",
+                    "-X", "POST", url,
                     "-H", f"Authorization: Bearer {api_key}",
                     "-H", "Content-Type: application/json",
                     "-d", payload_str,
@@ -105,7 +111,18 @@ async def _execute_schedule(schedule_id: uuid.UUID, agent_id: uuid.UUID, instruc
                     stderr=asyncio.subprocess.PIPE,
                 )
                 stdout, _ = await proc.communicate()
-                resp = _json.loads(stdout.decode())
+
+                stdout_text = stdout.decode().strip() if stdout else ""
+                if not stdout_text:
+                    logger.warning(f"Schedule {schedule_id}: LLM returned empty response")
+                    reply = "(LLM 返回空响应)"
+                    break
+
+                resp = _json.loads(stdout_text)
+                if not isinstance(resp, dict):
+                    logger.warning(f"Schedule {schedule_id}: LLM returned non-dict: {stdout_text[:200]}")
+                    reply = f"(LLM 返回异常: {stdout_text[:100]})"
+                    break
 
                 choice = resp.get("choices", [{}])[0]
                 msg = choice.get("message", {})
