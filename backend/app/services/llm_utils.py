@@ -30,7 +30,7 @@ def get_provider_base_url(provider: str, custom_base_url: str | None = None) -> 
     """
     if custom_base_url:
         return custom_base_url
-    return PROVIDER_URLS.get(provider, "https://api.openai.com/v1")
+    return PROVIDER_URLS.get(provider.lower(), "https://api.openai.com/v1")
 
 
 def get_tool_params(provider: str) -> dict:
@@ -39,7 +39,7 @@ def get_tool_params(provider: str) -> dict:
     Qwen and OpenAI support `tool_choice` and `parallel_tool_calls`.
     Anthropic uses a different tool calling format, so we skip these params.
     """
-    if provider in _TOOL_CHOICE_PROVIDERS:
+    if provider.lower() in _TOOL_CHOICE_PROVIDERS:
         return {
             "tool_choice": "auto",
             "parallel_tool_calls": True,
@@ -53,6 +53,7 @@ _MAX_TOKENS_BY_PROVIDER: dict[str, int] = {
     "qwen": 8192,       # conservative default; qwen-max hard limit
     "anthropic": 4096,  # claude native max output
     "minimax": 16384,   # MiniMax-M2.5 supports large output
+    "deepseek": 8192,   # deepseek API hard limit
 }
 # Model-level overrides (model string prefix → limit)
 _MAX_TOKENS_BY_MODEL: dict[str, int] = {
@@ -75,5 +76,5 @@ def get_max_tokens(provider: str, model: str | None = None) -> int:
             if model.lower().startswith(prefix):
                 return limit
     # Fall back to provider-level default, otherwise use 16384
-    return _MAX_TOKENS_BY_PROVIDER.get(provider, 16384)
+    return _MAX_TOKENS_BY_PROVIDER.get(provider.lower(), 16384)
 
