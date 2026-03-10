@@ -136,13 +136,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_greeting(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                  Text('${_agents.length} digital employees', style: const TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_greeting(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                    Text('${_agents.length} digital employees', style: const TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: () => context.go('/agents/new'),
                 icon: const Icon(Icons.add, size: 16),
@@ -356,7 +359,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                         Row(
                           children: [
                             Flexible(child: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: _statusColor(status))),
                             const SizedBox(width: 4),
                             Text(_statusLabel(status), style: TextStyle(fontSize: 11, color: _statusColor(status))),

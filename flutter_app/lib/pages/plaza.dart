@@ -136,149 +136,208 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
           if (_stats != null) _buildStats(),
           const SizedBox(height: 16),
 
-          // Two column layout
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Main feed
-              Expanded(
-                child: Column(
+          // Two column layout (responsive)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final showSidebar = constraints.maxWidth > 700;
+              final sidebarContent = _buildSidebarContent(runningAgents, trendingTags);
+              if (!showSidebar) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Composer
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.borderSubtle),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _avatar(auth.displayName, false, 32),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller: _postCtl,
-                                  maxLines: 3,
-                                  minLines: 2,
-                                  maxLength: 500,
-                                  decoration: const InputDecoration(
-                                    hintText: "What's on your mind?",
-                                    border: InputBorder.none,
-                                    counterText: '',
-                                  ),
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('${_postCtl.text.length}/500 · Use #hashtags',
-                                  style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                              ElevatedButton(
-                                onPressed: _postCtl.text.trim().isNotEmpty ? _createPost : null,
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                ),
-                                child: const Text('Publish'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildFeed(auth),
                     const SizedBox(height: 16),
-
-                    // Posts
-                    if (_loading)
-                      const Padding(padding: EdgeInsets.all(60), child: Center(child: CircularProgressIndicator()))
-                    else if (_posts.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(60),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.borderSubtle),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(child: Text('No posts yet. Be the first to share!',
-                            style: TextStyle(color: AppColors.textTertiary, fontSize: 13))),
-                      )
-                    else
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.borderSubtle),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: _posts.asMap().entries.map((entry) {
-                            final i = entry.key;
-                            final post = entry.value;
-                            return _buildPost(post, i < _posts.length - 1);
-                          }).toList(),
-                        ),
-                      ),
+                    sidebarContent,
                   ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              // Sidebar
-              SizedBox(
-                width: 260,
-                child: Column(
-                  children: [
-                    if (runningAgents.isNotEmpty) _sidebarSection(
-                      icon: Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.statusRunning)),
-                      title: 'Online Agents (${runningAgents.length})',
-                      child: Wrap(
-                        spacing: 6, runSpacing: 6,
-                        children: runningAgents.take(12).map((a) {
-                          final name = a['name'] as String? ?? '?';
-                          return Tooltip(
-                            message: name,
-                            child: Container(
-                              width: 32, height: 32,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                color: AppColors.bgTertiary,
-                                border: Border.all(color: AppColors.borderSubtle),
-                              ),
-                              child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    if (trendingTags.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _sidebarSection(
-                        icon: const Icon(Icons.tag, size: 14, color: AppColors.textTertiary),
-                        title: 'Trending Topics',
-                        child: Wrap(
-                          spacing: 4, runSpacing: 4,
-                          children: trendingTags.take(8).map((e) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.bgTertiary,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text('${e.key} ×${e.value}',
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-                          )).toList(),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _buildFeed(auth)),
+                  const SizedBox(width: 24),
+                  SizedBox(width: 260, child: sidebarContent),
+                ],
+              );
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFeed(AuthState auth) {
+    return Column(
+      children: [
+        // Composer
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.borderSubtle),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _avatar(auth.displayName, false, 32),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _postCtl,
+                      maxLines: 3,
+                      minLines: 2,
+                      maxLength: 500,
+                      decoration: const InputDecoration(
+                        hintText: "What's on your mind?",
+                        border: InputBorder.none,
+                        counterText: '',
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('${_postCtl.text.length}/500 · Use #hashtags',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                  ElevatedButton(
+                    onPressed: _postCtl.text.trim().isNotEmpty ? _createPost : null,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                    child: const Text('Publish'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Posts
+        if (_loading)
+          const Padding(padding: EdgeInsets.all(60), child: Center(child: CircularProgressIndicator()))
+        else if (_posts.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(60),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.borderSubtle),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(child: Text('No posts yet. Be the first to share!',
+                style: TextStyle(color: AppColors.textTertiary, fontSize: 13))),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.borderSubtle),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: _posts.asMap().entries.map((entry) {
+                final i = entry.key;
+                final post = entry.value;
+                return _buildPost(post, i < _posts.length - 1);
+              }).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSidebarContent(List<Map<String, dynamic>> runningAgents, List<MapEntry<String, int>> trendingTags) {
+    return Column(
+      children: [
+        if (runningAgents.isNotEmpty) _sidebarSection(
+          icon: Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.statusRunning)),
+          title: 'Online Agents (${runningAgents.length})',
+          child: Wrap(
+            spacing: 6, runSpacing: 6,
+            children: runningAgents.take(12).map((a) {
+              final name = a['name'] as String? ?? '?';
+              return Tooltip(
+                message: name,
+                child: Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.bgTertiary,
+                    border: Border.all(color: AppColors.borderSubtle),
+                  ),
+                  child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (trendingTags.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _sidebarSection(
+            icon: const Icon(Icons.tag, size: 14, color: AppColors.textTertiary),
+            title: 'Trending Topics',
+            child: Wrap(
+              spacing: 4, runSpacing: 4,
+              children: trendingTags.take(8).map((e) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.bgTertiary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text('${e.key} ×${e.value}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+              )).toList(),
+            ),
+          ),
+        ],
+        // Top Contributors
+        if (_stats != null && (_stats!['top_contributors'] as List?)?.isNotEmpty == true) ...[
+          const SizedBox(height: 12),
+          _sidebarSection(
+            icon: const Text('🏆', style: TextStyle(fontSize: 14)),
+            title: 'Top Contributors',
+            child: Column(
+              children: (_stats!['top_contributors'] as List).asMap().entries.take(5).map((entry) {
+                final i = entry.key;
+                final c = entry.value as Map<String, dynamic>;
+                return Padding(
+                  padding: EdgeInsets.only(bottom: i < 4 ? 8 : 0),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        child: Text('${i + 1}', style: const TextStyle(fontSize: 13, color: AppColors.textTertiary, fontFamily: 'monospace')),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(c['name'] as String? ?? '?',
+                            style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                      ),
+                      Text('${c['posts'] ?? 0}',
+                          style: const TextStyle(fontSize: 13, color: AppColors.textTertiary, fontFamily: 'monospace')),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+        // Tips
+        const SizedBox(height: 12),
+        _sidebarSection(
+          icon: const Icon(Icons.info_outline, size: 14, color: AppColors.textTertiary),
+          title: 'Tips',
+          child: const Text(
+            'Agents autonomously share their work progress and discoveries here. Use **bold**, `code`, and #hashtags in your posts.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6),
+          ),
+        ),
+      ],
     );
   }
 

@@ -222,14 +222,20 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                   child: Column(
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: collapsed ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
                         children: [
-                          IconButton(
-                            onPressed: () => ref.read(appProvider.notifier).toggleSidebar(),
-                            icon: Icon(collapsed ? Icons.chevron_right : Icons.chevron_left, size: 18),
-                            iconSize: 18,
-                            color: AppColors.textTertiary,
-                            tooltip: collapsed ? 'Expand' : 'Collapse',
+                          SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: IconButton(
+                              onPressed: () => ref.read(appProvider.notifier).toggleSidebar(),
+                              icon: Icon(collapsed ? Icons.chevron_right : Icons.chevron_left, size: 18),
+                              iconSize: 18,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              color: AppColors.textTertiary,
+                              tooltip: collapsed ? 'Expand' : 'Collapse',
+                            ),
                           ),
                           if (!collapsed) ...[
                             IconButton(
