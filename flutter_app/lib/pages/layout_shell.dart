@@ -82,10 +82,10 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
-                    const Text('🐾', style: TextStyle(fontSize: 20)),
+                    const Text('🚢', style: TextStyle(fontSize: 20)),
                     const SizedBox(width: 10),
                     const Expanded(
-                      child: Text('Clawith', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      child: Text('Soloship', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                     ),
                     IconButton(
                       onPressed: () => _scaffoldKey.currentState?.closeDrawer(),
