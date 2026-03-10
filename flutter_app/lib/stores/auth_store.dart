@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api.dart';
@@ -63,6 +64,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
+    // Also sign out from Firebase
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
     state = const AuthState();
   }
 

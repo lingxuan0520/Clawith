@@ -1,6 +1,10 @@
+import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../stores/auth_store.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
@@ -12,77 +16,87 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  bool _isRegister = false;
   bool _loading = false;
   String _error = '';
-  bool _invitationRequired = false;
-  List<Map<String, dynamic>> _tenants = [];
-
-  final _usernameCtl = TextEditingController();
-  final _passwordCtl = TextEditingController();
-  final _emailCtl = TextEditingController();
-  final _invitationCtl = TextEditingController();
-  String _selectedTenantId = '';
+  bool _googleInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _loadConfig();
+    _initGoogleSignIn();
   }
 
-  Future<void> _loadConfig() async {
+  Future<void> _initGoogleSignIn() async {
     try {
-      final config = await ApiService.instance.getRegistrationConfig();
-      setState(() => _invitationRequired = config['invitation_code_required'] == true);
+      await GoogleSignIn.instance.initialize();
+      _googleInitialized = true;
     } catch (_) {}
   }
 
-  Future<void> _loadTenants() async {
-    if (_tenants.isNotEmpty) return;
-    try {
-      final data = await ApiService.instance.listPublicTenants();
-      final tenants = data.cast<Map<String, dynamic>>();
-      setState(() {
-        _tenants = tenants;
-        if (tenants.isNotEmpty && _selectedTenantId.isEmpty) {
-          _selectedTenantId = tenants.first['id'] as String;
-        }
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _submit() async {
+  Future<void> _signInWithGoogle() async {
     setState(() { _error = ''; _loading = true; });
     try {
-      Map<String, dynamic> res;
-      if (_isRegister) {
-        final data = {
-          'username': _usernameCtl.text,
-          'password': _passwordCtl.text,
-          'email': _emailCtl.text,
-          'display_name': _usernameCtl.text,
-          'tenant_id': _selectedTenantId,
-        };
-        if (_invitationRequired && _invitationCtl.text.isNotEmpty) {
-          data['invitation_code'] = _invitationCtl.text;
-        }
-        res = await ApiService.instance.register(data);
-      } else {
-        res = await ApiService.instance.login(_usernameCtl.text, _passwordCtl.text);
+      if (!_googleInitialized) {
+        await GoogleSignIn.instance.initialize();
+        _googleInitialized = true;
       }
-      final user = res['user'] as Map<String, dynamic>;
-      final token = res['access_token'] as String;
-      await ref.read(authProvider.notifier).setAuth(user, token);
-      if (mounted) context.go('/plaza');
+      final googleAccount = await GoogleSignIn.instance.authenticate();
+      final idToken = googleAccount.authentication.idToken;
+      if (idToken == null) throw Exception('Google did not return an ID token');
+
+      final credential = GoogleAuthProvider.credential(idToken: idToken);
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final firebaseIdToken = await userCredential.user!.getIdToken();
+      await _exchangeToken(firebaseIdToken!);
     } catch (e) {
+      if (e.toString().contains('canceled') || e.toString().contains('sign_in_canceled')) {
+        setState(() => _loading = false);
+        return;
+      }
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _signInWithApple() async {
+    setState(() { _error = ''; _loading = true; });
+    try {
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+      final oauthCredential = OAuthProvider("apple.com").credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+      final firebaseIdToken = await userCredential.user!.getIdToken();
+      await _exchangeToken(firebaseIdToken!);
+    } catch (e) {
+      if (e.toString().contains('canceled') || e.toString().contains('AuthorizationCanceled')) {
+        setState(() => _loading = false);
+        return;
+      }
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _exchangeToken(String idToken) async {
+    final res = await ApiService.instance.loginWithFirebase(idToken);
+    final user = res['user'] as Map<String, dynamic>;
+    final token = res['access_token'] as String;
+    await ref.read(authProvider.notifier).setAuth(user, token);
+    if (mounted) context.go('/plaza');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isIOS = Platform.isIOS || Platform.isMacOS;
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       body: LayoutBuilder(
@@ -118,25 +132,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              const Text('Open Source · Multi-Agent Collaboration',
+                              const Text('Your personal AI company',
                                   style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
                         const SizedBox(height: 32),
-                        const Text('Clawith',
+                        const Text('Soloship',
                             style: TextStyle(fontSize: 48, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -1)),
-                        const Text('OpenClaw for Teams',
+                        const Text('Run a company of one',
                             style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                         const SizedBox(height: 16),
-                        const Text('OpenClaw empowers individuals.\nClawith scales it to frontier organizations.',
+                        const Text('AI employees who work for you,\n24/7, no payroll needed.',
                             style: TextStyle(fontSize: 15, color: AppColors.textTertiary, height: 1.6)),
                         const SizedBox(height: 40),
-                        _heroFeature('🤖', 'Multi-Agent Crew', 'Agents collaborate autonomously'),
+                        _heroFeature('🤖', 'AI Employees', 'Hire, configure, and deploy AI workers'),
                         const SizedBox(height: 16),
-                        _heroFeature('🧠', 'Persistent Memory', 'Soul, memory, and self-evolution'),
+                        _heroFeature('🧠', 'Persistent Memory', 'They learn, remember, and grow'),
                         const SizedBox(height: 16),
-                        _heroFeature('🏛️', 'Agent Plaza', 'Social feed for inter-agent interaction'),
+                        _heroFeature('🚀', 'Solo Operator', 'Scale your one-person company'),
                       ],
                     ),
                   ),
@@ -150,24 +164,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(40),
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 380),
+                        constraints: const BoxConstraints(maxWidth: 360),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Row(
+                            const Row(
                               children: [
-                                const Text('🐾', style: TextStyle(fontSize: 24)),
-                                const SizedBox(width: 8),
-                                const Text('Clawith', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                Text('🚢', style: TextStyle(fontSize: 24)),
+                                SizedBox(width: 8),
+                                Text('Soloship', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                               ],
                             ),
-                            const SizedBox(height: 24),
-                            Text(_isRegister ? 'Register' : 'Login',
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            const SizedBox(height: 32),
+                            const Text('Welcome aboard',
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                             const SizedBox(height: 4),
-                            Text(_isRegister ? 'Create your account to get started.' : 'Welcome back. Sign in to continue.',
-                                style: const TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                            const SizedBox(height: 24),
+                            const Text('Sign in to manage your AI crew.',
+                                style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                            const SizedBox(height: 32),
                             if (_error.isNotEmpty)
                               Container(
                                 padding: const EdgeInsets.all(12),
@@ -179,87 +193,43 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 ),
                                 child: Text('⚠ $_error', style: const TextStyle(color: AppColors.error, fontSize: 13)),
                               ),
-                            // Username
-                            const Text('Username', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: _usernameCtl,
-                              decoration: const InputDecoration(hintText: 'Enter username'),
-                              autofocus: true,
-                              onSubmitted: (_) => _submit(),
+                            // Google Sign-in
+                            _SignInButton(
+                              onTap: _loading ? null : _signInWithGoogle,
+                              loading: _loading,
+                              icon: _GoogleIcon(),
+                              label: 'Continue with Google',
                             ),
-                            const SizedBox(height: 16),
-                            if (_isRegister) ...[
-                              const Text('Email', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                              const SizedBox(height: 4),
-                              TextField(
-                                controller: _emailCtl,
-                                decoration: const InputDecoration(hintText: 'you@example.com'),
-                                keyboardType: TextInputType.emailAddress,
+                            // Apple Sign-in (only on iOS/macOS)
+                            if (isIOS) ...[
+                              const SizedBox(height: 12),
+                              _SignInButton(
+                                onTap: _loading ? null : _signInWithApple,
+                                loading: false,
+                                icon: const Icon(Icons.apple, size: 20, color: AppColors.textPrimary),
+                                label: 'Continue with Apple',
                               ),
-                              const SizedBox(height: 16),
-                              const Text('Company', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                              const SizedBox(height: 4),
-                              DropdownButtonFormField<String>(
-                                value: _selectedTenantId.isEmpty ? null : _selectedTenantId,
-                                items: _tenants.map((t) => DropdownMenuItem(
-                                  value: t['id'] as String,
-                                  child: Text(t['name'] as String, style: const TextStyle(fontSize: 13)),
-                                )).toList(),
-                                onChanged: (v) => setState(() => _selectedTenantId = v ?? ''),
-                                decoration: const InputDecoration(hintText: '— Select a company —'),
-                                dropdownColor: AppColors.bgElevated,
-                              ),
-                              const SizedBox(height: 16),
-                              if (_invitationRequired) ...[
-                                const Text('Invitation Code', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                                const SizedBox(height: 4),
-                                TextField(
-                                  controller: _invitationCtl,
-                                  decoration: const InputDecoration(hintText: 'Enter invitation code'),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Token consumption is significant, so invitation codes are required.',
-                                  style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
-                                ),
-                                const SizedBox(height: 16),
-                              ],
                             ],
-                            const Text('Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: _passwordCtl,
-                              decoration: const InputDecoration(hintText: 'Enter password'),
-                              obscureText: true,
-                              onSubmitted: (_) => _submit(),
-                            ),
                             const SizedBox(height: 24),
-                            SizedBox(
-                              height: 44,
-                              child: ElevatedButton(
-                                onPressed: _loading ? null : _submit,
-                                child: _loading
-                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                    : Text(_isRegister ? 'Register →' : 'Login →'),
-                              ),
+                            const Row(
+                              children: [
+                                Expanded(child: Divider()),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text('Secure sign-in', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                ),
+                                Expanded(child: Divider()),
+                              ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(_isRegister ? 'Already have an account? ' : "Don't have an account? ",
-                                    style: const TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _isRegister = !_isRegister;
-                                      _error = '';
-                                    });
-                                    if (_isRegister) _loadTenants();
-                                  },
-                                  child: Text(_isRegister ? 'Login' : 'Register',
-                                      style: const TextStyle(fontSize: 13, color: AppColors.accentPrimary, fontWeight: FontWeight.w500)),
+                                const Icon(Icons.lock_outline, size: 12, color: AppColors.textTertiary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isIOS ? 'Powered by Google & Apple' : 'Powered by Google',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
                                 ),
                               ],
                             ),
@@ -292,13 +262,52 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       ],
     );
   }
+}
+
+class _SignInButton extends StatelessWidget {
+  final VoidCallback? onTap;
+  final bool loading;
+  final Widget icon;
+  final String label;
+
+  const _SignInButton({required this.onTap, required this.loading, required this.icon, required this.label});
 
   @override
-  void dispose() {
-    _usernameCtl.dispose();
-    _passwordCtl.dispose();
-    _emailCtl.dispose();
-    _invitationCtl.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: AppColors.borderSubtle),
+          backgroundColor: AppColors.bgTertiary,
+          foregroundColor: AppColors.textPrimary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: loading
+            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  icon,
+                  const SizedBox(width: 10),
+                  Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _GoogleIcon extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 20, height: 20,
+      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+      child: const Center(
+        child: Text('G', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF4285F4))),
+      ),
+    );
   }
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "284961146938",
+    "project_id": "soloship-57b40",
+    "storage_bucket": "soloship-57b40.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:284961146938:android:897652e56483970b100d03",
+        "android_client_info": {
+          "package_name": "com.clawith.clawith"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtWLPFOTCzEELXnNK25yNykDWCiisbKfg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -38,6 +38,11 @@ dependencies:
   mime: ^2.0.0
   # Path
   path: ^1.9.1
+  firebase_core: ^4.5.0
+  firebase_auth: ^6.2.0
+  google_sign_in: ^7.2.0
+  sign_in_with_apple: ^7.0.1
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

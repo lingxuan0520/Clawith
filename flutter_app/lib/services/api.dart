@@ -30,6 +30,11 @@ class ApiService {
     return r.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> loginWithFirebase(String idToken) async {
+    final r = await _dio.post('/auth/firebase', data: {'id_token': idToken});
+    return r.data as Map<String, dynamic>;
+  }
+
   // ─── Tenants ──────────────────────────────────────────
   Future<List<dynamic>> listPublicTenants() async {
     final r = await _dio.get('/tenants/public/list');
