@@ -158,6 +158,85 @@ async def update_me(
 
 # ─── Firebase Auth ─────────────────────────────────────
 
+FIREBASE_PROJECT_ID = "soloship-57b40"
+GOOGLE_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+
+# Cache Google's public certificates (they rotate infrequently)
+_google_certs_cache: dict = {}
+
+
+async def _verify_firebase_id_token(id_token: str) -> dict:
+    """Verify a Firebase ID token without firebase-admin SDK.
+
+    Uses Google's public certificates to verify the RS256 JWT signature,
+    then validates standard Firebase claims.
+    """
+    import time
+    import httpx
+    from jose import jwt as jose_jwt, JWTError as JoseJWTError
+    from cryptography.x509 import load_pem_x509_certificate
+
+    # Fetch Google's public certificates (cached)
+    global _google_certs_cache
+    now = time.time()
+    if not _google_certs_cache or _google_certs_cache.get("_expires", 0) < now:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(GOOGLE_CERTS_URL)
+            resp.raise_for_status()
+            certs = resp.json()
+            # Cache based on Cache-Control max-age
+            max_age = 3600  # default 1 hour
+            cc = resp.headers.get("Cache-Control", "")
+            for part in cc.split(","):
+                part = part.strip()
+                if part.startswith("max-age="):
+                    try:
+                        max_age = int(part.split("=")[1])
+                    except ValueError:
+                        pass
+            _google_certs_cache = {**certs, "_expires": now + max_age}
+
+    # Decode JWT header to get the key ID
+    try:
+        header = jose_jwt.get_unverified_header(id_token)
+    except Exception:
+        raise ValueError("Invalid token format")
+
+    kid = header.get("kid")
+    if not kid or kid not in _google_certs_cache:
+        raise ValueError("Token signed with unknown key")
+
+    # Extract public key from X.509 certificate
+    cert_pem = _google_certs_cache[kid]
+    cert = load_pem_x509_certificate(cert_pem.encode("utf-8"))
+    public_key = cert.public_key()
+
+    # Verify and decode the token
+    try:
+        payload = jose_jwt.decode(
+            id_token,
+            public_key,
+            algorithms=["RS256"],
+            audience=FIREBASE_PROJECT_ID,
+            issuer=f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}",
+        )
+    except JoseJWTError as e:
+        raise ValueError(f"Token verification failed: {e}")
+
+    # Validate required claims
+    if not payload.get("sub"):
+        raise ValueError("Token missing subject claim")
+
+    return {
+        "uid": payload["sub"],
+        "email": payload.get("email", ""),
+        "name": payload.get("name", ""),
+        "picture": payload.get("picture", ""),
+        "email_verified": payload.get("email_verified", False),
+        "firebase": payload.get("firebase", {}),
+    }
+
+
 class FirebaseLoginRequest(BaseModel):
     id_token: str
 
@@ -169,23 +248,10 @@ async def firebase_login(data: FirebaseLoginRequest, db: AsyncSession = Depends(
     Accepts a Firebase ID token, verifies it, and returns a platform JWT.
     If the user doesn't exist yet, a new account is created automatically.
     """
-    import firebase_admin
-    from firebase_admin import auth as firebase_auth, credentials
-
-    # Initialize Firebase Admin SDK (once)
-    if not firebase_admin._apps:
-        # Uses GOOGLE_APPLICATION_CREDENTIALS env var, or default credentials
-        try:
-            firebase_admin.initialize_app()
-        except Exception:
-            # Fallback: initialize without credentials (works if running on GCP)
-            cred = credentials.ApplicationDefault()
-            firebase_admin.initialize_app(cred)
-
     # Verify the Firebase ID token
     try:
-        decoded = firebase_auth.verify_id_token(data.id_token)
-    except Exception as e:
+        decoded = await _verify_firebase_id_token(data.id_token)
+    except (ValueError, Exception) as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid Firebase token: {e}")
 
     firebase_uid = decoded["uid"]

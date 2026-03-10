@@ -12,7 +12,12 @@
           "package_name": "com.clawith.clawith"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "284961146938-7db6urfm3lthrmer5abdaen24fusclhg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCtWLPFOTCzEELXnNK25yNykDWCiisbKfg"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "284961146938-7db6urfm3lthrmer5abdaen24fusclhg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "284961146938-e358goc7v9n1ug8h7e83iqp3jbe8dgkr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.clawith.clawith"
+              }
+            }
+          ]
         }
       }
     }

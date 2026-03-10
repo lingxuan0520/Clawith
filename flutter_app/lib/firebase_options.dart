@@ -63,6 +63,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '284961146938',
     projectId: 'soloship-57b40',
     storageBucket: 'soloship-57b40.firebasestorage.app',
+    iosClientId: '284961146938-e358goc7v9n1ug8h7e83iqp3jbe8dgkr.apps.googleusercontent.com',
     iosBundleId: 'com.clawith.clawith',
   );
+
 }

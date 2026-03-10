@@ -4,7 +4,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "add_firebase_uid"
-down_revision = "add_invitation_codes"
+down_revision = "add_agent_triggers"
 branch_labels = None
 depends_on = None
 
