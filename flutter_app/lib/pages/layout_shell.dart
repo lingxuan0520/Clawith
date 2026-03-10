@@ -20,6 +20,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   bool _showNewCompany = false;
   final _newCompanyCtl = TextEditingController();
   Timer? _refreshTimer;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -56,244 +57,249 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     }
   }
 
+  void _navigate(String path) {
+    _scaffoldKey.currentState?.closeDrawer();
+    context.go(path);
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final appState = ref.watch(appProvider);
-    final collapsed = appState.sidebarCollapsed;
     final currentLocation = GoRouterState.of(context).matchedLocation;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppColors.bgPrimary,
-      body: Row(
-        children: [
-          // Sidebar
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: collapsed ? 60 : 240,
-            decoration: const BoxDecoration(
-              color: AppColors.bgSecondary,
-              border: Border(right: BorderSide(color: AppColors.borderSubtle)),
-            ),
-            child: Column(
-              children: [
-                // Logo
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      const Text('🐾', style: TextStyle(fontSize: 18)),
-                      if (!collapsed) ...[
-                        const SizedBox(width: 8),
-                        const Text('Clawith', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      ],
-                    ],
-                  ),
-                ),
-                // Tenant switcher (platform admin only)
-                if (auth.isPlatformAdmin && !collapsed) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Column(
-                      children: [
-                        DropdownButtonFormField<String>(
-                          value: appState.currentTenantId.isEmpty ? null : appState.currentTenantId,
-                          items: _tenants.map((t) => DropdownMenuItem(
-                            value: t['id'] as String,
-                            child: Text(t['name'] as String, style: const TextStyle(fontSize: 12)),
-                          )).toList(),
-                          onChanged: (v) {
-                            if (v != null) {
-                              ref.read(appProvider.notifier).setTenant(v);
-                              _loadAgents();
-                            }
-                          },
-                          decoration: const InputDecoration(
-                            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            isDense: true,
-                          ),
-                          dropdownColor: AppColors.bgElevated,
-                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
-                        ),
-                        if (_showNewCompany) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _newCompanyCtl,
-                                  style: const TextStyle(fontSize: 11),
-                                  decoration: const InputDecoration(
-                                    hintText: 'Company Name',
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                    isDense: true,
-                                  ),
-                                  onSubmitted: (_) => _createCompany(),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              InkWell(onTap: _createCompany, child: const Icon(Icons.check, size: 16, color: AppColors.accentPrimary)),
-                              InkWell(onTap: () => setState(() => _showNewCompany = false),
-                                  child: const Icon(Icons.close, size: 16, color: AppColors.textTertiary)),
-                            ],
-                          ),
-                        ] else
-                          TextButton.icon(
-                            onPressed: () => setState(() => _showNewCompany = true),
-                            icon: const Icon(Icons.add, size: 14),
-                            label: const Text('New Company', style: TextStyle(fontSize: 11)),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              foregroundColor: AppColors.textTertiary,
-                            ),
-                          ),
-                        const Divider(),
-                      ],
+      drawer: Drawer(
+        backgroundColor: AppColors.bgSecondary,
+        width: 260,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Logo
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    const Text('🐾', style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('Clawith', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                     ),
-                  ),
-                ],
-                // Nav items
-                _navItem(Icons.storefront, 'Plaza', '/plaza', currentLocation, collapsed),
-                _navItem(Icons.dashboard, 'Dashboard', '/dashboard', currentLocation, collapsed),
-                const SizedBox(height: 8),
-                // Agent list
-                if (!collapsed)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Text('My Digital Employees',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary,
-                            letterSpacing: 0.5)),
-                  ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    itemCount: _agents.length,
-                    itemBuilder: (context, i) {
-                      final agent = _agents[i];
-                      final id = agent['id'] as String;
-                      final name = agent['name'] as String? ?? 'Agent';
-                      final status = agent['status'] as String? ?? 'idle';
-                      final isActive = currentLocation == '/agents/$id';
-                      return InkWell(
-                        onTap: () => context.go('/agents/$id'),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: collapsed ? 8 : 12, vertical: 8),
-                          margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 4),
-                          decoration: BoxDecoration(
-                            color: isActive ? AppColors.bgHover : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 8, height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _statusColor(status),
-                                ),
-                              ),
-                              if (!collapsed) ...[
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(name,
-                                      style: TextStyle(fontSize: 13, color: isActive ? AppColors.textPrimary : AppColors.textSecondary),
-                                      overflow: TextOverflow.ellipsis),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                    IconButton(
+                      onPressed: () => _scaffoldKey.currentState?.closeDrawer(),
+                      icon: const Icon(Icons.close, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      color: AppColors.textTertiary,
+                    ),
+                  ],
                 ),
-                // Bottom section
-                const Divider(height: 1),
-                _navItem(Icons.add, 'New Agent', '/agents/new', currentLocation, collapsed),
-                if (auth.isAdmin)
-                  _navItem(Icons.settings, 'Enterprise', '/enterprise', currentLocation, collapsed),
-                if (auth.isPlatformAdmin)
-                  _navItem(Icons.confirmation_number, 'Invitations', '/invitations', currentLocation, collapsed),
-                const Divider(height: 1),
-                // Footer controls
+              ),
+              const Divider(height: 1),
+              // Tenant switcher (platform admin only)
+              if (auth.isPlatformAdmin) ...[
                 Padding(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Column(
                     children: [
-                      Row(
-                        mainAxisAlignment: collapsed ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
-                        children: [
-                          SizedBox(
-                            width: 32,
-                            height: 32,
-                            child: IconButton(
-                              onPressed: () => ref.read(appProvider.notifier).toggleSidebar(),
-                              icon: Icon(collapsed ? Icons.chevron_right : Icons.chevron_left, size: 18),
-                              iconSize: 18,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              color: AppColors.textTertiary,
-                              tooltip: collapsed ? 'Expand' : 'Collapse',
-                            ),
-                          ),
-                          if (!collapsed) ...[
-                            IconButton(
-                              onPressed: () => ref.read(appProvider.notifier).toggleTheme(),
-                              icon: Icon(appState.themeMode == 'dark' ? Icons.light_mode : Icons.dark_mode, size: 16),
-                              iconSize: 16,
-                              color: AppColors.textTertiary,
-                            ),
-                          ],
-                        ],
+                      DropdownButtonFormField<String>(
+                        value: appState.currentTenantId.isEmpty ? null : appState.currentTenantId,
+                        items: _tenants.map((t) => DropdownMenuItem(
+                          value: t['id'] as String,
+                          child: Text(t['name'] as String, style: const TextStyle(fontSize: 12)),
+                        )).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            ref.read(appProvider.notifier).setTenant(v);
+                            _loadAgents();
+                          }
+                        },
+                        decoration: const InputDecoration(
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          isDense: true,
+                        ),
+                        dropdownColor: AppColors.bgElevated,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
                       ),
-                      if (!collapsed && auth.user != null)
+                      if (_showNewCompany) ...[
+                        const SizedBox(height: 6),
                         Row(
                           children: [
-                            Container(
-                              width: 28, height: 28,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                color: AppColors.bgTertiary,
-                                border: Border.all(color: AppColors.borderSubtle),
-                              ),
-                              child: const Icon(Icons.person, size: 16, color: AppColors.textTertiary),
-                            ),
-                            const SizedBox(width: 8),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(auth.displayName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                                      overflow: TextOverflow.ellipsis),
-                                  Text(_roleLabel(auth.role), style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                                ],
+                              child: TextField(
+                                controller: _newCompanyCtl,
+                                style: const TextStyle(fontSize: 11),
+                                decoration: const InputDecoration(
+                                  hintText: 'Company Name',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  isDense: true,
+                                ),
+                                onSubmitted: (_) => _createCompany(),
                               ),
                             ),
-                            IconButton(
-                              onPressed: () async {
-                                final nav = GoRouter.of(context);
-                                await ref.read(authProvider.notifier).logout();
-                                if (mounted) nav.go('/login');
-                              },
-                              icon: const Icon(Icons.logout, size: 14),
-                              iconSize: 14,
-                              color: AppColors.textTertiary,
-                              tooltip: 'Logout',
-                            ),
+                            const SizedBox(width: 4),
+                            InkWell(onTap: _createCompany, child: const Icon(Icons.check, size: 16, color: AppColors.accentPrimary)),
+                            InkWell(onTap: () => setState(() => _showNewCompany = false),
+                                child: const Icon(Icons.close, size: 16, color: AppColors.textTertiary)),
                           ],
+                        ),
+                      ] else
+                        TextButton.icon(
+                          onPressed: () => setState(() => _showNewCompany = true),
+                          icon: const Icon(Icons.add, size: 14),
+                          label: const Text('New Company', style: TextStyle(fontSize: 11)),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            foregroundColor: AppColors.textTertiary,
+                          ),
                         ),
                     ],
                   ),
                 ),
+                const Divider(height: 1),
               ],
-            ),
+              // Nav items
+              const SizedBox(height: 4),
+              _navItem(Icons.storefront, 'Plaza', '/plaza', currentLocation),
+              _navItem(Icons.dashboard, 'Dashboard', '/dashboard', currentLocation),
+              const SizedBox(height: 8),
+              // Agent list
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Text('My Digital Employees',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary,
+                        letterSpacing: 0.5)),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  itemCount: _agents.length,
+                  itemBuilder: (context, i) {
+                    final agent = _agents[i];
+                    final id = agent['id'] as String;
+                    final name = agent['name'] as String? ?? 'Agent';
+                    final status = agent['status'] as String? ?? 'idle';
+                    final isActive = currentLocation == '/agents/$id';
+                    return InkWell(
+                      onTap: () => _navigate('/agents/$id'),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: isActive ? AppColors.bgHover : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8, height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _statusColor(status),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(name,
+                                  style: TextStyle(fontSize: 13, color: isActive ? AppColors.textPrimary : AppColors.textSecondary),
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              // Bottom section
+              const Divider(height: 1),
+              _navItem(Icons.add, 'New Agent', '/agents/new', currentLocation),
+              if (auth.isAdmin)
+                _navItem(Icons.settings, 'Enterprise', '/enterprise', currentLocation),
+              if (auth.isPlatformAdmin)
+                _navItem(Icons.confirmation_number, 'Invitations', '/invitations', currentLocation),
+              const Divider(height: 1),
+              // Footer
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          onPressed: () => ref.read(appProvider.notifier).toggleTheme(),
+                          icon: Icon(appState.themeMode == 'dark' ? Icons.light_mode : Icons.dark_mode, size: 16),
+                          iconSize: 16,
+                          color: AppColors.textTertiary,
+                        ),
+                      ],
+                    ),
+                    if (auth.user != null)
+                      Row(
+                        children: [
+                          Container(
+                            width: 28, height: 28,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: AppColors.bgTertiary,
+                              border: Border.all(color: AppColors.borderSubtle),
+                            ),
+                            child: const Icon(Icons.person, size: 16, color: AppColors.textTertiary),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(auth.displayName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                    overflow: TextOverflow.ellipsis),
+                                Text(_roleLabel(auth.role), style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () async {
+                              final nav = GoRouter.of(context);
+                              await ref.read(authProvider.notifier).logout();
+                              if (mounted) nav.go('/login');
+                            },
+                            icon: const Icon(Icons.logout, size: 14),
+                            iconSize: 14,
+                            color: AppColors.textTertiary,
+                            tooltip: 'Logout',
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          // Main content
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              child: widget.child,
+        ),
+      ),
+      body: Stack(
+        children: [
+          // Full-screen content
+          widget.child,
+          // Menu button (top-left)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 8,
+            child: Material(
+              color: AppColors.bgSecondary.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                borderRadius: BorderRadius.circular(10),
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(Icons.menu, size: 20, color: AppColors.textPrimary),
+                ),
+              ),
             ),
           ),
         ],
@@ -301,13 +307,13 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     );
   }
 
-  Widget _navItem(IconData icon, String label, String path, String current, bool collapsed) {
+  Widget _navItem(IconData icon, String label, String path, String current) {
     final isActive = current == path || current.startsWith('$path/');
     return InkWell(
-      onTap: () => context.go(path),
+      onTap: () => _navigate(path),
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: collapsed ? 8 : 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 4),
         decoration: BoxDecoration(
           color: isActive ? AppColors.bgHover : Colors.transparent,
@@ -316,10 +322,8 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
         child: Row(
           children: [
             Icon(icon, size: 16, color: isActive ? AppColors.accentPrimary : AppColors.textTertiary),
-            if (!collapsed) ...[
-              const SizedBox(width: 10),
-              Text(label, style: TextStyle(fontSize: 13, color: isActive ? AppColors.textPrimary : AppColors.textSecondary)),
-            ],
+            const SizedBox(width: 10),
+            Text(label, style: TextStyle(fontSize: 13, color: isActive ? AppColors.textPrimary : AppColors.textSecondary)),
           ],
         ),
       ),
