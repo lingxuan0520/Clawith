@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Dark theme colors (matching React CSS variables)
-  static const bgPrimary = Color(0xFF0D0F11);
-  static const bgSecondary = Color(0xFF151820);
-  static const bgTertiary = Color(0xFF1C1F2B);
-  static const bgElevated = Color(0xFF1A1D28);
-  static const bgHover = Color(0xFF1E2230);
+  // Dark theme colors — high contrast
+  static const bgPrimary = Color(0xFF101216);
+  static const bgSecondary = Color(0xFF181C24);
+  static const bgTertiary = Color(0xFF222834);
+  static const bgElevated = Color(0xFF1E2330);
+  static const bgHover = Color(0xFF262D3C);
 
-  static const textPrimary = Color(0xFFE8E9ED);
-  static const textSecondary = Color(0xFF9BA1B0);
-  static const textTertiary = Color(0xFF5E6478);
+  static const textPrimary = Color(0xFFF0F1F4);
+  static const textSecondary = Color(0xFFBCC2CE);
+  static const textTertiary = Color(0xFF8A92A4);
 
-  static const borderSubtle = Color(0xFF232736);
-  static const borderDefault = Color(0xFF2C3040);
-  static const borderStrong = Color(0xFF3A3F52);
+  static const borderSubtle = Color(0xFF2E3446);
+  static const borderDefault = Color(0xFF3A4258);
+  static const borderStrong = Color(0xFF4A5370);
 
-  static const accentPrimary = Color(0xFF4F8CFF);
-  static const accentSubtle = Color(0x1A4F8CFF);
-  static const accentText = Color(0xFF6BA1FF);
+  static const accentPrimary = Color(0xFF5A96FF);
+  static const accentSubtle = Color(0x264F8CFF);
+  static const accentText = Color(0xFF7DB3FF);
 
   static const statusRunning = Color(0xFF34D399);
   static const statusIdle = Color(0xFFFBBF24);
@@ -36,8 +36,8 @@ class AppColors {
   static const lightBgElevated = Color(0xFFFFFFFF);
 
   static const lightTextPrimary = Color(0xFF1A1D28);
-  static const lightTextSecondary = Color(0xFF5E6478);
-  static const lightTextTertiary = Color(0xFF9BA1B0);
+  static const lightTextSecondary = Color(0xFF4A5068);
+  static const lightTextTertiary = Color(0xFF6B7390);
 
   static const lightBorderSubtle = Color(0xFFE5E7EB);
   static const lightBorderDefault = Color(0xFFD1D5DB);

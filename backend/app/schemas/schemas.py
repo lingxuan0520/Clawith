@@ -39,7 +39,6 @@ class UserOut(BaseModel):
     department_id: uuid.UUID | None = None
     title: str | None = None
     feishu_open_id: str | None = None
-    firebase_uid: str | None = None
     is_active: bool
     created_at: datetime
 
