@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/theme/app_theme.dart';
@@ -21,6 +22,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final List<ChatMessage> _messages = [];
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _inputFocus = FocusNode();
   WebSocketClient? _ws;
   StreamSubscription? _eventSub;
   StreamSubscription? _connSub;
@@ -37,6 +39,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   void initState() {
     super.initState();
+    // Rebuild when text changes so the Send button enables/disables correctly
+    _inputCtrl.addListener(() { if (mounted) setState(() {}); });
     _loadAgent();
     _loadHistory();
     _connectWs();
@@ -386,19 +390,31 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: TextField(
-                  controller: _inputCtrl,
-                  enabled: _connected,
-                  decoration: InputDecoration(
-                    hintText: _attachedFile != null
-                        ? 'Ask about ${_attachedFile!.name}...'
-                        : 'Type a message...',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    isDense: true,
+                child: KeyboardListener(
+                  focusNode: _inputFocus,
+                  onKeyEvent: (event) {
+                    if (event is KeyDownEvent &&
+                        event.logicalKey == LogicalKeyboardKey.enter &&
+                        !HardwareKeyboard.instance.isShiftPressed) {
+                      _sendMessage();
+                    }
+                  },
+                  child: TextField(
+                    controller: _inputCtrl,
+                    enabled: _connected,
+                    focusNode: FocusNode(),
+                    decoration: InputDecoration(
+                      hintText: _attachedFile != null
+                          ? 'Ask about ${_attachedFile!.name}...'
+                          : 'Type a message...',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      isDense: true,
+                    ),
+                    maxLines: 3,
+                    minLines: 1,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sendMessage(),
                   ),
-                  maxLines: 3,
-                  minLines: 1,
-                  onSubmitted: (_) => _sendMessage(),
                 ),
               ),
               const SizedBox(width: 8),
@@ -536,6 +552,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _connSub?.cancel();
     _ws?.dispose();
     _inputCtrl.dispose();
+    _inputFocus.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
