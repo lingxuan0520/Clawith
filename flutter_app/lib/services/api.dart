@@ -25,6 +25,11 @@ class ApiService {
     return r.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> updateMe(Map<String, dynamic> data) async {
+    final r = await _dio.patch('/auth/me', data: data);
+    return r.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getRegistrationConfig() async {
     final r = await _dio.get('/auth/registration-config');
     return r.data as Map<String, dynamic>;
@@ -125,6 +130,10 @@ class ApiService {
     return r.data as List<dynamic>;
   }
 
+  Future<void> triggerTask(String agentId, String taskId) async {
+    await _dio.post('/agents/$agentId/tasks/$taskId/trigger');
+  }
+
   // ─── Files ────────────────────────────────────────────
   Future<List<dynamic>> listFiles(String agentId, {String path = ''}) async {
     final r = await _dio.get('/agents/$agentId/files/', queryParameters: {'path': path});
@@ -144,6 +153,12 @@ class ApiService {
 
   Future<void> deleteFile(String agentId, String path) async {
     await _dio.delete('/agents/$agentId/files/content', queryParameters: {'path': path});
+  }
+
+  Future<Map<String, dynamic>> importSkill(String agentId, String skillId) async {
+    final r = await _dio.post('/agents/$agentId/files/import-skill',
+        queryParameters: {'skill_id': skillId});
+    return r.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> uploadFile(String agentId, String filePath, String fileName,
@@ -207,6 +222,15 @@ class ApiService {
     }
   }
 
+  Future<String?> getChannelWebhookUrl(String agentId) async {
+    try {
+      final r = await _dio.get('/agents/$agentId/channel/webhook-url');
+      return (r.data as Map<String, dynamic>)['url'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> createChannel(String agentId, Map<String, dynamic> data) async {
     final r = await _dio.post('/agents/$agentId/channel', data: data);
     return r.data as Map<String, dynamic>;
@@ -240,6 +264,30 @@ class ApiService {
   Future<List<dynamic>> listKbFiles({String path = ''}) async {
     final r = await _dio.get('/enterprise/knowledge-base/files', queryParameters: {'path': path});
     return r.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> readKbFile(String path) async {
+    final r = await _dio.get('/enterprise/knowledge-base/content', queryParameters: {'path': path});
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<void> writeKbFile(String path, String content) async {
+    await _dio.put('/enterprise/knowledge-base/content',
+        queryParameters: {'path': path}, data: {'content': content});
+  }
+
+  Future<void> deleteKbFile(String path) async {
+    await _dio.delete('/enterprise/knowledge-base/content', queryParameters: {'path': path});
+  }
+
+  Future<Map<String, dynamic>> uploadKbFile(List<int> bytes, String fileName,
+      {String path = ''}) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: fileName),
+    });
+    final r = await _dio.post('/enterprise/knowledge-base/upload',
+        queryParameters: path.isNotEmpty ? {'path': path} : null, data: formData);
+    return r.data as Map<String, dynamic>;
   }
 
   // ─── Activity ─────────────────────────────────────────
@@ -278,6 +326,15 @@ class ApiService {
     return r.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> updateSchedule(String agentId, String scheduleId, Map<String, dynamic> data) async {
+    final r = await _dio.patch('/agents/$agentId/schedules/$scheduleId', data: data);
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<void> triggerSchedule(String agentId, String scheduleId) async {
+    await _dio.post('/agents/$agentId/schedules/$scheduleId/run');
+  }
+
   Future<void> deleteSchedule(String agentId, String scheduleId) async {
     await _dio.delete('/agents/$agentId/schedules/$scheduleId');
   }
@@ -307,6 +364,44 @@ class ApiService {
     return r.data as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> getSkill(String id) async {
+    final r = await _dio.get('/skills/$id');
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createSkill(Map<String, dynamic> data) async {
+    final r = await _dio.post('/skills/', data: data);
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateSkill(String id, Map<String, dynamic> data) async {
+    final r = await _dio.put('/skills/$id', data: data);
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteSkill(String id) async {
+    await _dio.delete('/skills/$id');
+  }
+
+  Future<List<dynamic>> listSkillFiles({String path = ''}) async {
+    final r = await _dio.get('/skills/browse/list', queryParameters: {'path': path});
+    return r.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> readSkillFile(String path) async {
+    final r = await _dio.get('/skills/browse/read', queryParameters: {'path': path});
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<void> writeSkillFile(String path, String content) async {
+    await _dio.put('/skills/browse/write',
+        queryParameters: {'path': path}, data: {'content': content});
+  }
+
+  Future<void> deleteSkillFile(String path) async {
+    await _dio.delete('/skills/browse/delete', queryParameters: {'path': path});
+  }
+
   // ─── Relationships ────────────────────────────────────
   Future<List<dynamic>> getRelationships(String agentId) async {
     final r = await _dio.get('/agents/$agentId/relationships/');
@@ -316,6 +411,22 @@ class ApiService {
   Future<List<dynamic>> getAgentRelationships(String agentId) async {
     final r = await _dio.get('/agents/$agentId/relationships/agents');
     return r.data as List<dynamic>;
+  }
+
+  Future<void> updateRelationships(String agentId, List<dynamic> data) async {
+    await _dio.put('/agents/$agentId/relationships/', data: data);
+  }
+
+  Future<void> deleteRelationship(String agentId, String relId) async {
+    await _dio.delete('/agents/$agentId/relationships/$relId');
+  }
+
+  Future<void> updateAgentRelationships(String agentId, List<dynamic> data) async {
+    await _dio.put('/agents/$agentId/relationships/agents', data: data);
+  }
+
+  Future<void> deleteAgentRelationship(String agentId, String relId) async {
+    await _dio.delete('/agents/$agentId/relationships/agents/$relId');
   }
 
   // ─── Plaza ────────────────────────────────────────────
@@ -360,8 +471,19 @@ class ApiService {
     return r.data as List<dynamic>;
   }
 
+  Future<List<dynamic>> listAgentToolsWithConfig(String agentId) async {
+    final r = await _dio.get('/tools/agents/$agentId/with-config');
+    return r.data as List<dynamic>;
+  }
+
   Future<void> toggleAgentTool(String agentId, String toolId, bool enabled) async {
     await _dio.put('/tools/agents/$agentId/tools/$toolId', data: {'enabled': enabled});
+  }
+
+  Future<Map<String, dynamic>> updateToolConfig(
+      String agentId, String toolId, Map<String, dynamic> config) async {
+    final r = await _dio.put('/tools/agents/$agentId/tool-config/$toolId', data: config);
+    return r.data as Map<String, dynamic>;
   }
 
   // ─── Invitation Codes ─────────────────────────────────
@@ -388,5 +510,11 @@ class ApiService {
 
   Future<void> deactivateInvitationCode(String id) async {
     await _dio.delete('/enterprise/invitation-codes/$id');
+  }
+
+  Future<String> exportInvitationCodes() async {
+    final r = await _dio.get('/enterprise/invitation-codes/export',
+        options: Options(responseType: ResponseType.plain));
+    return r.data as String;
   }
 }
