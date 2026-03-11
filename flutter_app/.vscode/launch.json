@@ -2,19 +2,20 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Clawith (debug)",
+      "name": "Soloship (debug)",
       "request": "launch",
       "type": "dart",
-      "flutterMode": "debug"
+      "flutterMode": "debug",
+      "deviceId": "22000188-307F-4488-BC7F-1D3C62F3B8E2"
     },
     {
-      "name": "Clawith (profile)",
+      "name": "Soloship (profile)",
       "request": "launch",
       "type": "dart",
       "flutterMode": "profile"
     },
     {
-      "name": "Clawith (release)",
+      "name": "Soloship (release)",
       "request": "launch",
       "type": "dart",
       "flutterMode": "release"

@@ -39,12 +39,27 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   }
 
   Future<void> _loadTenants() async {
-    final auth = ref.read(authProvider);
-    if (!auth.isPlatformAdmin) return;
     try {
       final data = await ApiService.instance.listTenants();
-      if (mounted) setState(() => _tenants = data.cast<Map<String, dynamic>>());
+      if (mounted) {
+        setState(() => _tenants = data.cast<Map<String, dynamic>>());
+        // Auto-select tenant if none selected
+        final appState = ref.read(appProvider);
+        final auth = ref.read(authProvider);
+        if (appState.currentTenantId.isEmpty && data.isNotEmpty) {
+          final fallback = auth.tenantId ?? (data.first['id'] as String);
+          ref.read(appProvider.notifier).setTenant(fallback);
+          _loadAgents();
+        }
+      }
     } catch (_) {}
+  }
+
+  String get _currentTenantName {
+    final tenantId = ref.read(appProvider).currentTenantId;
+    if (tenantId.isEmpty || _tenants.isEmpty) return '';
+    final match = _tenants.where((t) => t['id'] == tenantId);
+    return match.isNotEmpty ? (match.first['name'] as String? ?? '') : '';
   }
 
   Color _statusColor(String status) {
@@ -98,12 +113,12 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                 ),
               ),
               const Divider(height: 1),
-              // Tenant switcher (platform admin only)
-              if (auth.isPlatformAdmin) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Column(
-                    children: [
+              // Tenant switcher
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Column(
+                  children: [
+                    if (_tenants.length > 1)
                       DropdownButtonFormField<String>(
                         value: appState.currentTenantId.isEmpty ? null : appState.currentTenantId,
                         items: _tenants.map((t) => DropdownMenuItem(
@@ -122,44 +137,52 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                         ),
                         dropdownColor: AppColors.bgElevated,
                         style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                      )
+                    else if (_tenants.length == 1)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(_tenants.first['name'] as String,
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        ),
                       ),
-                      if (_showNewCompany) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _newCompanyCtl,
-                                style: const TextStyle(fontSize: 11),
-                                decoration: const InputDecoration(
-                                  hintText: 'Company Name',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                  isDense: true,
-                                ),
-                                onSubmitted: (_) => _createCompany(),
+                    if (_showNewCompany) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _newCompanyCtl,
+                              style: const TextStyle(fontSize: 11),
+                              decoration: const InputDecoration(
+                                hintText: 'Company Name',
+                                contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                isDense: true,
                               ),
+                              onSubmitted: (_) => _createCompany(),
                             ),
-                            const SizedBox(width: 4),
-                            InkWell(onTap: _createCompany, child: const Icon(Icons.check, size: 16, color: AppColors.accentPrimary)),
-                            InkWell(onTap: () => setState(() => _showNewCompany = false),
-                                child: const Icon(Icons.close, size: 16, color: AppColors.textTertiary)),
-                          ],
-                        ),
-                      ] else
-                        TextButton.icon(
-                          onPressed: () => setState(() => _showNewCompany = true),
-                          icon: const Icon(Icons.add, size: 14),
-                          label: const Text('New Company', style: TextStyle(fontSize: 11)),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            foregroundColor: AppColors.textTertiary,
                           ),
+                          const SizedBox(width: 4),
+                          InkWell(onTap: _createCompany, child: const Icon(Icons.check, size: 16, color: AppColors.accentPrimary)),
+                          InkWell(onTap: () => setState(() => _showNewCompany = false),
+                              child: const Icon(Icons.close, size: 16, color: AppColors.textTertiary)),
+                        ],
+                      ),
+                    ] else
+                      TextButton.icon(
+                        onPressed: () => setState(() => _showNewCompany = true),
+                        icon: const Icon(Icons.add, size: 14),
+                        label: const Text('New Company', style: TextStyle(fontSize: 11)),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          foregroundColor: AppColors.textTertiary,
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
-                const Divider(height: 1),
-              ],
+              ),
+              const Divider(height: 1),
               // Nav items
               const SizedBox(height: 4),
               _navItem(Icons.storefront, 'Plaza', '/plaza', currentLocation),
@@ -285,7 +308,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
         children: [
           // Full-screen content
           widget.child,
-          // Menu button (top-left)
+          // Menu button + company name (top-left)
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             left: 8,
@@ -295,9 +318,23 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
               child: InkWell(
                 onTap: () => _scaffoldKey.currentState?.openDrawer(),
                 borderRadius: BorderRadius.circular(10),
-                child: const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Icon(Icons.menu, size: 20, color: AppColors.textPrimary),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.menu, size: 20, color: AppColors.textPrimary),
+                      if (_currentTenantName.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 160),
+                          child: Text(_currentTenantName,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),

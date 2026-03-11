@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -51,7 +48,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCtWLPFOTCzEELXnNK25yNykDWCiisbKfg',
-    appId: '1:284961146938:android:897652e56483970b100d03',
+    appId: '1:284961146938:android:6b1ff01b7a54506b100d03',
     messagingSenderId: '284961146938',
     projectId: 'soloship-57b40',
     storageBucket: 'soloship-57b40.firebasestorage.app',
@@ -59,12 +56,22 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyC_fD8m8MprVPpoaa1NjusLByePtZVGCnY',
-    appId: '1:284961146938:ios:cc1661f3daa63f13100d03',
+    appId: '1:284961146938:ios:cbd718eec5e9647d100d03',
     messagingSenderId: '284961146938',
     projectId: 'soloship-57b40',
     storageBucket: 'soloship-57b40.firebasestorage.app',
-    iosClientId: '284961146938-e358goc7v9n1ug8h7e83iqp3jbe8dgkr.apps.googleusercontent.com',
-    iosBundleId: 'com.clawith.clawith',
+    iosClientId: '284961146938-9tpd04u6i2lnflata0lt720e7kkt9dp8.apps.googleusercontent.com',
+    iosBundleId: 'com.soloship.app',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBxiYSqTexNeoj2rMRvGYtRzm6oaBxFeSc',
+    appId: '1:284961146938:web:984c23303ca1ccc6100d03',
+    messagingSenderId: '284961146938',
+    projectId: 'soloship-57b40',
+    authDomain: 'soloship-57b40.firebaseapp.com',
+    storageBucket: 'soloship-57b40.firebasestorage.app',
+    measurementId: 'G-918CJC6R8B',
   );
 
 }

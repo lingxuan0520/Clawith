@@ -16,7 +16,8 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  bool _loading = false;
+  bool _googleLoading = false;
+  bool _appleLoading = false;
   String _error = '';
   bool _googleInitialized = false;
 
@@ -34,7 +35,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() { _error = ''; _loading = true; });
+    setState(() { _error = ''; _googleLoading = true; });
     try {
       if (!_googleInitialized) {
         await GoogleSignIn.instance.initialize();
@@ -50,17 +51,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       await _exchangeToken(firebaseIdToken!);
     } catch (e) {
       if (e.toString().contains('canceled') || e.toString().contains('sign_in_canceled')) {
-        setState(() => _loading = false);
+        setState(() => _googleLoading = false);
         return;
       }
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _googleLoading = false);
     }
   }
 
   Future<void> _signInWithApple() async {
-    setState(() { _error = ''; _loading = true; });
+    setState(() { _error = ''; _appleLoading = true; });
     try {
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
@@ -77,12 +78,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       await _exchangeToken(firebaseIdToken!);
     } catch (e) {
       if (e.toString().contains('canceled') || e.toString().contains('AuthorizationCanceled')) {
-        setState(() => _loading = false);
+        setState(() => _appleLoading = false);
         return;
       }
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _appleLoading = false);
     }
   }
 
@@ -195,8 +196,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ),
                             // Google Sign-in
                             _SignInButton(
-                              onTap: _loading ? null : _signInWithGoogle,
-                              loading: _loading,
+                              onTap: (_googleLoading || _appleLoading) ? null : _signInWithGoogle,
+                              loading: _googleLoading,
                               icon: _GoogleIcon(),
                               label: 'Continue with Google',
                             ),
@@ -204,8 +205,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             if (isIOS) ...[
                               const SizedBox(height: 12),
                               _SignInButton(
-                                onTap: _loading ? null : _signInWithApple,
-                                loading: false,
+                                onTap: (_googleLoading || _appleLoading) ? null : _signInWithApple,
+                                loading: _appleLoading,
                                 icon: const Icon(Icons.apple, size: 20, color: AppColors.textPrimary),
                                 label: 'Continue with Apple',
                               ),
