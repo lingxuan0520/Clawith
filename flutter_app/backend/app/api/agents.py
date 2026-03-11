@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.permissions import check_agent_access, is_agent_creator
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user
 from app.database import get_db
 from app.models.agent import Agent, AgentPermission
 from app.models.user import User

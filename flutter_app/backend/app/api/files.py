@@ -352,10 +352,7 @@ async def upload_enterprise_kb_file(
     current_user: User = Depends(get_current_user),
 ):
     """Upload a file to enterprise knowledge base."""
-    from app.core.security import require_role
-    # Only admin can upload to enterprise KB
-    if current_user.role not in ("platform_admin", "org_admin"):
-        raise HTTPException(status_code=403, detail="仅管理员可上传企业知识库文件")
+    # 2C model: all users have full access
 
     info_dir = _enterprise_info_dir()
     target_dir = (info_dir / sub_path).resolve()

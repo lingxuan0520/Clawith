@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_current_admin, get_current_user, require_role
+from app.core.security import get_current_user
 from app.database import get_db
 from app.models.agent import Agent
 from app.models.audit import ApprovalRequest, AuditLog, EnterpriseInfo
@@ -38,7 +38,7 @@ async def list_llm_models(
 @router.post("/llm-models", response_model=LLMModelOut, status_code=status.HTTP_201_CREATED)
 async def add_llm_model(
     data: LLMModelCreate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Add a new LLM model to the pool (admin)."""
@@ -61,7 +61,7 @@ async def add_llm_model(
 async def remove_llm_model(
     model_id: uuid.UUID,
     force: bool = False,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Remove an LLM model from the pool."""
@@ -104,7 +104,7 @@ async def remove_llm_model(
 async def update_llm_model(
     model_id: uuid.UUID,
     data: LLMModelCreate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update an existing LLM model in the pool (admin)."""
@@ -140,7 +140,7 @@ async def list_enterprise_info(
 async def update_enterprise_info(
     info_type: str,
     data: EnterpriseInfoUpdate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create or update enterprise information. Triggers sync to agents."""
@@ -197,7 +197,7 @@ async def resolve_approval(
 async def list_audit_logs(
     agent_id: uuid.UUID | None = None,
     limit: int = 50,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List audit logs (admin only). Optionally filter by agent."""
@@ -213,7 +213,7 @@ async def list_audit_logs(
 @router.get("/stats")
 async def get_enterprise_stats(
     tenant_id: str | None = None,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get enterprise dashboard statistics, optionally scoped to a tenant."""
@@ -280,7 +280,7 @@ async def get_tenant_quotas(
 @router.patch("/tenant-quotas")
 async def update_tenant_quotas(
     data: TenantQuotaUpdate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update tenant quota defaults (admin only). Enforces heartbeat floor on existing agents."""
@@ -361,7 +361,7 @@ async def get_system_setting(
 async def update_system_setting(
     key: str,
     data: SettingUpdate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create or update a system setting."""
@@ -440,7 +440,7 @@ async def list_org_members(
 
 @router.post("/org/sync")
 async def trigger_org_sync(
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
     """Manually trigger org structure sync from Feishu."""
     from app.services.org_sync_service import org_sync_service
@@ -461,7 +461,7 @@ class InvitationCodeCreate(BaseModel):
 @router.post("/invitation-codes")
 async def create_invitation_codes(
     data: InvitationCodeCreate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Batch-create invitation codes."""
@@ -484,7 +484,7 @@ async def list_invitation_codes(
     page: int = 1,
     page_size: int = 20,
     search: str = "",
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List invitation codes with pagination and search."""
@@ -526,7 +526,7 @@ async def list_invitation_codes(
 
 @router.get("/invitation-codes/export")
 async def export_invitation_codes_csv(
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Export all invitation codes as CSV, ordered by created_at."""
@@ -562,7 +562,7 @@ async def export_invitation_codes_csv(
 @router.delete("/invitation-codes/{code_id}")
 async def deactivate_invitation_code(
     code_id: str,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Deactivate an invitation code."""

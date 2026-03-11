@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import check_agent_access
-from app.core.security import get_current_user, get_current_admin
+from app.core.security import get_current_user
 from app.database import get_db
 from app.models.agent import Agent, AgentTemplate
 from app.models.user import User
@@ -149,7 +149,7 @@ async def create_template(
 @router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_template(
     template_id: uuid.UUID,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a template (admin or creator)."""

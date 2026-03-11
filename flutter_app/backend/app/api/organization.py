@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_current_admin, get_current_user
+from app.core.security import get_current_user
 from app.database import get_db
 from app.models.user import Department, User
 from app.schemas.schemas import DepartmentCreate, DepartmentOut, DepartmentTree, UserOut, UserUpdate
@@ -55,7 +55,7 @@ async def get_department_tree(
 @router.post("/departments", response_model=DepartmentOut, status_code=status.HTTP_201_CREATED)
 async def create_department(
     data: DepartmentCreate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new department (admin only)."""
@@ -73,7 +73,7 @@ async def create_department(
 async def update_department(
     dept_id: uuid.UUID,
     data: DepartmentCreate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a department."""
@@ -94,7 +94,7 @@ async def update_department(
 @router.delete("/departments/{dept_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_department(
     dept_id: uuid.UUID,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a department (admin only)."""
@@ -127,7 +127,7 @@ async def list_users(
 async def admin_update_user(
     user_id: uuid.UUID,
     data: UserUpdate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Admin update user profile (role, department)."""

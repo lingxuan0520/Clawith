@@ -1,4 +1,4 @@
-"""Tenant (Company) management API — platform_admin only."""
+"""Tenant (Company) management API."""
 
 import uuid
 from datetime import datetime
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user
 from app.database import get_db
 from app.models.tenant import Tenant
 from app.models.user import User
@@ -41,10 +41,10 @@ class TenantUpdate(BaseModel):
 
 @router.get("/", response_model=list[TenantOut])
 async def list_tenants(
-    current_user: User = Depends(require_role("platform_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all tenants (platform_admin only)."""
+    """List all tenants."""
     result = await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))
     return [TenantOut.model_validate(t) for t in result.scalars().all()]
 
@@ -70,7 +70,7 @@ async def create_tenant(
 @router.get("/{tenant_id}", response_model=TenantOut)
 async def get_tenant(
     tenant_id: uuid.UUID,
-    current_user: User = Depends(require_role("platform_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get tenant details."""
@@ -85,7 +85,7 @@ async def get_tenant(
 async def update_tenant(
     tenant_id: uuid.UUID,
     data: TenantUpdate,
-    current_user: User = Depends(require_role("platform_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update tenant settings."""
@@ -105,7 +105,7 @@ async def assign_user_to_tenant(
     tenant_id: uuid.UUID,
     user_id: uuid.UUID,
     role: str = "member",
-    current_user: User = Depends(require_role("platform_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Assign a user to a tenant with a specific role."""

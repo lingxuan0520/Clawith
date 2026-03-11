@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import async_session
 from app.models.skill import Skill, SkillFile
-from app.core.security import require_role
+from app.core.security import get_current_user
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -76,7 +76,7 @@ async def get_skill(skill_id: str):
 
 
 @router.post("/")
-async def create_skill(body: SkillCreateIn, _=Depends(require_role("platform_admin"))):
+async def create_skill(body: SkillCreateIn, _=Depends(get_current_user)):
     """Create a custom skill."""
     async with async_session() as db:
         skill = Skill(
@@ -114,7 +114,7 @@ class SkillUpdateIn(BaseModel):
 
 
 @router.put("/{skill_id}")
-async def update_skill(skill_id: str, body: SkillUpdateIn, _=Depends(require_role("platform_admin"))):
+async def update_skill(skill_id: str, body: SkillUpdateIn, _=Depends(get_current_user)):
     """Update a skill's metadata and/or files."""
     async with async_session() as db:
         result = await db.execute(
@@ -146,7 +146,7 @@ async def update_skill(skill_id: str, body: SkillUpdateIn, _=Depends(require_rol
 
 
 @router.delete("/{skill_id}")
-async def delete_skill(skill_id: str, _=Depends(require_role("platform_admin"))):
+async def delete_skill(skill_id: str, _=Depends(get_current_user)):
     """Delete a skill (not builtin)."""
     async with async_session() as db:
         result = await db.execute(select(Skill).where(Skill.id == skill_id))
@@ -241,7 +241,7 @@ class BrowseWriteIn(BaseModel):
 
 
 @router.put("/browse/write")
-async def browse_write(body: BrowseWriteIn, _=Depends(require_role("platform_admin"))):
+async def browse_write(body: BrowseWriteIn, _=Depends(get_current_user)):
     """Write a file in a skill folder. Creates the skill if the folder doesn't exist."""
     parts = body.path.strip("/").split("/", 1)
     if len(parts) < 2:
@@ -280,7 +280,7 @@ async def browse_write(body: BrowseWriteIn, _=Depends(require_role("platform_adm
 
 
 @router.delete("/browse/delete")
-async def browse_delete(path: str, _=Depends(require_role("platform_admin"))):
+async def browse_delete(path: str, _=Depends(get_current_user)):
     """Delete a file or an entire skill folder."""
     parts = path.strip("/").split("/", 1)
     folder = parts[0]
