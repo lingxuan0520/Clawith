@@ -44,7 +44,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
       setState(() {
         _agents = agentList;
         _player = OfficePlayer(
-          position: Vector2(10 * kTileSize, 12 * kTileSize),
+          position: Vector2(3.0 * kTileSize, 10.0 * kTileSize),
           onInteract: _onInteract,
         );
         _npcs = _createNpcs(agentList);
@@ -61,10 +61,16 @@ class _OfficePageState extends ConsumerState<OfficePage> {
     for (int i = 0; i < agents.length && i < positions.length; i++) {
       final a = agents[i];
       final p = positions[i];
+      // Use role_description as task hint when running
+      final status = a['status']?.toString();
+      final taskHint = status == 'running'
+          ? (a['role_description']?.toString() ?? a['name']?.toString())
+          : null;
       list.add(AgentNpc(
         agentId: a['id']?.toString() ?? '',
         agentName: a['name']?.toString() ?? 'Agent',
-        agentStatus: a['status']?.toString(),
+        agentStatus: status,
+        agentTask: taskHint,
         colorVariant: i % 8,
         position: Vector2(p[0] * kTileSize, p[1] * kTileSize),
         onPlayerContact: (npc) {
@@ -269,21 +275,9 @@ class _OfficePageState extends ConsumerState<OfficePage> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentSubtle,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.accentPrimary),
-                  ),
-                  child: const Text('E',
-                      style: TextStyle(
-                          color: AppColors.accentText,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold)),
-                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.touch_app,
+                    size: 14, color: AppColors.accentText),
               ],
             ),
           ),
