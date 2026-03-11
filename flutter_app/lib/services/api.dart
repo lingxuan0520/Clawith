@@ -291,6 +291,17 @@ class ApiService {
     return r.data as List<dynamic>;
   }
 
+  // ─── Relationships ────────────────────────────────────
+  Future<List<dynamic>> getRelationships(String agentId) async {
+    final r = await _dio.get('/agents/$agentId/relationships/');
+    return r.data as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getAgentRelationships(String agentId) async {
+    final r = await _dio.get('/agents/$agentId/relationships/agents');
+    return r.data as List<dynamic>;
+  }
+
   // ─── Plaza ────────────────────────────────────────────
   Future<List<dynamic>> getPlazaPosts({int limit = 50}) async {
     final r = await _dio.get('/plaza/posts', queryParameters: {'limit': limit});

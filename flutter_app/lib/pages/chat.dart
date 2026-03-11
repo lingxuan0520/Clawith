@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -214,7 +215,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e')),
+          SnackBar(content: Text('上传失败: $e')),
         );
       }
     } finally {
@@ -239,19 +240,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if (af.imageUrl != null) {
         contentForLLM = text.isNotEmpty
             ? '[image_data:${af.imageUrl}]\n$text'
-            : '[image_data:${af.imageUrl}]\nPlease analyze this image';
-        if (userMsg.isEmpty) userMsg = '[Image] ${af.name}';
+            : '[image_data:${af.imageUrl}]\n请分析这张图片';
+        if (userMsg.isEmpty) userMsg = '[图片] ${af.name}';
       } else {
         final wsPath = af.path ?? '';
         final codePath = wsPath.replaceFirst(RegExp(r'^workspace/'), '');
         final fileLoc = wsPath.isNotEmpty
             ? '\nFile location: $wsPath (for read_file/read_document tools)\nIn execute_code, use relative path: "$codePath"'
             : '';
-        final fileContext = '[file:${af.name}]$fileLoc\n\n${af.text}';
+        final fileContext = '[文件: ${af.name}]$fileLoc\n\n${af.text}';
         contentForLLM = text.isNotEmpty
-            ? '$fileContext\n\nUser question: $text'
-            : 'Please read and analyze the following file:\n\n$fileContext';
-        if (userMsg.isEmpty) userMsg = '[Attachment] ${af.name}';
+            ? '$fileContext\n\n用户问题: $text'
+            : '请阅读并分析以下文件内容:\n\n$fileContext';
+        if (userMsg.isEmpty) userMsg = '[附件] ${af.name}';
       }
     }
 
@@ -275,57 +276,68 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _scrollToBottom();
   }
 
+  /// Get file type emoji matching React implementation
+  String _fileEmoji(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    if (ext == 'pdf') return '📄';
+    if (['csv', 'xlsx', 'xls'].contains(ext)) return '📊';
+    if (['docx', 'doc'].contains(ext)) return '📝';
+    return '📎';
+  }
+
+  bool _isImageFile(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].contains(ext);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: AppColors.bgTertiary,
-                  border: Border.all(color: AppColors.borderSubtle),
-                ),
-                child: const Icon(Icons.smart_toy, size: 20, color: AppColors.textTertiary),
+    return Scaffold(
+      backgroundColor: AppColors.bgPrimary,
+      appBar: AppBar(
+        backgroundColor: AppColors.bgSecondary,
+        title: Row(
+          children: [
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: AppColors.bgTertiary,
+                border: Border.all(color: AppColors.borderSubtle),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_agent?['name'] as String? ?? '...', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                    Row(
-                      children: [
-                        Container(
-                          width: 6, height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _connected ? AppColors.statusRunning : AppColors.statusStopped,
-                          ),
+              child: const Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_agent?['name'] as String? ?? '...', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Row(
+                    children: [
+                      Container(
+                        width: 5, height: 5,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _connected ? AppColors.statusRunning : AppColors.statusStopped,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _connected ? 'Connected' : 'Disconnected',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _connected ? '已连接' : '未连接',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-
-        // Messages
+      ),
+      body: Column(
+        children: [
         Expanded(
           child: _messages.isEmpty
               ? Center(
@@ -334,10 +346,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     children: [
                       const Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
                       const SizedBox(height: 12),
-                      Text('Start a conversation with ${_agent?['name'] ?? 'Agent'}',
+                      Text('开始与 ${_agent?['name'] ?? 'Agent'} 对话',
                           style: const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                       const SizedBox(height: 8),
-                      const Text('Supports text and file uploads', style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+                      const Text('支持文本和文件上传', style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
                     ],
                   ),
                 )
@@ -359,8 +371,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.attach_file, size: 16, color: AppColors.textTertiary),
-                const SizedBox(width: 6),
+                if (_attachedFile!.imageUrl != null)
+                  Container(
+                    width: 32, height: 32,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      color: AppColors.bgTertiary,
+                    ),
+                    child: const Icon(Icons.image, size: 18, color: AppColors.textTertiary),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.only(right: 6),
+                    child: Icon(Icons.attach_file, size: 16, color: AppColors.textTertiary),
+                  ),
                 Expanded(child: Text(_attachedFile!.name, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
                 IconButton(
                   onPressed: () => setState(() => _attachedFile = null),
@@ -386,7 +411,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.attach_file, size: 20),
                 color: AppColors.textTertiary,
-                tooltip: 'Upload file',
+                tooltip: '上传文件',
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -405,8 +430,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     focusNode: FocusNode(),
                     decoration: InputDecoration(
                       hintText: _attachedFile != null
-                          ? 'Ask about ${_attachedFile!.name}...'
-                          : 'Type a message...',
+                          ? '询问关于 ${_attachedFile!.name}...'
+                          : '输入消息...',
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       isDense: true,
                     ),
@@ -422,128 +447,247 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 onPressed: _connected && (_inputCtrl.text.trim().isNotEmpty || _attachedFile != null)
                     ? _sendMessage
                     : null,
-                child: const Text('Send'),
+                child: const Text('发送'),
               ),
             ],
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _buildMessage(ChatMessage msg) {
     final isUser = msg.role == 'user';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: AppColors.bgTertiary,
-              border: Border.all(color: AppColors.borderSubtle),
-            ),
-            child: Icon(
-              isUser ? Icons.person : Icons.smart_toy,
-              size: 18,
-              color: AppColors.textTertiary,
+
+    // Build bubble content
+    final bubbleChildren = <Widget>[];
+
+    // File attachment with emoji icons (matching React)
+    if (msg.fileName != null) {
+      if (_isImageFile(msg.fileName!) && msg.imageUrl != null) {
+        // Image preview
+        bubbleChildren.add(Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          constraints: const BoxConstraints(maxWidth: 240, maxHeight: 180),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.memory(
+            base64Decode(msg.imageUrl!.replaceFirst(RegExp(r'^data:image/[^;]+;base64,'), '')),
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Padding(
+              padding: EdgeInsets.all(12),
+              child: Icon(Icons.broken_image, color: AppColors.textTertiary),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // File attachment
-                if (msg.fileName != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    margin: const EdgeInsets.only(bottom: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgTertiary,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColors.borderSubtle),
+        ));
+      } else {
+        // File badge with type emoji
+        final emoji = _fileEmoji(msg.fileName!);
+        bubbleChildren.add(Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          margin: EdgeInsets.only(bottom: msg.content.isNotEmpty ? 4 : 0),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 12)),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  msg.fileName!,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ],
+          ),
+        ));
+      }
+    }
+
+    // Thinking (only for assistant)
+    if (!isUser && msg.thinking != null && msg.thinking!.isNotEmpty) {
+      bubbleChildren.add(Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF9382DC).withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF9382DC).withValues(alpha: 0.15)),
+        ),
+        child: ExpansionTile(
+          dense: true,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+          childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+          title: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('💭 ', style: TextStyle(fontSize: 12)),
+              Text('思考中', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF9382DC))),
+            ],
+          ),
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 300),
+              child: SingleChildScrollView(
+                child: Text(msg.thinking!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
+              ),
+            ),
+          ],
+        ),
+      ));
+    }
+
+    // Tool calls (only for assistant)
+    if (!isUser && msg.toolCalls != null && msg.toolCalls!.isNotEmpty) {
+      bubbleChildren.add(Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: AppColors.accentSubtle,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: ExpansionTile(
+          dense: true,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+          childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.build, size: 13, color: AppColors.accentPrimary),
+              const SizedBox(width: 4),
+              Text(
+                '${msg.toolCalls!.length} 个工具调用',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.accentPrimary),
+              ),
+            ],
+          ),
+          children: msg.toolCalls!.asMap().entries.map((entry) {
+            final j = entry.key;
+            final tc = entry.value;
+            return Container(
+              padding: EdgeInsets.only(bottom: j < msg.toolCalls!.length - 1 ? 6 : 0),
+              margin: EdgeInsets.only(bottom: j < msg.toolCalls!.length - 1 ? 6 : 0),
+              decoration: BoxDecoration(
+                border: j < msg.toolCalls!.length - 1
+                    ? const Border(bottom: BorderSide(color: AppColors.borderSubtle))
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tc.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accentPrimary)),
+                  if (tc.args != null)
+                    Text(
+                      tc.args is String ? tc.args : jsonEncode(tc.args),
+                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textTertiary),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.attach_file, size: 12, color: AppColors.textTertiary),
-                        const SizedBox(width: 4),
-                        Text(msg.fileName!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ),
-                // Thinking
-                if (msg.thinking != null && msg.thinking!.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF9382DC).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF9382DC).withValues(alpha: 0.15)),
-                    ),
-                    child: ExpansionTile(
-                      dense: true,
-                      tilePadding: const EdgeInsets.symmetric(horizontal: 10),
-                      childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-                      title: const Text('Thinking', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF9382DC))),
-                      children: [
-                        Text(msg.thinking!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
-                      ],
-                    ),
-                  ),
-                // Tool calls
-                if (msg.toolCalls != null && msg.toolCalls!.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentSubtle,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: ExpansionTile(
-                      dense: true,
-                      tilePadding: const EdgeInsets.symmetric(horizontal: 10),
-                      childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-                      title: Text(
-                        '${msg.toolCalls!.length} tool call${msg.toolCalls!.length > 1 ? 's' : ''}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.accentPrimary),
+                  if (tc.result != null)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      constraints: const BoxConstraints(maxHeight: 120),
+                      child: SingleChildScrollView(
+                        child: Text(tc.result!, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
                       ),
-                      children: msg.toolCalls!.map((tc) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(tc.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accentPrimary)),
-                            Text(
-                              tc.args?.toString() ?? '',
-                              style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textTertiary),
-                            ),
-                            if (tc.result != null)
-                              Container(
-                                margin: const EdgeInsets.only(top: 4),
-                                constraints: const BoxConstraints(maxHeight: 120),
-                                child: SingleChildScrollView(
-                                  child: Text(tc.result!, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
-                                ),
-                              ),
-                          ],
-                        ),
-                      )).toList(),
                     ),
-                  ),
-                // Content
-                if (msg.content.isNotEmpty)
-                  isUser
-                      ? Text(msg.content, style: const TextStyle(fontSize: 14, height: 1.6))
-                      : MarkdownRenderer(data: msg.content),
-              ],
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ));
+    }
+
+    // Content
+    if (msg.content.isNotEmpty) {
+      bubbleChildren.add(
+        isUser
+            ? Text(msg.content, style: const TextStyle(fontSize: 14, height: 1.6, color: Colors.white))
+            : MarkdownRenderer(data: msg.content),
+      );
+    }
+
+    // Build the full message row
+    if (isUser) {
+      // User: right-aligned, accent background, avatar on right
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Spacer(flex: 3),
+            Flexible(
+              flex: 7,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.accentPrimary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: bubbleChildren,
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(width: 10),
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: AppColors.bgTertiary,
+                border: Border.all(color: AppColors.borderSubtle),
+              ),
+              child: const Icon(Icons.person, size: 18, color: AppColors.textTertiary),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Assistant: left-aligned, elevated background, avatar on left
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: AppColors.bgTertiary,
+                border: Border.all(color: AppColors.borderSubtle),
+              ),
+              child: const Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              flex: 7,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.bgElevated,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.borderSubtle),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: bubbleChildren,
+                ),
+              ),
+            ),
+            const Spacer(flex: 3),
+          ],
+        ),
+      );
+    }
   }
 
   @override

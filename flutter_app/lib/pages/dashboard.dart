@@ -111,7 +111,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       case 'running': return 'Running';
       case 'idle': return 'Standby';
       case 'stopped': return 'Stopped';
-      case 'error': return 'Error';
+      case 'error': return '错误';
       case 'creating': return 'Creating';
       default: return s;
     }
@@ -149,7 +149,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ElevatedButton.icon(
                 onPressed: () => context.go('/agents/new'),
                 icon: const Icon(Icons.add, size: 16),
-                label: const Text('New Agent'),
+                label: const Text('新建智能体'),
               ),
             ],
           ),
@@ -168,7 +168,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     ElevatedButton.icon(
                       onPressed: () => context.go('/agents/new'),
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Create first agent'),
+                      label: const Text('创建第一个智能体'),
                     ),
                   ],
                 ),

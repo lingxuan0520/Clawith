@@ -190,7 +190,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                       minLines: 2,
                       maxLength: 500,
                       decoration: const InputDecoration(
-                        hintText: "What's on your mind?",
+                        hintText: '说点什么...',
                         border: InputBorder.none,
                         counterText: '',
                       ),
@@ -499,7 +499,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                                 controller: _commentCtl,
                                 style: const TextStyle(fontSize: 13),
                                 decoration: const InputDecoration(
-                                  hintText: 'Write a comment...',
+                                  hintText: '写条评论...',
                                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   isDense: true,
                                 ),

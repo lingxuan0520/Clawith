@@ -81,6 +81,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   String? _viewingSkillContent;
   String? _viewingSkillName;
 
+  // ── Relationships ─────────────────────────────────────────
+  List<dynamic> _humanRelationships = [];
+  List<dynamic> _agentRelationships = [];
+  bool _loadingRelationships = false;
+
   // ── Workspace ────────────────────────────────────────────
   List<dynamic> _workspaceFiles = [];
   String _currentPath = '';
@@ -110,16 +115,17 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   bool _showDeleteConfirm = false;
 
   static const _tabLabels = [
-    'Overview',
-    'Chat',
-    'Tasks',
-    'Pulse',
-    'Mind',
-    'Tools',
-    'Skills',
-    'Workspace',
-    'Activity',
-    'Settings',
+    '状态',
+    '聊天',
+    '任务',
+    '动态',
+    '思维',
+    '工具',
+    '技能',
+    '关系',
+    '工作区',
+    '活动',
+    '设置',
   ];
 
   // ─── Lifecycle ───────────────────────────────────────────
@@ -191,12 +197,15 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _fetchSkillsData();
         break;
       case 7:
-        _fetchWorkspaceFiles();
+        _fetchRelationshipsData();
         break;
       case 8:
-        _fetchActivity();
+        _fetchWorkspaceFiles();
         break;
       case 9:
+        _fetchActivity();
+        break;
+      case 10:
         _fetchSettingsData();
         break;
     }
@@ -264,7 +273,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingTasks = false);
-      _showSnack('Failed to load tasks: $e');
+      _showSnack('加载任务失败: $e');
     }
   }
 
@@ -359,6 +368,25 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
   }
 
+  Future<void> _fetchRelationshipsData() async {
+    setState(() => _loadingRelationships = true);
+    try {
+      final results = await Future.wait([
+        _api.getRelationships(widget.agentId).catchError((_) => <dynamic>[]),
+        _api.getAgentRelationships(widget.agentId).catchError((_) => <dynamic>[]),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _humanRelationships = results[0] as List<dynamic>;
+        _agentRelationships = results[1] as List<dynamic>;
+        _loadingRelationships = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingRelationships = false);
+    }
+  }
+
   Future<void> _fetchWorkspaceFiles([String path = '']) async {
     setState(() {
       _loadingWorkspace = true;
@@ -376,7 +404,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingWorkspace = false);
-      _showSnack('Failed to load files: $e');
+      _showSnack('加载文件失败: $e');
     }
   }
 
@@ -392,7 +420,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingActivity = false);
-      _showSnack('Failed to load activity: $e');
+      _showSnack('加载活动失败: $e');
     }
   }
 
@@ -430,9 +458,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       await _api.startAgent(widget.agentId);
       await _fetchAgent();
-      _showSnack('Agent started');
+      _showSnack('智能体已启动');
     } catch (e) {
-      _showSnack('Failed to start agent: $e');
+      _showSnack('启动失败: $e');
     }
   }
 
@@ -440,25 +468,25 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       await _api.stopAgent(widget.agentId);
       await _fetchAgent();
-      _showSnack('Agent stopped');
+      _showSnack('智能体已停止');
     } catch (e) {
-      _showSnack('Failed to stop agent: $e');
+      _showSnack('停止失败: $e');
     }
   }
 
   Future<void> _deleteAgent() async {
     final confirmed = await _showConfirmDialog(
-      'Delete Agent',
-      'Are you sure you want to permanently delete this agent? This action cannot be undone.',
+      '删除智能体',
+      '确认永久删除这个智能体吗？此操作不可撤销。',
     );
     if (confirmed != true) return;
     try {
       await _api.deleteAgent(widget.agentId);
       if (!mounted) return;
       context.go('/dashboard');
-      _showSnack('Agent deleted');
+      _showSnack('智能体已删除');
     } catch (e) {
-      _showSnack('Failed to delete agent: $e');
+      _showSnack('删除失败: $e');
     }
   }
 
@@ -474,18 +502,18 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _editingRole = false;
         _savingRole = false;
       });
-      _showSnack('Role description saved');
+      _showSnack('角色描述已保存');
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingRole = false);
-      _showSnack('Failed to save: $e');
+      _showSnack('保存失败: $e');
     }
   }
 
   Future<void> _createTask() async {
     final title = _taskTitleCtrl.text.trim();
     if (title.isEmpty) {
-      _showSnack('Task title is required');
+      _showSnack('请输入任务标题');
       return;
     }
     setState(() => _creatingTask = true);
@@ -504,12 +532,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _showCreateTask = false;
         _taskPriority = 'medium';
       });
-      _showSnack('Task created');
+      _showSnack('任务已创建');
       _fetchTasks();
     } catch (e) {
       if (!mounted) return;
       setState(() => _creatingTask = false);
-      _showSnack('Failed to create task: $e');
+      _showSnack('创建任务失败: $e');
     }
   }
 
@@ -523,11 +551,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _editingSoul = false;
         _savingSoul = false;
       });
-      _showSnack('soul.md saved');
+      _showSnack('soul.md 已保存');
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingSoul = false);
-      _showSnack('Failed to save soul.md: $e');
+      _showSnack('保存 soul.md 失败: $e');
     }
   }
 
@@ -536,7 +564,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       await _api.toggleAgentTool(widget.agentId, toolId, enabled);
       _fetchToolsData();
     } catch (e) {
-      _showSnack('Failed to toggle tool: $e');
+      _showSnack('工具开关失败: $e');
     }
   }
 
@@ -564,11 +592,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       await _fetchAgentSilent();
       if (!mounted) return;
       setState(() => _savingSettings = false);
-      _showSnack('Settings saved');
+      _showSnack('设置已保存');
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingSettings = false);
-      _showSnack('Failed to save settings: $e');
+      _showSnack('保存设置失败: $e');
     }
   }
 
@@ -589,7 +617,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _viewingFileName = name;
       });
     } catch (e) {
-      _showSnack('Failed to read file: $e');
+      _showSnack('读取文件失败: $e');
     }
   }
 
@@ -603,53 +631,53 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _viewingSkillName = name;
       });
     } catch (e) {
-      _showSnack('Failed to read skill file: $e');
+      _showSnack('读取技能文件失败: $e');
     }
   }
 
   Future<void> _deleteSkillFile(String name) async {
     final confirmed = await _showConfirmDialog(
-      'Delete Skill',
-      'Are you sure you want to delete "$name"?',
+      '删除技能',
+      '确认删除 "$name" 吗？',
     );
     if (confirmed != true) return;
     try {
       await _api.deleteFile(widget.agentId, 'skills/$name');
-      _showSnack('Skill deleted');
+      _showSnack('技能已删除');
       _fetchSkillsData();
     } catch (e) {
-      _showSnack('Failed to delete skill: $e');
+      _showSnack('删除技能失败: $e');
     }
   }
 
   Future<void> _deleteWorkspaceFile(String name) async {
     final confirmed = await _showConfirmDialog(
-      'Delete File',
-      'Are you sure you want to delete "$name"?',
+      '删除文件',
+      '确认删除 "$name" 吗？',
     );
     if (confirmed != true) return;
     try {
       final filePath = _currentPath.isEmpty ? name : '$_currentPath/$name';
       await _api.deleteFile(widget.agentId, filePath);
-      _showSnack('File deleted');
+      _showSnack('文件已删除');
       _fetchWorkspaceFiles(_currentPath);
     } catch (e) {
-      _showSnack('Failed to delete file: $e');
+      _showSnack('删除文件失败: $e');
     }
   }
 
   Future<void> _deleteTrigger(String triggerId) async {
     final confirmed = await _showConfirmDialog(
-      'Delete Trigger',
-      'Are you sure you want to delete this trigger?',
+      '删除触发器',
+      '确认删除此触发器吗？',
     );
     if (confirmed != true) return;
     try {
       await _api.deleteTrigger(widget.agentId, triggerId);
-      _showSnack('Trigger deleted');
+      _showSnack('触发器已删除');
       _fetchPulseData();
     } catch (e) {
-      _showSnack('Failed to delete trigger: $e');
+      _showSnack('删除触发器失败: $e');
     }
   }
 
@@ -659,29 +687,29 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       if (!mounted) return;
       _showContentDialog(name, res['content'] as String? ?? '(empty)');
     } catch (e) {
-      _showSnack('Failed to read memory file: $e');
+      _showSnack('读取记忆文件失败: $e');
     }
   }
 
   Future<void> _deleteChannel() async {
     final confirmed = await _showConfirmDialog(
-      'Delete Channel',
-      'Are you sure you want to delete the channel configuration?',
+      '删除通道',
+      '确认删除通道配置吗？',
     );
     if (confirmed != true) return;
     try {
       await _api.deleteChannel(widget.agentId);
-      _showSnack('Channel deleted');
+      _showSnack('通道已删除');
       _fetchSettingsData();
     } catch (e) {
-      _showSnack('Failed to delete channel: $e');
+      _showSnack('删除通道失败: $e');
     }
   }
 
   Future<void> _deleteSchedule(String scheduleId) async {
     final confirmed = await _showConfirmDialog(
-      'Delete Schedule',
-      'Are you sure you want to delete this schedule?',
+      '删除计划',
+      '确认删除此计划吗？',
     );
     if (confirmed != true) return;
     try {
@@ -723,12 +751,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: const Text('取消'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirm'),
+            child: const Text('确认'),
           ),
         ],
       ),
@@ -805,9 +833,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       case 'idle':
         return 'Idle';
       case 'stopped':
-        return 'Stopped';
+        return '已停止';
       case 'error':
-        return 'Error';
+        return '错误';
       default:
         return status ?? 'Unknown';
     }
@@ -927,13 +955,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           if (status == 'running' || status == 'idle')
             IconButton(
               icon: const Icon(Icons.stop, color: AppColors.warning),
-              tooltip: 'Stop Agent',
+              tooltip: '停止智能体',
               onPressed: _stopAgent,
             )
           else
             IconButton(
               icon: const Icon(Icons.play_arrow, color: AppColors.success),
-              tooltip: 'Start Agent',
+              tooltip: '启动智能体',
               onPressed: _startAgent,
             ),
           IconButton(
@@ -965,6 +993,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           _buildMindTab(),
           _buildToolsTab(),
           _buildSkillsTab(),
+          _buildRelationshipsTab(),
           _buildWorkspaceTab(),
           _buildActivityTab(),
           _buildSettingsTab(agent),
@@ -1051,10 +1080,10 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   runSpacing: 8,
                   children: [
                     if (status == 'running' || status == 'idle')
-                      _actionBtn(Icons.stop, 'Stop', AppColors.warning, _stopAgent)
+                      _actionBtn(Icons.stop, '停止', AppColors.warning, _stopAgent)
                     else
-                      _actionBtn(Icons.play_arrow, 'Start', AppColors.success, _startAgent),
-                    _actionBtn(Icons.chat_bubble_outline, 'Chat', AppColors.accentPrimary, () {
+                      _actionBtn(Icons.play_arrow, '启动', AppColors.success, _startAgent),
+                    _actionBtn(Icons.chat_bubble_outline, '聊天', AppColors.accentPrimary, () {
                       context.go('/agents/${widget.agentId}/chat');
                     }),
                     _actionBtn(Icons.refresh, 'Refresh', AppColors.textSecondary, _fetchAgent),
@@ -1107,7 +1136,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                           _roleController.text = agent['role_description'] as String? ?? '';
                           setState(() => _editingRole = false);
                         },
-                        child: const Text('Cancel'),
+                        child: const Text('取消'),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
@@ -1126,7 +1155,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   Text(
                     (agent['role_description'] as String?)?.isNotEmpty == true
                         ? agent['role_description'] as String
-                        : 'No role description set. Click edit to add one.',
+                        : '暂无角色描述，点击编辑按钮添加。',
                     style: TextStyle(
                       color: (agent['role_description'] as String?)?.isNotEmpty == true
                           ? AppColors.textSecondary
@@ -1158,7 +1187,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   children: [
                     Expanded(child: _metricTile('Messages', messagesCount.toString(), Icons.message)),
                     const SizedBox(width: 12),
-                    Expanded(child: _metricTile('Tasks Done', tasksCompleted.toString(), Icons.check_circle)),
+                    Expanded(child: _metricTile('已完成任务', tasksCompleted.toString(), Icons.check_circle)),
                   ],
                 ),
               ],
@@ -1215,7 +1244,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 _infoRow('Created', _fmtTs(createdAt)),
                 _infoRow('Updated', _fmtTs(updatedAt)),
                 _infoRow('Model', model),
-                _infoRow('Status', _statusLabel(status)),
+                _infoRow('状态', _statusLabel(status)),
               ],
             ),
           ),
@@ -1323,7 +1352,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           const Icon(Icons.chat_bubble_outline, size: 64, color: AppColors.textTertiary),
           const SizedBox(height: 16),
           const Text(
-            'Chat with this agent',
+            '开始与此智能体聊天',
             style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
@@ -1357,7 +1386,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const Icon(Icons.task_alt, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('Tasks', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+                child: Text('任务', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               _segmentedControl(
                 options: const ['all', 'pending', 'running', 'completed', 'failed'],
@@ -1394,7 +1423,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Create Task', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const Text('创建任务', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _taskTitleCtrl,
@@ -1430,7 +1459,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     children: [
                       TextButton(
                         onPressed: () => setState(() => _showCreateTask = false),
-                        child: const Text('Cancel'),
+                        child: const Text('取消'),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
@@ -1487,7 +1516,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           child: _loadingTasks
               ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
               : _tasks.isEmpty
-                  ? _emptyState('No tasks yet', 'Create a task to get started.')
+                  ? _emptyState('暂无任务', '创建一个任务开始吧。')
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       itemCount: _tasks.length,
@@ -1669,7 +1698,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           iconColor: AppColors.accentPrimary,
           title: 'Agenda',
           content: _agendaContent,
-          emptyMsg: 'No agenda file found.',
+          emptyMsg: '未找到日程文件。',
         );
       case 'triggers':
         return _buildTriggersSection();
@@ -1679,7 +1708,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           iconColor: AppColors.accentPrimary,
           title: 'Monologue',
           content: _monologueContent,
-          emptyMsg: 'No monologue content.',
+          emptyMsg: '暂无内心独白内容。',
         );
       case 'history':
         return _buildPulseContent(
@@ -1687,7 +1716,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           iconColor: AppColors.warning,
           title: 'Task History',
           content: _taskHistoryContent,
-          emptyMsg: 'No task history found.',
+          emptyMsg: '暂无任务历史。',
         );
       default:
         return const SizedBox.shrink();
@@ -1755,7 +1784,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             const SizedBox(height: 12),
             if (_triggers.isEmpty)
               const Text(
-                'No triggers configured.',
+                '暂无触发器配置。',
                 style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic),
               )
             else
@@ -1867,17 +1896,17 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                           _soulController.text = _soulContent ?? '';
                           setState(() => _editingSoul = false);
                         },
-                        child: const Text('Cancel'),
+                        child: const Text('取消'),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: _savingSoul ? null : _saveSoulMd,
-                        child: _savingSoul ? _miniSpinner() : const Text('Save'),
+                        child: _savingSoul ? _miniSpinner() : const Text('保存'),
                       ),
                     ],
                   ),
                 ] else
-                  _codeBlock(_soulContent, 'No soul.md file found. Click edit to create one.'),
+                  _codeBlock(_soulContent, '未找到 soul.md 文件，点击编辑按钮创建。'),
               ],
             ),
           ),
@@ -1892,7 +1921,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 const SizedBox(height: 12),
                 if (_memoryFiles.isEmpty)
                   const Text(
-                    'No memory files found.',
+                    '暂无记忆文件。',
                     style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic),
                   )
                 else
@@ -1959,7 +1988,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const Icon(Icons.build, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('Tools', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+                child: Text('工具', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               IconButton(icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18), onPressed: _fetchToolsData),
             ],
@@ -2191,7 +2220,143 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   // ═══════════════════════════════════════════════════════════
-  // TAB 7 : Workspace (file browser)
+  // TAB 7 : Relationships
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _buildRelationshipsTab() {
+    if (_loadingRelationships) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Human Relationships
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('人际关系', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                if (_humanRelationships.isEmpty)
+                  const Text('暂无人际关系', style: TextStyle(color: AppColors.textTertiary, fontSize: 13))
+                else
+                  ..._humanRelationships.map((r) {
+                    final member = r['member'] as Map<String, dynamic>?;
+                    final label = r['relation_label'] as String? ?? r['relation'] as String? ?? '';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgTertiary,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.borderSubtle),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: AppColors.bgElevated,
+                            child: Text(
+                              (member?['name'] as String? ?? '?').substring(0, 1),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(member?['name'] as String? ?? '未知', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                                if (member?['title'] != null)
+                                  Text(member!['title'] as String, style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                if (r['description'] != null && (r['description'] as String).isNotEmpty)
+                                  Text(r['description'] as String, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentSubtle,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.accentText)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Agent-to-Agent Relationships
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('智能体关系', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                if (_agentRelationships.isEmpty)
+                  const Text('暂无智能体关系', style: TextStyle(color: AppColors.textTertiary, fontSize: 13))
+                else
+                  ..._agentRelationships.map((r) {
+                    final label = r['relation_label'] as String? ?? r['relation'] as String? ?? '';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgTertiary,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.borderSubtle),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: AppColors.bgElevated,
+                              border: Border.all(color: AppColors.borderSubtle),
+                            ),
+                            child: const Icon(Icons.smart_toy, size: 20, color: AppColors.textTertiary),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(r['target_agent_name'] as String? ?? '未知智能体', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                                if (r['description'] != null && (r['description'] as String).isNotEmpty)
+                                  Text(r['description'] as String, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentSubtle,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.accentText)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // TAB 8 : Workspace (file browser)
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildWorkspaceTab() {
@@ -2695,7 +2860,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     alignment: Alignment.centerRight,
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                      label: const Text('Delete Channel', style: TextStyle(color: AppColors.error)),
+                      label: const Text('删除通道', style: TextStyle(color: AppColors.error)),
                       style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
                       onPressed: _deleteChannel,
                     ),
@@ -2734,7 +2899,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 if (!_showDeleteConfirm)
                   ElevatedButton.icon(
                     icon: const Icon(Icons.delete_forever, size: 18),
-                    label: const Text('Delete Agent'),
+                    label: const Text('删除智能体'),
                     style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
                     onPressed: () => setState(() => _showDeleteConfirm = true),
                   )
@@ -2751,7 +2916,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       const SizedBox(width: 8),
                       OutlinedButton(
                         onPressed: () => setState(() => _showDeleteConfirm = false),
-                        child: const Text('Cancel'),
+                        child: const Text('取消'),
                       ),
                     ],
                   ),

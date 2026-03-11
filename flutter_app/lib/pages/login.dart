@@ -177,10 +177,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ],
                             ),
                             const SizedBox(height: 32),
-                            const Text('Welcome aboard',
+                            const Text('欢迎回来',
                                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                             const SizedBox(height: 4),
-                            const Text('Sign in to manage your AI crew.',
+                            const Text('登录以管理你的 AI 团队。',
                                 style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
                             const SizedBox(height: 32),
                             if (_error.isNotEmpty)

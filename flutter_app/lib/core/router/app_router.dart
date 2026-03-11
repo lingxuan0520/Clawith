@@ -22,12 +22,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final location = state.matchedLocation;
 
-      // Still initializing — stay on or go to splash
       if (!authState.initialized) {
         return location == '/splash' ? null : '/splash';
       }
 
-      // Initialized — never stay on splash
       final isLoggedIn = authState.token != null;
       if (location == '/splash') {
         return isLoggedIn ? '/plaza' : '/login';
@@ -47,6 +45,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (context, state) => const LoginPage(),
       ),
+      // Agent detail and chat have their own full AppBar — outside shell
+      GoRoute(
+        path: '/agents/new',
+        builder: (context, state) => const AgentCreatePage(),
+      ),
+      GoRoute(
+        path: '/agents/:id',
+        builder: (context, state) =>
+            AgentDetailPage(agentId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/agents/:id/chat',
+        builder: (context, state) =>
+            ChatPage(agentId: state.pathParameters['id']!),
+      ),
       ShellRoute(
         builder: (context, state, child) => LayoutShell(child: child),
         routes: [
@@ -57,20 +70,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/plaza',
             builder: (context, state) => const PlazaPage(),
-          ),
-          GoRoute(
-            path: '/agents/new',
-            builder: (context, state) => const AgentCreatePage(),
-          ),
-          GoRoute(
-            path: '/agents/:id',
-            builder: (context, state) =>
-                AgentDetailPage(agentId: state.pathParameters['id']!),
-          ),
-          GoRoute(
-            path: '/agents/:id/chat',
-            builder: (context, state) =>
-                ChatPage(agentId: state.pathParameters['id']!),
           ),
           GoRoute(
             path: '/messages',

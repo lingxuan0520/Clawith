@@ -83,7 +83,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Messages', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                const Text('消息', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                 if (unreadCount > 0)
                   TextButton(
                     onPressed: _markAllRead,
@@ -106,7 +106,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                     color: AppColors.bgSecondary,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text('No messages yet', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+                  child: const Text('暂无消息', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                 ),
               )
             else

@@ -110,7 +110,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Invitation Codes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                  const Text('邀请码', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   const Text('Manage invitation codes for platform registration.',
                       style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
@@ -183,7 +183,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Create Invitation Codes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                        const Text('创建邀请码', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -252,7 +252,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                               child: TextField(
                                 controller: _searchCtrl,
                                 decoration: const InputDecoration(
-                                  hintText: 'Search...',
+                                  hintText: '搜索...',
                                   isDense: true,
                                   contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                                 ),
