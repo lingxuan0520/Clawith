@@ -486,6 +486,40 @@ class ApiService {
     return r.data as Map<String, dynamic>;
   }
 
+  // ─── Org Structure ────────────────────────────────
+  Future<Map<String, dynamic>?> getSystemSetting(String key) async {
+    try {
+      final r = await _dio.get('/enterprise/system-settings/$key');
+      return r.data as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setSystemSetting(String key, dynamic value) async {
+    await _dio.put('/enterprise/system-settings/$key', data: {'value': value});
+  }
+
+  Future<List<dynamic>> listOrgDepartments({String? tenantId}) async {
+    final r = await _dio.get('/enterprise/org/departments',
+        queryParameters: tenantId != null ? {'tenant_id': tenantId} : null);
+    return r.data as List<dynamic>;
+  }
+
+  Future<List<dynamic>> listOrgMembers({String? departmentId, String? search, String? tenantId}) async {
+    final params = <String, dynamic>{};
+    if (departmentId != null) params['department_id'] = departmentId;
+    if (search != null && search.isNotEmpty) params['search'] = search;
+    if (tenantId != null) params['tenant_id'] = tenantId;
+    final r = await _dio.get('/enterprise/org/members', queryParameters: params);
+    return r.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> syncOrg() async {
+    final r = await _dio.post('/enterprise/org/sync');
+    return r.data as Map<String, dynamic>;
+  }
+
   // ─── Invitation Codes ─────────────────────────────────
   Future<Map<String, dynamic>> getInvitationSetting() async {
     final r = await _dio.get('/enterprise/system-settings/invitation_code_enabled');

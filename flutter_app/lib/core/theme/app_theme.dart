@@ -44,14 +44,25 @@ class AppColors {
 }
 
 class AppTheme {
-  static ThemeData get darkTheme {
+  static Color _parseHex(String? hex, Color fallback) {
+    if (hex == null || hex.isEmpty) return fallback;
+    try {
+      final h = hex.replaceFirst('#', '');
+      return Color(int.parse('FF$h', radix: 16));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  static ThemeData darkTheme({String? accentHex}) {
+    final accent = _parseHex(accentHex, AppColors.accentPrimary);
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.bgPrimary,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.accentPrimary,
-        secondary: AppColors.accentPrimary,
+      colorScheme: ColorScheme.dark(
+        primary: accent,
+        secondary: accent,
         surface: AppColors.bgSecondary,
         error: AppColors.error,
         onPrimary: Colors.white,
@@ -85,7 +96,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.accentPrimary, width: 1.5),
+          borderSide: BorderSide(color: accent, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
@@ -93,7 +104,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accentPrimary,
+          backgroundColor: accent,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -111,7 +122,7 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.accentPrimary,
+          foregroundColor: accent,
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         ),
       ),
@@ -129,10 +140,10 @@ class AppTheme {
         bodySmall: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         labelSmall: TextStyle(fontSize: 11, color: AppColors.textTertiary),
       ),
-      tabBarTheme: const TabBarThemeData(
-        labelColor: AppColors.accentPrimary,
+      tabBarTheme: TabBarThemeData(
+        labelColor: accent,
         unselectedLabelColor: AppColors.textTertiary,
-        indicatorColor: AppColors.accentPrimary,
+        indicatorColor: accent,
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.bgTertiary,
@@ -155,14 +166,15 @@ class AppTheme {
     );
   }
 
-  static ThemeData get lightTheme {
+  static ThemeData lightTheme({String? accentHex}) {
+    final accent = _parseHex(accentHex, AppColors.accentPrimary);
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.lightBgPrimary,
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.accentPrimary,
-        secondary: AppColors.accentPrimary,
+      colorScheme: ColorScheme.light(
+        primary: accent,
+        secondary: accent,
         surface: AppColors.lightBgSecondary,
         error: AppColors.error,
       ),
@@ -187,7 +199,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.accentPrimary, width: 1.5),
+          borderSide: BorderSide(color: accent, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),

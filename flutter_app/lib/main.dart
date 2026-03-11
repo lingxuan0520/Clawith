@@ -26,7 +26,9 @@ class ClawithApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Soloship',
       debugShowCheckedModeBanner: false,
-      theme: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
+      theme: isDark
+          ? AppTheme.darkTheme(accentHex: appState.accentColor)
+          : AppTheme.lightTheme(accentHex: appState.accentColor),
       routerConfig: router,
     );
   }

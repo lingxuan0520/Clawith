@@ -7,12 +7,14 @@ class AppState {
   final String? selectedAgentId;
   final String currentTenantId;
   final String themeMode; // 'dark' or 'light'
+  final String? accentColor; // hex, e.g. '#5A96FF'
 
   const AppState({
     this.sidebarCollapsed = false,
     this.selectedAgentId,
     this.currentTenantId = '',
     this.themeMode = 'dark',
+    this.accentColor,
   });
 
   AppState copyWith({
@@ -20,13 +22,16 @@ class AppState {
     String? selectedAgentId,
     String? currentTenantId,
     String? themeMode,
+    String? accentColor,
     bool clearAgent = false,
+    bool clearAccent = false,
   }) {
     return AppState(
       sidebarCollapsed: sidebarCollapsed ?? this.sidebarCollapsed,
       selectedAgentId: clearAgent ? null : (selectedAgentId ?? this.selectedAgentId),
       currentTenantId: currentTenantId ?? this.currentTenantId,
       themeMode: themeMode ?? this.themeMode,
+      accentColor: clearAccent ? null : (accentColor ?? this.accentColor),
     );
   }
 }
@@ -41,10 +46,12 @@ class AppNotifier extends StateNotifier<AppState> {
     final collapsed = prefs.getBool('sidebar_collapsed') ?? false;
     final theme = prefs.getString('theme') ?? 'dark';
     final tenant = prefs.getString('current_tenant_id') ?? '';
+    final accent = prefs.getString('accent_color');
     state = state.copyWith(
       sidebarCollapsed: collapsed,
       themeMode: theme,
       currentTenantId: tenant,
+      accentColor: accent,
     );
   }
 
@@ -70,6 +77,16 @@ class AppNotifier extends StateNotifier<AppState> {
 
   void setSelectedAgent(String? id) {
     state = state.copyWith(selectedAgentId: id, clearAgent: id == null);
+  }
+
+  Future<void> setAccentColor(String? hex) async {
+    state = state.copyWith(accentColor: hex, clearAccent: hex == null);
+    final prefs = await SharedPreferences.getInstance();
+    if (hex == null) {
+      await prefs.remove('accent_color');
+    } else {
+      await prefs.setString('accent_color', hex);
+    }
   }
 }
 

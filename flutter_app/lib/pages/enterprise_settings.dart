@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../stores/auth_store.dart';
+import '../stores/app_store.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
 import '../core/network/api_client.dart';
@@ -27,6 +28,7 @@ class _EnterpriseSettingsPageState
     'Skills',
     'Quotas & Users',
     'Knowledge Base',
+    'Org Structure',
   ];
 
   @override
@@ -77,6 +79,7 @@ class _EnterpriseSettingsPageState
           _SkillsTab(),
           _QuotasUsersTab(),
           _KnowledgeBaseTab(),
+          _OrgTab(),
         ],
       ),
     );
@@ -509,6 +512,11 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        // ── Theme Color Picker ──
+        _SectionCard(
+          child: _ThemeColorPicker(),
+        ),
       ],
     );
   }
@@ -521,6 +529,616 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
     _publicUrlCtl.dispose();
     _maxRoundsCtl.dispose();
     super.dispose();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  THEME COLOR PICKER
+// ═══════════════════════════════════════════════════════════════
+class _ThemeColorPicker extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_ThemeColorPicker> createState() => _ThemeColorPickerState();
+}
+
+class _ThemeColorPickerState extends ConsumerState<_ThemeColorPicker> {
+  final _hexCtl = TextEditingController();
+
+  static const _presets = [
+    {'name': 'Blue', 'hex': '#5A96FF'},
+    {'name': 'Purple', 'hex': '#9C7CF4'},
+    {'name': 'Green', 'hex': '#22C55E'},
+    {'name': 'Teal', 'hex': '#14B8A6'},
+    {'name': 'Orange', 'hex': '#F97316'},
+    {'name': 'Pink', 'hex': '#EC4899'},
+    {'name': 'Red', 'hex': '#EF4444'},
+    {'name': 'Yellow', 'hex': '#EAB308'},
+  ];
+
+  void _apply(String hex) {
+    ref.read(appProvider.notifier).setAccentColor(hex);
+  }
+
+  void _reset() {
+    ref.read(appProvider.notifier).setAccentColor(null);
+    _hexCtl.clear();
+  }
+
+  void _applyCustom() {
+    final hex = _hexCtl.text.trim();
+    final valid = RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex);
+    if (!valid) return;
+    _apply(hex);
+  }
+
+  @override
+  void dispose() {
+    _hexCtl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentColor = ref.watch(appProvider).accentColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Theme Accent Color',
+            style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _presets.map((p) {
+            final hex = p['hex']!;
+            final isSelected = currentColor == hex;
+            final color = Color(int.parse('FF${hex.replaceFirst('#', '')}', radix: 16));
+            return GestureDetector(
+              onTap: () => _apply(hex),
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? AppColors.textPrimary : Colors.transparent,
+                    width: 2,
+                  ),
+                  boxShadow: isSelected
+                      ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4, spreadRadius: 1)]
+                      : null,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            SizedBox(
+              width: 120,
+              child: TextField(
+                controller: _hexCtl,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'monospace',
+                    color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  hintText: '#hex',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  isDense: true,
+                ),
+                onSubmitted: (_) => _applyCustom(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: _applyCustom,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                textStyle: const TextStyle(fontSize: 12),
+              ),
+              child: const Text('Apply'),
+            ),
+            if (currentColor != null) ...[
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: _reset,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textTertiary,
+                  textStyle: const TextStyle(fontSize: 12),
+                ),
+                child: const Text('Reset'),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Color(int.parse(
+                      'FF${currentColor.replaceFirst('#', '')}', radix: 16)),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppColors.borderDefault),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  7. ORG STRUCTURE TAB
+// ═══════════════════════════════════════════════════════════════
+class _OrgTab extends ConsumerStatefulWidget {
+  const _OrgTab();
+
+  @override
+  ConsumerState<_OrgTab> createState() => _OrgTabState();
+}
+
+class _OrgTabState extends ConsumerState<_OrgTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  final _appIdCtl = TextEditingController();
+  final _appSecretCtl = TextEditingController();
+  final _memberSearchCtl = TextEditingController();
+  bool _syncing = false;
+  Map<String, dynamic>? _syncResult;
+  List<dynamic> _departments = [];
+  List<dynamic> _members = [];
+  String? _selectedDeptId;
+  bool _loadingDepts = false;
+  bool _loadingMembers = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConfig();
+    _loadDepartments();
+    _memberSearchCtl.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    _loadMembers();
+  }
+
+  Future<void> _loadConfig() async {
+    try {
+      final data = await ApiService.instance.getSystemSetting('feishu_org_sync');
+      if (!mounted) return;
+      final appId = data?['value']?['app_id'] as String?;
+      if (appId != null) setState(() => _appIdCtl.text = appId);
+    } catch (_) {}
+  }
+
+  Future<void> _loadDepartments() async {
+    if (!mounted) return;
+    setState(() => _loadingDepts = true);
+    try {
+      final tenantId = ref.read(appProvider).currentTenantId;
+      final data = await ApiService.instance.listOrgDepartments(
+          tenantId: tenantId.isNotEmpty ? tenantId : null);
+      if (!mounted) return;
+      setState(() {
+        _departments = data;
+        _loadingDepts = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingDepts = false);
+    }
+  }
+
+  Future<void> _loadMembers() async {
+    if (!mounted) return;
+    setState(() => _loadingMembers = true);
+    try {
+      final tenantId = ref.read(appProvider).currentTenantId;
+      final data = await ApiService.instance.listOrgMembers(
+        departmentId: _selectedDeptId,
+        search: _memberSearchCtl.text.trim(),
+        tenantId: tenantId.isNotEmpty ? tenantId : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _members = data;
+        _loadingMembers = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingMembers = false);
+    }
+  }
+
+  Future<void> _triggerSync() async {
+    if (_appIdCtl.text.trim().isEmpty) return;
+    setState(() {
+      _syncing = true;
+      _syncResult = null;
+    });
+    try {
+      if (_appSecretCtl.text.trim().isNotEmpty) {
+        await ApiService.instance.setSystemSetting('feishu_org_sync', {
+          'app_id': _appIdCtl.text.trim(),
+          'app_secret': _appSecretCtl.text.trim(),
+        });
+      }
+      final result = await ApiService.instance.syncOrg();
+      if (!mounted) return;
+      setState(() {
+        _syncResult = result;
+        _syncing = false;
+      });
+      _loadDepartments();
+      _loadMembers();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _syncResult = {'error': e.toString()};
+        _syncing = false;
+      });
+    }
+  }
+
+  void _selectDept(String? id) {
+    setState(() => _selectedDeptId = id);
+    _loadMembers();
+  }
+
+  @override
+  void dispose() {
+    _appIdCtl.dispose();
+    _appSecretCtl.dispose();
+    _memberSearchCtl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Feishu Sync Config ──
+          _SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Feishu 组织同步',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary)),
+                const SizedBox(height: 4),
+                const Text('通过飞书开放平台同步企业组织架构',
+                    style:
+                        TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('App ID',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary)),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _appIdCtl,
+                            style: const TextStyle(
+                                fontSize: 13, color: AppColors.textPrimary),
+                            decoration: const InputDecoration(
+                              hintText: 'cli_xxxxxxxx',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('App Secret',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary)),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _appSecretCtl,
+                            obscureText: true,
+                            style: const TextStyle(
+                                fontSize: 13, color: AppColors.textPrimary),
+                            decoration: const InputDecoration(
+                              hintText: '留空保持不变',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    ElevatedButton(
+                      onPressed: (_syncing || _appIdCtl.text.trim().isEmpty)
+                          ? null
+                          : _triggerSync,
+                      child: _syncing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text('立即同步'),
+                    ),
+                    if (_syncResult != null) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _syncResult!.containsKey('error')
+                                ? AppColors.error.withValues(alpha: 0.1)
+                                : AppColors.success.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            _syncResult!.containsKey('error')
+                                ? '同步失败: ${_syncResult!['error']}'
+                                : '同步完成 · ${_syncResult!['departments'] ?? 0} 部门 · ${_syncResult!['members'] ?? 0} 成员',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _syncResult!.containsKey('error')
+                                  ? AppColors.error
+                                  : AppColors.success,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // ── Org Browser ──
+          _SectionCard(
+            padding: const EdgeInsets.all(0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: Text('组织架构浏览',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary)),
+                ),
+                const Divider(height: 1, color: AppColors.borderSubtle),
+                SizedBox(
+                  height: 500,
+                  child: Row(
+                    children: [
+                      // Dept tree
+                      SizedBox(
+                        width: 200,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                              child: Text('部门',
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textTertiary)),
+                            ),
+                            // All departments item
+                            _deptItem(null, '全部'),
+                            Expanded(
+                              child: _loadingDepts
+                                  ? const Center(
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2))
+                                  : _departments.isEmpty
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(12),
+                                          child: Text('暂无数据',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      AppColors.textTertiary)),
+                                        )
+                                      : ListView(
+                                          children: _departments
+                                              .map((d) => _deptItem(
+                                                    d['id'] as String?,
+                                                    d['name'] as String? ?? '-',
+                                                  ))
+                                              .toList(),
+                                        ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const VerticalDivider(
+                          width: 1, color: AppColors.borderSubtle),
+                      // Members list
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: TextField(
+                                controller: _memberSearchCtl,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textPrimary),
+                                decoration: const InputDecoration(
+                                  hintText: '搜索成员...',
+                                  prefixIcon: Icon(Icons.search,
+                                      size: 16,
+                                      color: AppColors.textTertiary),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: _loadingMembers
+                                  ? const Center(
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2))
+                                  : _members.isEmpty
+                                      ? const Center(
+                                          child: Text('暂无成员',
+                                              style: TextStyle(
+                                                  fontSize: 13,
+                                                  color:
+                                                      AppColors.textTertiary)),
+                                        )
+                                      : ListView.builder(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          itemCount: _members.length,
+                                          itemBuilder: (_, i) {
+                                            final m = _members[i]
+                                                as Map<String, dynamic>;
+                                            final name =
+                                                m['name'] as String? ?? '-';
+                                            final title =
+                                                m['title'] as String?;
+                                            final deptPath =
+                                                m['department_path']
+                                                    as String?;
+                                            final email =
+                                                m['email'] as String?;
+                                            return Container(
+                                              margin: const EdgeInsets.only(
+                                                  bottom: 4),
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                    color:
+                                                        AppColors.borderSubtle),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 32,
+                                                    height: 32,
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      color:
+                                                          AppColors.bgTertiary,
+                                                    ),
+                                                    alignment: Alignment.center,
+                                                    child: Text(
+                                                      name.isNotEmpty
+                                                          ? name[0]
+                                                          : '?',
+                                                      style: const TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: AppColors
+                                                              .textPrimary),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(name,
+                                                            style: const TextStyle(
+                                                                fontSize: 13,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w500,
+                                                                color: AppColors
+                                                                    .textPrimary)),
+                                                        Text(
+                                                          [
+                                                            if (title != null)
+                                                              title,
+                                                            if (deptPath !=
+                                                                null)
+                                                              deptPath,
+                                                            if (email != null)
+                                                              email,
+                                                          ].join(' · '),
+                                                          style: const TextStyle(
+                                                              fontSize: 11,
+                                                              color: AppColors
+                                                                  .textTertiary),
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _deptItem(String? id, String name) {
+    final isSelected = _selectedDeptId == id;
+    return InkWell(
+      onTap: () => _selectDept(id),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.bgHover : Colors.transparent,
+        ),
+        child: Text(
+          name,
+          style: TextStyle(
+            fontSize: 13,
+            color: isSelected
+                ? AppColors.textPrimary
+                : AppColors.textSecondary,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
   }
 }
 
