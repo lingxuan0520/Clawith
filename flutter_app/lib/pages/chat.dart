@@ -45,6 +45,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   String _allUserFilter = '';
   bool _sessionsLoading = false;
 
+  // Vision model support
+  bool _supportsVision = false;
+
   // Streaming accumulators
   String _streamContent = '';
   String _thinkingContent = '';
@@ -56,12 +59,27 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _inputCtrl.addListener(() { if (mounted) setState(() {}); });
     _loadAgent();
     _loadSessions();
+    _checkVisionSupport();
   }
 
   Future<void> _loadAgent() async {
     try {
       final agent = await ApiService.instance.getAgent(widget.agentId);
       if (mounted) setState(() => _agent = agent);
+    } catch (_) {}
+  }
+
+  Future<void> _checkVisionSupport() async {
+    try {
+      final agent = _agent ?? await ApiService.instance.getAgent(widget.agentId);
+      final primaryModelId = agent['primary_model_id'] as String?;
+      if (primaryModelId == null) return;
+      final models = await ApiService.instance.listLlmModels();
+      if (!mounted) return;
+      final supported = models.any((m) =>
+          (m as Map<String, dynamic>)['id'] == primaryModelId &&
+          (m['supports_vision'] as bool? ?? false));
+      setState(() => _supportsVision = supported);
     } catch (_) {}
   }
 
@@ -387,10 +405,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     if (_attachedFile != null) {
       final af = _attachedFile!;
-      if (af.imageUrl != null) {
+      if (af.imageUrl != null && _supportsVision) {
+        // Vision model — embed image data for direct analysis
         contentForLLM = text.isNotEmpty
             ? '[image_data:${af.imageUrl}]\n$text'
             : '[image_data:${af.imageUrl}]\n请分析这张图片';
+        if (userMsg.isEmpty) userMsg = '[图片] ${af.name}';
+      } else if (af.imageUrl != null) {
+        // Non-vision model — reference file path, let model use read_document tool
+        final wsPath = af.path ?? '';
+        contentForLLM = text.isNotEmpty
+            ? '[图片文件已上传: ${af.name}，保存在 $wsPath]\n\n$text'
+            : '[图片文件已上传: ${af.name}，保存在 $wsPath]\n请描述或处理这个图片文件。你可以使用 read_document 工具读取它。';
         if (userMsg.isEmpty) userMsg = '[图片] ${af.name}';
       } else {
         final wsPath = af.path ?? '';
