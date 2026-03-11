@@ -13,6 +13,7 @@ import '../../pages/chat.dart';
 import '../../pages/messages.dart';
 import '../../pages/enterprise_settings.dart';
 import '../../pages/invitation_codes.dart';
+import '../../game/office_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -59,6 +60,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/agents/:id/chat',
         builder: (context, state) =>
             ChatPage(agentId: state.pathParameters['id']!),
+      ),
+      // Virtual office — full screen game, no shell nav
+      GoRoute(
+        path: '/office',
+        builder: (context, state) => const OfficePage(),
       ),
       ShellRoute(
         builder: (context, state, child) => LayoutShell(child: child),

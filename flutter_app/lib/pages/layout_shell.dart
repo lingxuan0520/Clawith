@@ -240,6 +240,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
               _navItem(Icons.storefront, '广场', '/plaza', currentLocation),
               _navItem(Icons.dashboard, '仪表盘', '/dashboard', currentLocation),
               _navItemWithBadge(Icons.mail_outline, '消息', '/messages', currentLocation, _unreadCount),
+              _navItem(Icons.meeting_room, '虚拟办公室', '/office', currentLocation),
               const SizedBox(height: 8),
               // Agent list
               Padding(

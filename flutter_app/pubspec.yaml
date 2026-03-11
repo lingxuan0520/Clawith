@@ -43,6 +43,8 @@ dependencies:
   google_sign_in: ^7.2.0
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.7
+  # Game engine for virtual office
+  bonfire: ^3.16.0
 
 dev_dependencies:
   flutter_test:
@@ -54,3 +56,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/images/office/
+    - assets/images/player/
+    - assets/images/npc/
