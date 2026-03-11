@@ -408,8 +408,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       setState(() {
         _llmModels = results[0] as List<dynamic>;
         _channelConfig = results[1] as Map<String, dynamic>?;
-        _modelCtrl.text = agent['model'] as String? ?? '';
-        _fallbackModelCtrl.text = agent['fallback_model'] as String? ?? '';
+        _modelCtrl.text = (agent['primary_model_id'] ?? agent['model'] ?? '') as String;
+        _fallbackModelCtrl.text = (agent['fallback_model_id'] ?? agent['fallback_model'] ?? '') as String;
         _maxTokensCtrl.text = (agent['max_tokens'] ?? 4096).toString();
         _temperatureCtrl.text = (agent['temperature'] ?? 0.7).toString();
         _contextWindowCtrl.text = (agent['context_window'] ?? 100).toString();
@@ -544,9 +544,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     setState(() => _savingSettings = true);
     try {
       final data = <String, dynamic>{};
-      if (_modelCtrl.text.isNotEmpty) data['model'] = _modelCtrl.text;
+      if (_modelCtrl.text.isNotEmpty) data['primary_model_id'] = _modelCtrl.text;
       if (_fallbackModelCtrl.text.isNotEmpty) {
-        data['fallback_model'] = _fallbackModelCtrl.text;
+        data['fallback_model_id'] = _fallbackModelCtrl.text;
       }
       final maxTokens = int.tryParse(_maxTokensCtrl.text);
       if (maxTokens != null) data['max_tokens'] = maxTokens;
@@ -2769,7 +2769,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       final currentValue = ctrl.text;
       final hasMatch = _llmModels.any((m) {
         final model = m as Map<String, dynamic>;
-        return model['id']?.toString() == currentValue || model['name']?.toString() == currentValue;
+        return model['id']?.toString() == currentValue;
       });
       return DropdownButtonFormField<String>(
         value: hasMatch ? currentValue : null,
@@ -2780,18 +2780,22 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           const DropdownMenuItem(value: '', child: Text('None', style: TextStyle(color: AppColors.textTertiary))),
           ..._llmModels.map((m) {
             final model = m as Map<String, dynamic>;
-            final id = model['id']?.toString() ?? model['name']?.toString() ?? '';
-            final name = model['name']?.toString() ?? id;
+            final id = model['id']?.toString() ?? '';
+            final displayLabel = (model['label'] as String?)?.isNotEmpty == true
+                ? model['label'] as String
+                : model['model']?.toString() ?? id;
             final provider = model['provider']?.toString() ?? '';
+            final modelName = model['model']?.toString() ?? '';
             return DropdownMenuItem(
               value: id,
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Flexible(child: Text(name)),
-                  if (provider.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Text('($provider)', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
-                  ],
+                  Text(displayLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  if (provider.isNotEmpty || modelName.isNotEmpty)
+                    Text('$provider/$modelName',
+                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                 ],
               ),
             );

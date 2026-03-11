@@ -533,8 +533,24 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
           hint: 'Select primary LLM model',
           items: _llmModels.map((m) {
             final id = m['id']?.toString() ?? '';
-            final name = m['name']?.toString() ?? id;
-            return DropdownMenuItem(value: id, child: Text(name));
+            final label = (m['label'] as String?)?.isNotEmpty == true
+                ? m['label'] as String
+                : m['model']?.toString() ?? id;
+            final provider = m['provider']?.toString() ?? '';
+            final modelName = m['model']?.toString() ?? '';
+            return DropdownMenuItem(
+              value: id,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  if (provider.isNotEmpty)
+                    Text('$provider/$modelName',
+                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                ],
+              ),
+            );
           }).toList(),
           onChanged: (v) =>
               setState(() => _form['primary_model_id'] = v ?? ''),
@@ -551,8 +567,24 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
           hint: 'Select fallback LLM model (optional)',
           items: _llmModels.map((m) {
             final id = m['id']?.toString() ?? '';
-            final name = m['name']?.toString() ?? id;
-            return DropdownMenuItem(value: id, child: Text(name));
+            final label = (m['label'] as String?)?.isNotEmpty == true
+                ? m['label'] as String
+                : m['model']?.toString() ?? id;
+            final provider = m['provider']?.toString() ?? '';
+            final modelName = m['model']?.toString() ?? '';
+            return DropdownMenuItem(
+              value: id,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  if (provider.isNotEmpty)
+                    Text('$provider/$modelName',
+                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                ],
+              ),
+            );
           }).toList(),
           onChanged: (v) =>
               setState(() => _form['fallback_model_id'] = v ?? ''),
