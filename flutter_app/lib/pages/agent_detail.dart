@@ -69,6 +69,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   final _soulController = TextEditingController();
   List<dynamic> _memoryFiles = [];
   bool _loadingMind = false;
+  String? _heartbeatContent;
 
   // ── Tools ────────────────────────────────────────────────
   List<dynamic> _platformTools = [];
@@ -99,6 +100,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   String _logFilter = 'all';
   String? _expandedLogId;
 
+  // ── Header inline edit ─────────────────────────────────────
+  bool _editingName = false;
+  final _nameController = TextEditingController();
+  bool _savingName = false;
+
   // ── Settings ─────────────────────────────────────────────
   final _modelCtrl = TextEditingController();
   final _fallbackModelCtrl = TextEditingController();
@@ -113,6 +119,18 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   bool _loadingSettings = false;
   bool _savingSettings = false;
   bool _showDeleteConfirm = false;
+  bool _showCreateChannel = false;
+  String _newChannelType = 'feishu';
+  final _channelTokenCtrl = TextEditingController();
+  final _channelIdCtrl = TextEditingController();
+  final _channelSecretCtrl = TextEditingController();
+
+  // ── Schedule creation ────────────────────────────────────
+  bool _showCreateSchedule = false;
+  final _scheduleNameCtrl = TextEditingController();
+  final _scheduleCronCtrl = TextEditingController();
+  String _scheduleFrequency = 'daily';
+  bool _creatingSchedule = false;
 
   static const _tabLabels = [
     '状态',
@@ -160,6 +178,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     _maxToolRoundsCtrl.dispose();
     _dailyTokenCtrl.dispose();
     _monthlyTokenCtrl.dispose();
+    _nameController.dispose();
+    _channelTokenCtrl.dispose();
+    _channelIdCtrl.dispose();
+    _channelSecretCtrl.dispose();
+    _scheduleNameCtrl.dispose();
+    _scheduleCronCtrl.dispose();
     super.dispose();
   }
 
@@ -320,12 +344,14 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       final results = await Future.wait([
         _api.readFile(widget.agentId, 'soul.md').catchError((_) => <String, dynamic>{}),
         _api.listFiles(widget.agentId, path: 'memory').catchError((_) => <dynamic>[]),
+        _api.readFile(widget.agentId, 'heartbeat.md').catchError((_) => <String, dynamic>{}),
       ]);
       if (!mounted) return;
       setState(() {
         _soulContent = (results[0] as Map<String, dynamic>)['content'] as String?;
         _soulController.text = _soulContent ?? '';
         _memoryFiles = results[1] as List<dynamic>;
+        _heartbeatContent = (results[2] as Map<String, dynamic>)['content'] as String?;
         _loadingMind = false;
       });
     } catch (e) {
@@ -714,11 +740,224 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     if (confirmed != true) return;
     try {
       await _api.deleteSchedule(widget.agentId, scheduleId);
-      _showSnack('Schedule deleted');
+      _showSnack('计划已删除');
       _fetchSchedules();
     } catch (e) {
-      _showSnack('Failed to delete schedule: $e');
+      _showSnack('删除计划失败: $e');
     }
+  }
+
+  Future<void> _saveAgentName() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return;
+    setState(() => _savingName = true);
+    try {
+      await _api.updateAgent(widget.agentId, {'name': name});
+      await _fetchAgentSilent();
+      if (!mounted) return;
+      setState(() {
+        _editingName = false;
+        _savingName = false;
+      });
+      _showSnack('名称已更新');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _savingName = false);
+      _showSnack('更新名称失败: $e');
+    }
+  }
+
+  Future<void> _toggleTrigger(String triggerId, bool enabled) async {
+    try {
+      await _api.updateTrigger(widget.agentId, triggerId, {'enabled': enabled});
+      _fetchPulseData();
+    } catch (e) {
+      _showSnack('更新触发器失败: $e');
+    }
+  }
+
+  Future<void> _triggerTask(String taskId) async {
+    try {
+      await _api.triggerTask(widget.agentId, taskId);
+      _showSnack('任务已触发');
+      _fetchTasks();
+    } catch (e) {
+      _showSnack('触发任务失败: $e');
+    }
+  }
+
+  Future<void> _triggerSchedule(String scheduleId) async {
+    try {
+      await _api.triggerSchedule(widget.agentId, scheduleId);
+      _showSnack('计划已手动触发');
+      _fetchSchedules();
+    } catch (e) {
+      _showSnack('触发计划失败: $e');
+    }
+  }
+
+  Future<void> _createSchedule() async {
+    final name = _scheduleNameCtrl.text.trim();
+    if (name.isEmpty) {
+      _showSnack('请输入计划名称');
+      return;
+    }
+    setState(() => _creatingSchedule = true);
+    try {
+      final data = <String, dynamic>{
+        'name': name,
+        'frequency': _scheduleFrequency,
+      };
+      if (_scheduleCronCtrl.text.trim().isNotEmpty) {
+        data['cron'] = _scheduleCronCtrl.text.trim();
+      }
+      await _api.createSchedule(widget.agentId, data);
+      _scheduleNameCtrl.clear();
+      _scheduleCronCtrl.clear();
+      if (!mounted) return;
+      setState(() {
+        _creatingSchedule = false;
+        _showCreateSchedule = false;
+        _scheduleFrequency = 'daily';
+      });
+      _showSnack('计划已创建');
+      _fetchSchedules();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _creatingSchedule = false);
+      _showSnack('创建计划失败: $e');
+    }
+  }
+
+  Future<void> _deleteHumanRelationship(String relId) async {
+    final confirmed = await _showConfirmDialog('删除关系', '确认删除此人际关系吗？');
+    if (confirmed != true) return;
+    try {
+      await _api.deleteRelationship(widget.agentId, relId);
+      _showSnack('关系已删除');
+      _fetchRelationshipsData();
+    } catch (e) {
+      _showSnack('删除关系失败: $e');
+    }
+  }
+
+  Future<void> _deleteAgentRelationship(String relId) async {
+    final confirmed = await _showConfirmDialog('删除关系', '确认删除此智能体关系吗？');
+    if (confirmed != true) return;
+    try {
+      await _api.deleteAgentRelationship(widget.agentId, relId);
+      _showSnack('关系已删除');
+      _fetchRelationshipsData();
+    } catch (e) {
+      _showSnack('删除关系失败: $e');
+    }
+  }
+
+  Future<void> _createChannel() async {
+    try {
+      final data = <String, dynamic>{'type': _newChannelType};
+      if (_channelTokenCtrl.text.trim().isNotEmpty) {
+        data['bot_token'] = _channelTokenCtrl.text.trim();
+      }
+      if (_channelIdCtrl.text.trim().isNotEmpty) {
+        data['channel_id'] = _channelIdCtrl.text.trim();
+      }
+      if (_channelSecretCtrl.text.trim().isNotEmpty) {
+        data['app_secret'] = _channelSecretCtrl.text.trim();
+      }
+      await _api.createChannel(widget.agentId, data);
+      _channelTokenCtrl.clear();
+      _channelIdCtrl.clear();
+      _channelSecretCtrl.clear();
+      if (!mounted) return;
+      setState(() => _showCreateChannel = false);
+      _showSnack('通道已创建');
+      _fetchSettingsData();
+    } catch (e) {
+      _showSnack('创建通道失败: $e');
+    }
+  }
+
+  Future<void> _uploadWorkspaceFile() async {
+    _showSnack('请使用 Web 版本上传文件');
+  }
+
+  void _showExpiryEditor() {
+    final agent = _agent;
+    if (agent == null) return;
+    final currentExpiry = agent['expires_at'] as String?;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('设置过期时间', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (currentExpiry != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text('当前过期: ${_fmtTs(currentExpiry)}',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              ),
+            const Text('快速续期', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _expiryBtn(ctx, '+24h', const Duration(hours: 24)),
+                _expiryBtn(ctx, '+7d', const Duration(days: 7)),
+                _expiryBtn(ctx, '+30d', const Duration(days: 30)),
+                _expiryBtn(ctx, '+90d', const Duration(days: 90)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.all_inclusive, size: 16),
+              label: const Text('永不过期'),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await _api.updateAgent(widget.agentId, {'expires_at': null});
+                  await _fetchAgentSilent();
+                  _showSnack('已设置为永不过期');
+                } catch (e) {
+                  _showSnack('设置失败: $e');
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        ],
+      ),
+    );
+  }
+
+  Widget _expiryBtn(BuildContext ctx, String label, Duration duration) {
+    return OutlinedButton(
+      onPressed: () async {
+        Navigator.pop(ctx);
+        final newExpiry = DateTime.now().add(duration).toUtc().toIso8601String();
+        try {
+          await _api.updateAgent(widget.agentId, {'expires_at': newExpiry});
+          await _fetchAgentSilent();
+          _showSnack('过期时间已更新');
+        } catch (e) {
+          _showSnack('设置失败: $e');
+        }
+      },
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        side: const BorderSide(color: AppColors.accentPrimary),
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
+    );
   }
 
   // ─── Helpers ─────────────────────────────────────────────
@@ -932,25 +1171,67 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.go('/dashboard'),
         ),
-        title: Row(
-          children: [
-            Icon(_statusIcon(status), color: _statusColor(status), size: 20),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                name,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
+        title: _editingName
+            ? Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _nameController,
+                      autofocus: true,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (_) => _saveAgentName(),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: _savingName
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.check, color: AppColors.success, size: 20),
+                    onPressed: _savingName ? null : _saveAgentName,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.textTertiary, size: 20),
+                    onPressed: () => setState(() => _editingName = false),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Icon(_statusIcon(status), color: _statusColor(status), size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: GestureDetector(
+                      onTap: () {
+                        _nameController.text = name;
+                        setState(() => _editingName = true);
+                      },
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _statusBadge(status),
+                  if (_expiryLabel(agent) != null) ...[
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: _showExpiryEditor,
+                      child: _expiryBadge(agent),
+                    ),
+                  ],
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            _statusBadge(status),
-          ],
-        ),
         actions: [
           if (status == 'running' || status == 'idle')
             IconButton(
@@ -964,6 +1245,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               tooltip: '启动智能体',
               onPressed: _startAgent,
             ),
+          IconButton(
+            icon: const Icon(Icons.timer_outlined, color: AppColors.textSecondary),
+            tooltip: '设置过期时间',
+            onPressed: _showExpiryEditor,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
             tooltip: 'Refresh',
@@ -1017,6 +1303,48 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           fontSize: 11,
           fontWeight: FontWeight.w500,
         ),
+      ),
+    );
+  }
+
+  String? _expiryLabel(Map<String, dynamic> agent) {
+    final expiresAt = agent['expires_at'] as String?;
+    if (expiresAt == null) return null;
+    try {
+      final dt = DateTime.parse(expiresAt);
+      final diff = dt.difference(DateTime.now());
+      if (diff.isNegative) return '已过期';
+      if (diff.inHours < 24) return '${diff.inHours}h';
+      if (diff.inDays < 30) return '${diff.inDays}d';
+      return '${(diff.inDays / 30).floor()}mo';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _expiryBadge(Map<String, dynamic> agent) {
+    final label = _expiryLabel(agent);
+    if (label == null) return const SizedBox.shrink();
+    final isExpired = label == '已过期';
+    final color = isExpired
+        ? AppColors.error
+        : label.endsWith('h')
+            ? AppColors.warning
+            : AppColors.success;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }
@@ -1475,41 +1803,143 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
         const SizedBox(height: 8),
 
-        // Schedules strip
-        if (_schedules.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Schedules', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                SizedBox(
-                  height: 40,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _schedules.length,
-                    itemBuilder: (ctx, i) {
-                      final s = _schedules[i] as Map<String, dynamic>;
-                      final name = s['name'] as String? ?? s['cron'] as String? ?? 'Schedule';
-                      final id = s['id']?.toString() ?? '';
-                      return Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        child: Chip(
-                          label: Text(name, style: const TextStyle(fontSize: 11)),
-                          deleteIcon: const Icon(Icons.close, size: 14),
-                          onDeleted: () => _deleteSchedule(id),
-                          backgroundColor: AppColors.bgTertiary,
-                          side: const BorderSide(color: AppColors.borderSubtle),
+        // Schedules section
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.schedule, color: AppColors.textSecondary, size: 16),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text('计划任务', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add, size: 14),
+                    label: const Text('新建', style: TextStyle(fontSize: 11)),
+                    onPressed: () => setState(() => _showCreateSchedule = !_showCreateSchedule),
+                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                  ),
+                ],
+              ),
+              if (_showCreateSchedule) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgSecondary,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.borderSubtle),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('创建计划', style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _scheduleNameCtrl,
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+                        decoration: const InputDecoration(labelText: '名称', hintText: '计划名称', isDense: true),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _scheduleFrequency,
+                        decoration: const InputDecoration(labelText: '频率', isDense: true),
+                        dropdownColor: AppColors.bgElevated,
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+                        items: const [
+                          DropdownMenuItem(value: 'minutely', child: Text('每分钟')),
+                          DropdownMenuItem(value: 'hourly', child: Text('每小时')),
+                          DropdownMenuItem(value: 'daily', child: Text('每天')),
+                          DropdownMenuItem(value: 'weekly', child: Text('每周')),
+                          DropdownMenuItem(value: 'monthly', child: Text('每月')),
+                          DropdownMenuItem(value: 'custom', child: Text('自定义 Cron')),
+                        ],
+                        onChanged: (v) { if (v != null) setState(() => _scheduleFrequency = v); },
+                      ),
+                      if (_scheduleFrequency == 'custom') ...[
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _scheduleCronCtrl,
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+                          decoration: const InputDecoration(labelText: 'Cron 表达式', hintText: '* * * * *', isDense: true),
                         ),
-                      );
-                    },
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(onPressed: () => setState(() => _showCreateSchedule = false), child: const Text('取消')),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _creatingSchedule ? null : _createSchedule,
+                            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), textStyle: const TextStyle(fontSize: 12)),
+                            child: _creatingSchedule ? _miniSpinner() : const Text('创建'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
               ],
-            ),
+              if (_schedules.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                ..._schedules.map((s) {
+                  final sched = s as Map<String, dynamic>;
+                  final name = sched['name'] as String? ?? sched['cron'] as String? ?? 'Schedule';
+                  final id = sched['id']?.toString() ?? '';
+                  final enabled = sched['enabled'] == true || sched['is_active'] == true;
+                  final nextFire = sched['next_fire_time'] ?? sched['next_run_at'];
+                  final fireCount = sched['fire_count'] ?? sched['run_count'] ?? 0;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgTertiary,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.schedule, size: 14, color: enabled ? AppColors.accentPrimary : AppColors.textTertiary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w500)),
+                              if (nextFire != null)
+                                Text('下次: ${_fmtRelative(nextFire)}', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                              if (fireCount > 0)
+                                Text('已执行 $fireCount 次', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.play_circle_outline, size: 16, color: AppColors.accentPrimary),
+                          tooltip: '立即触发',
+                          onPressed: () => _triggerSchedule(id),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                          tooltip: '删除',
+                          onPressed: () => _deleteSchedule(id),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ],
           ),
+        ),
+        const SizedBox(height: 8),
 
         // Task List
         Expanded(
@@ -1590,6 +2020,27 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   style: TextStyle(color: _priorityColor(priority), fontSize: 11),
                 ),
                 const Spacer(),
+                if (status == 'pending')
+                  GestureDetector(
+                    onTap: () => _triggerTask(taskId),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentPrimary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.accentPrimary.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.play_arrow, size: 11, color: AppColors.accentPrimary),
+                          SizedBox(width: 3),
+                          Text('触发', style: TextStyle(color: AppColors.accentPrimary, fontSize: 10, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ),
+                  ),
                 Text(_fmtTs(createdAt), style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
               ],
             ),
@@ -1826,6 +2277,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                           ],
                         ),
                       ),
+                      Switch(
+                        value: enabled,
+                        onChanged: (v) => _toggleTrigger(id, v),
+                        activeColor: AppColors.accentPrimary,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
                         onPressed: () => _deleteTrigger(id),
@@ -1907,6 +2364,25 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   ),
                 ] else
                   _codeBlock(_soulContent, '未找到 soul.md 文件，点击编辑按钮创建。'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Heartbeat
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.favorite_outline, color: AppColors.error, size: 18),
+                    SizedBox(width: 8),
+                    Text('heartbeat.md', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _codeBlock(_heartbeatContent, '未找到 heartbeat.md 文件。'),
               ],
             ),
           ),
@@ -2237,7 +2713,17 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('人际关系', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('人际关系', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18),
+                      onPressed: _fetchRelationshipsData,
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 12),
                 if (_humanRelationships.isEmpty)
                   const Text('暂无人际关系', style: TextStyle(color: AppColors.textTertiary, fontSize: 13))
@@ -2245,6 +2731,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   ..._humanRelationships.map((r) {
                     final member = r['member'] as Map<String, dynamic>?;
                     final label = r['relation_label'] as String? ?? r['relation'] as String? ?? '';
+                    final relId = r['id']?.toString() ?? '';
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(12),
@@ -2284,6 +2771,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                             ),
                             child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.accentText)),
                           ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                            onPressed: () => _deleteHumanRelationship(relId),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(4),
+                          ),
                         ],
                       ),
                     );
@@ -2298,13 +2792,14 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('智能体关系', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                const Text('智能体关系', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 const SizedBox(height: 12),
                 if (_agentRelationships.isEmpty)
                   const Text('暂无智能体关系', style: TextStyle(color: AppColors.textTertiary, fontSize: 13))
                 else
                   ..._agentRelationships.map((r) {
                     final label = r['relation_label'] as String? ?? r['relation'] as String? ?? '';
+                    final relId = r['id']?.toString() ?? '';
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(12),
@@ -2342,6 +2837,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.accentText)),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                            onPressed: () => _deleteAgentRelationship(relId),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(4),
                           ),
                         ],
                       ),
@@ -2437,6 +2939,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     _fetchWorkspaceFiles(parts.join('/'));
                   },
                 ),
+              IconButton(
+                icon: const Icon(Icons.upload_file, color: AppColors.textSecondary, size: 18),
+                tooltip: '上传文件',
+                onPressed: _uploadWorkspaceFile,
+              ),
               IconButton(
                 icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18),
                 onPressed: () => _fetchWorkspaceFiles(_currentPath),
@@ -2847,23 +3354,89 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (_channelConfig == null)
-                  const Text('No channel configured.', style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic))
-                else ...[
+                if (_channelConfig == null && !_showCreateChannel) ...[
+                  const Text('未配置通道。', style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic)),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('配置通道'),
+                    onPressed: () => setState(() => _showCreateChannel = true),
+                    style: ElevatedButton.styleFrom(textStyle: const TextStyle(fontSize: 12)),
+                  ),
+                ] else if (_showCreateChannel) ...[
+                  DropdownButtonFormField<String>(
+                    value: _newChannelType,
+                    decoration: const InputDecoration(labelText: '通道类型', isDense: true),
+                    dropdownColor: AppColors.bgElevated,
+                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                    items: const [
+                      DropdownMenuItem(value: 'feishu', child: Text('飞书')),
+                      DropdownMenuItem(value: 'slack', child: Text('Slack')),
+                      DropdownMenuItem(value: 'discord', child: Text('Discord')),
+                    ],
+                    onChanged: (v) { if (v != null) setState(() => _newChannelType = v); },
+                  ),
+                  const SizedBox(height: 8),
+                  if (_newChannelType == 'feishu') ...[
+                    TextField(
+                      controller: _channelTokenCtrl,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'App ID', isDense: true),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _channelSecretCtrl,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'App Secret', isDense: true),
+                    ),
+                  ] else ...[
+                    TextField(
+                      controller: _channelTokenCtrl,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'Bot Token', isDense: true),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _channelIdCtrl,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      decoration: const InputDecoration(labelText: 'Channel ID', isDense: true),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(onPressed: () => setState(() => _showCreateChannel = false), child: const Text('取消')),
+                      const SizedBox(width: 8),
+                      ElevatedButton(onPressed: _createChannel, child: const Text('保存')),
+                    ],
+                  ),
+                ] else ...[
                   _settingRow('Type', _channelConfig?['type']?.toString() ?? '-'),
                   _settingRow('Status', _channelConfig?['status']?.toString() ?? '-'),
                   _settingRow('Webhook URL', _channelConfig?['webhook_url']?.toString() ?? '-'),
                   if (_channelConfig?['bot_name'] != null)
                     _settingRow('Bot Name', _channelConfig?['bot_name']?.toString() ?? '-'),
                   const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                      label: const Text('删除通道', style: TextStyle(color: AppColors.error)),
-                      style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
-                      onPressed: _deleteChannel,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.edit, size: 14),
+                        label: const Text('编辑'),
+                        onPressed: () => setState(() => _showCreateChannel = true),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                        label: const Text('删除通道', style: TextStyle(color: AppColors.error)),
+                        style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
+                        onPressed: _deleteChannel,
+                      ),
+                    ],
                   ),
                 ],
               ],
