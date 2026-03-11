@@ -23,13 +23,26 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   Timer? _refreshTimer;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey _tenantKey = GlobalKey();
+  int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadAgents();
     _loadTenants();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadAgents());
+    _loadUnreadCount();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadAgents();
+      _loadUnreadCount();
+    });
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final data = await ApiService.instance.getUnreadCount();
+      final count = data['count'] as int? ?? 0;
+      if (mounted) setState(() => _unreadCount = count);
+    } catch (_) {}
   }
 
   Future<void> _loadAgents() async {
@@ -226,6 +239,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
               const SizedBox(height: 4),
               _navItem(Icons.storefront, '广场', '/plaza', currentLocation),
               _navItem(Icons.dashboard, '仪表盘', '/dashboard', currentLocation),
+              _navItemWithBadge(Icons.mail_outline, '消息', '/messages', currentLocation, _unreadCount),
               const SizedBox(height: 8),
               // Agent list
               Padding(
@@ -427,6 +441,57 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
         child: Row(
           children: [
             Icon(icon, size: 16, color: isActive ? AppColors.accentPrimary : AppColors.textTertiary),
+            const SizedBox(width: 10),
+            Text(label, style: TextStyle(fontSize: 13, color: isActive ? AppColors.textPrimary : AppColors.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navItemWithBadge(IconData icon, String label, String path, String current, int badgeCount) {
+    final isActive = current == path || current.startsWith('$path/');
+    return InkWell(
+      onTap: () => _navigate(path),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 4),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.bgHover : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, size: 16, color: isActive ? AppColors.accentPrimary : AppColors.textTertiary),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -5,
+                    right: -7,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(width: 10),
             Text(label, style: TextStyle(fontSize: 13, color: isActive ? AppColors.textPrimary : AppColors.textSecondary)),
           ],
