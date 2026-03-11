@@ -1,9 +1,7 @@
 import 'package:bonfire/bonfire.dart';
-import 'package:flutter/services.dart';
 
-/// The user's character controlled via joystick or keyboard.
-class OfficePlayer extends SimplePlayer
-    with BlockMovementCollision, KeyboardEventListener {
+/// The user's character controlled via joystick.
+class OfficePlayer extends SimplePlayer with BlockMovementCollision {
   final void Function()? onInteract;
 
   OfficePlayer({
@@ -102,15 +100,6 @@ class OfficePlayer extends SimplePlayer
       position: Vector2(2, 4),
       collisionType: CollisionType.active,
     ));
-  }
-
-  @override
-  bool onKeyboard(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
-    // E key triggers interaction
-    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyE) {
-      onInteract?.call();
-    }
-    return false;
   }
 
   @override

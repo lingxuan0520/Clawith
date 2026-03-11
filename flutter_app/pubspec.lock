@@ -68,10 +68,9 @@ packages:
   bonfire:
     dependency: "direct main"
     description:
-      name: bonfire
-      sha256: "9bdff94c6f9b811e7f8117d1356a9f3cf162fc200c2226594c8ca41894f1ccc6"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "local_packages/bonfire"
+      relative: true
+    source: path
     version: "3.16.1"
   boolean_selector:
     dependency: transitive

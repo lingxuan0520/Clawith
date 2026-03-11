@@ -1,6 +1,5 @@
 import 'package:bonfire/bonfire.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -141,20 +140,6 @@ class _OfficePageState extends ConsumerState<OfficePage> {
                     margin: const EdgeInsets.only(right: 48, bottom: 90),
                   ),
                 ],
-              ),
-              Keyboard(
-                config: KeyboardConfig(
-                  acceptedKeys: [
-                    LogicalKeyboardKey.arrowUp,
-                    LogicalKeyboardKey.arrowDown,
-                    LogicalKeyboardKey.arrowLeft,
-                    LogicalKeyboardKey.arrowRight,
-                    LogicalKeyboardKey.keyW,
-                    LogicalKeyboardKey.keyA,
-                    LogicalKeyboardKey.keyS,
-                    LogicalKeyboardKey.keyD,
-                  ],
-                ),
               ),
             ],
             cameraConfig: CameraConfig(

@@ -54,6 +54,11 @@ dev_dependencies:
   json_serializable: ^6.9.4
   riverpod_generator: ^2.6.4
 
+dependency_overrides:
+  # Patched bonfire to fix Flame 1.36+ RenderGameWidget 'behavior' parameter
+  bonfire:
+    path: local_packages/bonfire
+
 flutter:
   uses-material-design: true
   assets:
