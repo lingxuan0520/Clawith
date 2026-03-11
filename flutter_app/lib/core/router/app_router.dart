@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../stores/auth_store.dart';
+import '../../core/theme/app_theme.dart';
 import '../../pages/login.dart';
 import '../../pages/layout_shell.dart';
 import '../../pages/dashboard.dart';
@@ -16,16 +18,31 @@ final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
   return GoRouter(
-    initialLocation: '/plaza',
+    initialLocation: '/splash',
     redirect: (context, state) {
-      final isLoggedIn = authState.token != null;
-      final isLoginRoute = state.matchedLocation == '/login';
+      final location = state.matchedLocation;
 
+      // Still initializing — stay on or go to splash
+      if (!authState.initialized) {
+        return location == '/splash' ? null : '/splash';
+      }
+
+      // Initialized — never stay on splash
+      final isLoggedIn = authState.token != null;
+      if (location == '/splash') {
+        return isLoggedIn ? '/plaza' : '/login';
+      }
+
+      final isLoginRoute = location == '/login';
       if (!isLoggedIn && !isLoginRoute) return '/login';
       if (isLoggedIn && isLoginRoute) return '/plaza';
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const _SplashScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginPage(),
@@ -72,3 +89,17 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: AppColors.bgPrimary,
+      body: Center(
+        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary),
+      ),
+    );
+  }
+}

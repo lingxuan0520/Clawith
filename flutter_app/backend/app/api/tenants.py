@@ -52,7 +52,7 @@ async def list_tenants(
 @router.post("/", response_model=TenantOut, status_code=status.HTTP_201_CREATED)
 async def create_tenant(
     data: TenantCreate,
-    current_user: User = Depends(require_role("platform_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new tenant/company (platform_admin only)."""

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +22,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   final _newCompanyCtl = TextEditingController();
   Timer? _refreshTimer;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey _tenantKey = GlobalKey();
 
   @override
   void initState() {
@@ -43,7 +45,6 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
       final data = await ApiService.instance.listTenants();
       if (mounted) {
         setState(() => _tenants = data.cast<Map<String, dynamic>>());
-        // Auto-select tenant if none selected
         final appState = ref.read(appProvider);
         final auth = ref.read(authProvider);
         if (appState.currentTenantId.isEmpty && data.isNotEmpty) {
@@ -82,6 +83,9 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     final auth = ref.watch(authProvider);
     final appState = ref.watch(appProvider);
     final currentLocation = GoRouterState.of(context).matchedLocation;
+    final avatarUrl = (auth.user?['avatar_url'] as String?)?.isNotEmpty == true
+        ? auth.user!['avatar_url'] as String
+        : fb.FirebaseAuth.instance.currentUser?.photoURL;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -92,91 +96,126 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
         child: SafeArea(
           child: Column(
             children: [
-              // Logo
+              // Top: Company name + switcher
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    const Text('🚢', style: TextStyle(fontSize: 20)),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('Soloship', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    ),
-                    IconButton(
-                      onPressed: () => _scaffoldKey.currentState?.closeDrawer(),
-                      icon: const Icon(Icons.close, size: 18),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      color: AppColors.textTertiary,
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              // Tenant switcher
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_tenants.length > 1)
-                      DropdownButtonFormField<String>(
-                        value: appState.currentTenantId.isEmpty ? null : appState.currentTenantId,
-                        items: _tenants.map((t) => DropdownMenuItem(
-                          value: t['id'] as String,
-                          child: Text(t['name'] as String, style: const TextStyle(fontSize: 12)),
-                        )).toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            ref.read(appProvider.notifier).setTenant(v);
-                            _loadAgents();
-                          }
-                        },
-                        decoration: const InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          isDense: true,
+                    // Company header with tap-to-switch
+                    Row(
+                      children: [
+                        const Icon(Icons.business, size: 18, color: AppColors.accentPrimary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _tenants.length > 1
+                              ? GestureDetector(
+                                  key: _tenantKey,
+                                  onTap: () {
+                                    final box = _tenantKey.currentContext?.findRenderObject() as RenderBox?;
+                                    if (box == null) return;
+                                    final offset = box.localToGlobal(Offset.zero);
+                                    final width = box.size.width;
+                                    showMenu<String>(
+                                      context: context,
+                                      color: AppColors.bgElevated,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      elevation: 8,
+                                      constraints: BoxConstraints(minWidth: width, maxWidth: width),
+                                      position: RelativeRect.fromLTRB(
+                                        offset.dx,
+                                        offset.dy + box.size.height + 4,
+                                        offset.dx + width,
+                                        0,
+                                      ),
+                                      items: _tenants.map((t) {
+                                        final id = t['id'] as String;
+                                        final name = t['name'] as String;
+                                        final isSelected = id == ref.read(appProvider).currentTenantId;
+                                        return PopupMenuItem<String>(
+                                          value: id,
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(name,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                                    color: isSelected ? AppColors.accentPrimary : AppColors.textPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (isSelected)
+                                                const Icon(Icons.check, size: 14, color: AppColors.accentPrimary),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ).then((v) {
+                                      if (v != null) {
+                                        ref.read(appProvider.notifier).setTenant(v);
+                                        _loadAgents();
+                                      }
+                                    });
+                                  },
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _currentTenantName.isNotEmpty ? _currentTenantName : '我的公司',
+                                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const Icon(Icons.unfold_more, size: 16, color: AppColors.textTertiary),
+                                    ],
+                                  ),
+                                )
+                              : Text(
+                                  _currentTenantName.isNotEmpty ? _currentTenantName : '我的公司',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                         ),
-                        dropdownColor: AppColors.bgElevated,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
-                      )
-                    else if (_tenants.length == 1)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Text(_tenants.first['name'] as String,
-                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                        ),
-                      ),
+                      ],
+                    ),
+                    // New company
                     if (_showNewCompany) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
                             child: TextField(
                               controller: _newCompanyCtl,
-                              style: const TextStyle(fontSize: 11),
+                              style: const TextStyle(fontSize: 12),
                               decoration: const InputDecoration(
-                                hintText: 'Company Name',
-                                contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                hintText: '公司名称',
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                                 isDense: true,
                               ),
                               onSubmitted: (_) => _createCompany(),
+                              autofocus: true,
                             ),
                           ),
                           const SizedBox(width: 4),
                           InkWell(onTap: _createCompany, child: const Icon(Icons.check, size: 16, color: AppColors.accentPrimary)),
+                          const SizedBox(width: 4),
                           InkWell(onTap: () => setState(() => _showNewCompany = false),
                               child: const Icon(Icons.close, size: 16, color: AppColors.textTertiary)),
                         ],
                       ),
                     ] else
-                      TextButton.icon(
-                        onPressed: () => setState(() => _showNewCompany = true),
-                        icon: const Icon(Icons.add, size: 14),
-                        label: const Text('New Company', style: TextStyle(fontSize: 11)),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          foregroundColor: AppColors.textTertiary,
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => setState(() => _showNewCompany = true),
+                          icon: const Icon(Icons.add, size: 14),
+                          label: const Text('新建公司', style: TextStyle(fontSize: 11)),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            foregroundColor: AppColors.textTertiary,
+                          ),
                         ),
                       ),
                   ],
@@ -185,13 +224,13 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
               const Divider(height: 1),
               // Nav items
               const SizedBox(height: 4),
-              _navItem(Icons.storefront, 'Plaza', '/plaza', currentLocation),
-              _navItem(Icons.dashboard, 'Dashboard', '/dashboard', currentLocation),
+              _navItem(Icons.storefront, '广场', '/plaza', currentLocation),
+              _navItem(Icons.dashboard, '仪表盘', '/dashboard', currentLocation),
               const SizedBox(height: 8),
               // Agent list
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Text('My Digital Employees',
+                child: Text('我的数字员工',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary,
                         letterSpacing: 0.5)),
               ),
@@ -239,48 +278,64 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
               ),
               // Bottom section
               const Divider(height: 1),
-              _navItem(Icons.add, 'New Agent', '/agents/new', currentLocation),
+              _navItem(Icons.add, '新建 Agent', '/agents/new', currentLocation),
               if (auth.isAdmin)
-                _navItem(Icons.settings, 'Enterprise', '/enterprise', currentLocation),
+                _navItem(Icons.settings, '企业设置', '/enterprise', currentLocation),
               if (auth.isPlatformAdmin)
-                _navItem(Icons.confirmation_number, 'Invitations', '/invitations', currentLocation),
+                _navItem(Icons.confirmation_number, '邀请码', '/invitations', currentLocation),
               const Divider(height: 1),
-              // Footer
+              // Footer: user info + theme + language
               Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   children: [
+                    // Theme & language row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
+                        // Language button
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppColors.borderSubtle),
+                          ),
+                          child: const Text('中文', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                        ),
+                        const SizedBox(width: 8),
                         IconButton(
                           onPressed: () => ref.read(appProvider.notifier).toggleTheme(),
                           icon: Icon(appState.themeMode == 'dark' ? Icons.light_mode : Icons.dark_mode, size: 16),
                           iconSize: 16,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
                           color: AppColors.textTertiary,
                         ),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    // User info
                     if (auth.user != null)
                       Row(
                         children: [
-                          Container(
-                            width: 28, height: 28,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              color: AppColors.bgTertiary,
-                              border: Border.all(color: AppColors.borderSubtle),
-                            ),
-                            child: const Icon(Icons.person, size: 16, color: AppColors.textTertiary),
+                          // Avatar
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                                ? Image.network(avatarUrl, width: 32, height: 32, fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => _defaultAvatar())
+                                : _defaultAvatar(),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(auth.displayName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                Text(auth.displayName,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
                                     overflow: TextOverflow.ellipsis),
-                                Text(_roleLabel(auth.role), style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                Text(_roleLabel(auth.role),
+                                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                               ],
                             ),
                           ),
@@ -290,10 +345,12 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                               await ref.read(authProvider.notifier).logout();
                               if (mounted) nav.go('/login');
                             },
-                            icon: const Icon(Icons.logout, size: 14),
-                            iconSize: 14,
+                            icon: const Icon(Icons.logout, size: 16),
+                            iconSize: 16,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
                             color: AppColors.textTertiary,
-                            tooltip: 'Logout',
+                            tooltip: '退出登录',
                           ),
                         ],
                       ),
@@ -306,7 +363,6 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
       ),
       body: Stack(
         children: [
-          // Full-screen content
           widget.child,
           // Menu button + company name (top-left)
           Positioned(
@@ -344,6 +400,18 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     );
   }
 
+  Widget _defaultAvatar() {
+    return Container(
+      width: 32, height: 32,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: AppColors.bgTertiary,
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: const Icon(Icons.person, size: 18, color: AppColors.textTertiary),
+    );
+  }
+
   Widget _navItem(IconData icon, String label, String path, String current) {
     final isActive = current == path || current.startsWith('$path/');
     return InkWell(
@@ -368,22 +436,31 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   }
 
   Future<void> _createCompany() async {
-    if (_newCompanyCtl.text.isEmpty) return;
+    if (_newCompanyCtl.text.trim().isEmpty) return;
     try {
-      final slug = _newCompanyCtl.text.toLowerCase().replaceAll(RegExp(r'[\s]+'), '-').replaceAll(RegExp(r'[^a-z0-9_-]'), '');
-      await ApiService.instance.createTenant({'name': _newCompanyCtl.text, 'slug': slug, 'im_provider': 'web_only'});
+      final name = _newCompanyCtl.text.trim();
+      // Generate slug: strip non-ascii to base, fallback to timestamp if empty
+      var slug = name.toLowerCase().replaceAll(RegExp(r'[\s]+'), '-').replaceAll(RegExp(r'[^a-z0-9_-]'), '');
+      if (slug.length < 2) {
+        slug = 'co-${DateTime.now().millisecondsSinceEpoch}';
+      }
+      final result = await ApiService.instance.createTenant({'name': name, 'slug': slug, 'im_provider': 'web_only'});
       _newCompanyCtl.clear();
       setState(() => _showNewCompany = false);
-      _loadTenants();
+      // Auto-switch to the newly created company
+      final newId = result['id'] as String;
+      ref.read(appProvider.notifier).setTenant(newId);
+      await _loadTenants();
+      _loadAgents();
     } catch (_) {}
   }
 
   String _roleLabel(String role) {
     switch (role) {
-      case 'platform_admin': return 'Platform Admin';
-      case 'org_admin': return 'Org Admin';
-      case 'agent_admin': return 'Agent Admin';
-      default: return 'Member';
+      case 'platform_admin': return '平台管理员';
+      case 'org_admin': return '企业管理员';
+      case 'agent_admin': return 'Agent 管理员';
+      default: return '成员';
     }
   }
 

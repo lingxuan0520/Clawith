@@ -8,8 +8,9 @@ class AuthState {
   final String? token;
   final Map<String, dynamic>? user;
   final bool loading;
+  final bool initialized; // true after first token check from SharedPreferences
 
-  const AuthState({this.token, this.user, this.loading = false});
+  const AuthState({this.token, this.user, this.loading = false, this.initialized = false});
 
   bool get isAuthenticated => token != null;
   String get userId => user?['id'] ?? '';
@@ -25,6 +26,7 @@ class AuthState {
     String? token,
     Map<String, dynamic>? user,
     bool? loading,
+    bool? initialized,
     bool clearToken = false,
     bool clearUser = false,
   }) {
@@ -32,6 +34,7 @@ class AuthState {
       token: clearToken ? null : (token ?? this.token),
       user: clearUser ? null : (user ?? this.user),
       loading: loading ?? this.loading,
+      initialized: initialized ?? this.initialized,
     );
   }
 }
@@ -48,27 +51,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(token: token, loading: true);
       try {
         final user = await ApiService.instance.getMe();
-        state = state.copyWith(user: user, loading: false);
+        state = state.copyWith(user: user, loading: false, initialized: true);
       } catch (e) {
-        await logout();
+        await _clearAuth(prefs);
+        state = AuthState(initialized: true);
       }
+    } else {
+      state = state.copyWith(initialized: true);
     }
   }
 
   Future<void> setAuth(Map<String, dynamic> user, String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
-    state = AuthState(token: token, user: user);
+    state = AuthState(token: token, user: user, initialized: true);
   }
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
-    // Also sign out from Firebase
+    await _clearAuth(prefs);
     try {
       await FirebaseAuth.instance.signOut();
     } catch (_) {}
-    state = const AuthState();
+    state = AuthState(initialized: true);
+  }
+
+  Future<void> _clearAuth(SharedPreferences prefs) async {
+    await prefs.remove('token');
   }
 
   void updateUser(Map<String, dynamic> user) {

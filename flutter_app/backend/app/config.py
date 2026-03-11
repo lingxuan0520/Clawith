@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET_KEY: str = "change-me-jwt-secret"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 365  # 1 year
 
     # File Storage
     AGENT_DATA_DIR: str = "/data/agents"

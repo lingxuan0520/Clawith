@@ -276,6 +276,19 @@ async def firebase_login(data: FirebaseLoginRequest, db: AsyncSession = Depends(
             if display_name and user.display_name == user.username:
                 user.display_name = display_name
 
+    # Update avatar/display_name for existing users on every login
+    if user:
+        changed = False
+        if avatar_url and user.avatar_url != avatar_url:
+            user.avatar_url = avatar_url
+            changed = True
+        if display_name and not user.display_name:
+            user.display_name = display_name
+            changed = True
+        if changed:
+            await db.commit()
+            await db.refresh(user)
+
     if not user:
         # Auto-register new user
         from sqlalchemy import func
