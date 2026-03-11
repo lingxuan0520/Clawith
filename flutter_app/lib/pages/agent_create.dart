@@ -526,6 +526,10 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         // Primary model
         _FieldLabel('Primary Model *'),
         const SizedBox(height: 6),
+        if (_llmModels.isEmpty)
+          const Text('提示：请先前往「企业设置 → 模型池」添加 LLM 模型',
+              style: TextStyle(fontSize: 12, color: AppColors.textTertiary))
+        else
         _buildDropdown<String>(
           value: (_form['primary_model_id'] as String).isEmpty
               ? null
@@ -538,18 +542,12 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
                 : m['model']?.toString() ?? id;
             final provider = m['provider']?.toString() ?? '';
             final modelName = m['model']?.toString() ?? '';
+            final subtitle = provider.isNotEmpty ? ' ($provider/$modelName)' : '';
             return DropdownMenuItem(
               value: id,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  if (provider.isNotEmpty)
-                    Text('$provider/$modelName',
-                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
-                ],
-              ),
+              child: Text('$label$subtitle',
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis),
             );
           }).toList(),
           onChanged: (v) =>
@@ -560,6 +558,9 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         // Fallback model
         _FieldLabel('Fallback Model'),
         const SizedBox(height: 6),
+        if (_llmModels.isEmpty)
+          const SizedBox.shrink()
+        else
         _buildDropdown<String>(
           value: (_form['fallback_model_id'] as String).isEmpty
               ? null
@@ -572,18 +573,12 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
                 : m['model']?.toString() ?? id;
             final provider = m['provider']?.toString() ?? '';
             final modelName = m['model']?.toString() ?? '';
+            final subtitle = provider.isNotEmpty ? ' ($provider/$modelName)' : '';
             return DropdownMenuItem(
               value: id,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  if (provider.isNotEmpty)
-                    Text('$provider/$modelName',
-                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
-                ],
-              ),
+              child: Text('$label$subtitle',
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis),
             );
           }).toList(),
           onChanged: (v) =>

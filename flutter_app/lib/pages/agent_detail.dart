@@ -2773,11 +2773,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       });
       return DropdownButtonFormField<String>(
         value: hasMatch ? currentValue : null,
+        isExpanded: true,
         decoration: InputDecoration(labelText: label),
         dropdownColor: AppColors.bgElevated,
         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+        hint: Text('未选择', style: const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
         items: [
-          const DropdownMenuItem(value: '', child: Text('None', style: TextStyle(color: AppColors.textTertiary))),
+          const DropdownMenuItem(value: '', child: Text('不使用', style: TextStyle(color: AppColors.textTertiary))),
           ..._llmModels.map((m) {
             final model = m as Map<String, dynamic>;
             final id = model['id']?.toString() ?? '';
@@ -2786,30 +2788,31 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 : model['model']?.toString() ?? id;
             final provider = model['provider']?.toString() ?? '';
             final modelName = model['model']?.toString() ?? '';
+            final subtitle = provider.isNotEmpty ? ' ($provider/$modelName)' : '';
             return DropdownMenuItem(
               value: id,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(displayLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  if (provider.isNotEmpty || modelName.isNotEmpty)
-                    Text('$provider/$modelName',
-                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
-                ],
-              ),
+              child: Text('$displayLabel$subtitle',
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis),
             );
           }),
         ],
-        onChanged: (v) {
-          if (v != null) setState(() => ctrl.text = v);
-        },
+        onChanged: (v) => setState(() => ctrl.text = v ?? ''),
       );
     }
-    return TextField(
-      controller: ctrl,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-      decoration: InputDecoration(labelText: label, hintText: 'e.g. gpt-4, claude-3-opus...'),
+    // No models configured yet — show hint to go to enterprise settings
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: ctrl,
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          decoration: InputDecoration(labelText: label, hintText: '请先在企业设置中配置模型'),
+        ),
+        const SizedBox(height: 4),
+        const Text('提示：请先前往「企业设置 → 模型池」添加 LLM 模型',
+            style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+      ],
     );
   }
 
