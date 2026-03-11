@@ -166,6 +166,22 @@ class ApiService {
     return r.data as Map<String, dynamic>;
   }
 
+  // ─── Sessions ─────────────────────────────────────────
+  Future<List<dynamic>> listSessions(String agentId, {String scope = 'mine'}) async {
+    final r = await _dio.get('/agents/$agentId/sessions', queryParameters: {'scope': scope});
+    return r.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createSession(String agentId) async {
+    final r = await _dio.post('/agents/$agentId/sessions', data: {});
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> getSessionMessages(String agentId, String sessionId) async {
+    final r = await _dio.get('/agents/$agentId/sessions/$sessionId/messages');
+    return r.data as List<dynamic>;
+  }
+
   // ─── Chat ─────────────────────────────────────────────
   Future<List<dynamic>> getChatHistory(String agentId) async {
     final r = await _dio.get('/chat/$agentId/history');

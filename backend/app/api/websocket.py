@@ -67,7 +67,18 @@ async def get_chat_history(
     db: AsyncSession = Depends(get_db),
 ):
     """Return web chat message history for this user + agent."""
-    conv_id = f"web_{current_user.id}"
+    # Find the user's most recent chat session for this agent
+    from app.models.chat_session import ChatSession as _HistCS
+    sess_result = await db.execute(
+        select(_HistCS)
+        .where(_HistCS.agent_id == agent_id, _HistCS.user_id == current_user.id)
+        .order_by(_HistCS.last_message_at.desc().nulls_last(), _HistCS.created_at.desc())
+        .limit(1)
+    )
+    session = sess_result.scalar_one_or_none()
+    if not session:
+        return []
+    conv_id = str(session.id)
     result = await db.execute(
         select(ChatMessage)
         .where(ChatMessage.agent_id == agent_id, ChatMessage.conversation_id == conv_id)

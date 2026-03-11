@@ -20,17 +20,30 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final List<ChatMessage> _messages = [];
+  final List<ChatMessage> _historyMsgs = [];
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   final _inputFocus = FocusNode();
   WebSocketClient? _ws;
   StreamSubscription? _eventSub;
   StreamSubscription? _connSub;
+  StreamSubscription? _closeCodeSub;
   bool _connected = false;
   bool _uploading = false;
+  bool _isReadOnly = false;
+  bool _agentExpired = false;
   Map<String, dynamic>? _agent;
   _AttachedFile? _attachedFile;
+
+  // Session state
+  final List<Map<String, dynamic>> _sessions = [];
+  final List<Map<String, dynamic>> _allSessions = [];
+  Map<String, dynamic>? _activeSession;
+  String _chatScope = 'mine';
+  String _allUserFilter = '';
+  bool _sessionsLoading = false;
 
   // Streaming accumulators
   String _streamContent = '';
@@ -40,11 +53,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   void initState() {
     super.initState();
-    // Rebuild when text changes so the Send button enables/disables correctly
     _inputCtrl.addListener(() { if (mounted) setState(() {}); });
     _loadAgent();
-    _loadHistory();
-    _connectWs();
+    _loadSessions();
   }
 
   Future<void> _loadAgent() async {
@@ -54,47 +65,159 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     } catch (_) {}
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> _loadSessions({bool silent = false}) async {
+    if (!silent) {
+      if (mounted) setState(() => _sessionsLoading = true);
+    }
     try {
-      final history = await ApiService.instance.getChatHistory(widget.agentId);
+      final data = await ApiService.instance.listSessions(widget.agentId, scope: 'mine');
       if (!mounted) return;
       setState(() {
-        _messages.addAll(history.map((m) {
-          final msg = ChatMessage(
-            role: (m as Map<String, dynamic>)['role'] as String? ?? 'assistant',
-            content: m['content'] as String? ?? '',
-          );
-          return _parseMessage(msg);
-        }));
+        _sessions
+          ..clear()
+          ..addAll(data.cast<Map<String, dynamic>>());
+        _sessionsLoading = false;
       });
-      _scrollToBottom();
+      // Auto-select first session on initial load
+      if (!silent && _activeSession == null && _sessions.isNotEmpty) {
+        await _selectSession(_sessions.first);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _sessionsLoading = false);
+    }
+  }
+
+  Future<void> _loadAllSessions() async {
+    try {
+      final data = await ApiService.instance.listSessions(widget.agentId, scope: 'all');
+      if (mounted) {
+        setState(() {
+          _allSessions
+            ..clear()
+            ..addAll(data.cast<Map<String, dynamic>>());
+        });
+      }
     } catch (_) {}
   }
 
-  ChatMessage _parseMessage(ChatMessage msg) {
-    if (msg.role != 'user') return msg;
-    final content = msg.content;
-    // [file:name.pdf]\ncontent
-    final newFmt = RegExp(r'^\[file:([^\]]+)\]\n?').firstMatch(content);
-    if (newFmt != null) {
-      return msg.copyWith(
-        fileName: newFmt.group(1),
-        content: content.substring(newFmt.end).trim(),
-      );
-    }
-    // Old format: [File: name.pdf]
-    final oldFmt = RegExp(r'^\[File: ([^\]]+)\]').firstMatch(content);
-    if (oldFmt != null) {
-      final qMatch = RegExp(r'\nQuestion: ([\s\S]+)$').firstMatch(content);
-      return msg.copyWith(
-        fileName: oldFmt.group(1),
-        content: qMatch?.group(1)?.trim() ?? '',
-      );
-    }
-    return msg;
+  Future<void> _createSession() async {
+    try {
+      final newSess = await ApiService.instance.createSession(widget.agentId);
+      if (!mounted) return;
+      setState(() {
+        _sessions.insert(0, newSess);
+      });
+      await _selectSession(newSess);
+      _scaffoldKey.currentState?.closeEndDrawer();
+    } catch (_) {}
   }
 
-  void _connectWs() {
+  Future<void> _selectSession(Map<String, dynamic> sess) async {
+    setState(() {
+      _messages.clear();
+      _historyMsgs.clear();
+      _activeSession = sess;
+      _isReadOnly = false;
+      _agentExpired = false;
+    });
+
+    try {
+      final msgs = await ApiService.instance.getSessionMessages(
+        widget.agentId, sess['id'] as String,
+      );
+      if (!mounted) return;
+
+      final auth = ref.read(authProvider);
+      final isAgentSession =
+          sess['source_channel'] == 'agent' || sess['participant_type'] == 'agent';
+      final isOwnSession =
+          !isAgentSession && (sess['user_id'] as String?) == auth.userId;
+
+      if (isOwnSession) {
+        setState(() {
+          _messages.addAll(msgs.map((m) => _parseHistoryMessage(m as Map<String, dynamic>)));
+          _isReadOnly = false;
+        });
+        _reconnectWs();
+      } else {
+        setState(() {
+          _historyMsgs.addAll(msgs.map((m) => _parseHistoryMessage(m as Map<String, dynamic>)));
+          _isReadOnly = true;
+        });
+        _ws?.dispose();
+        _ws = null;
+        if (mounted) setState(() => _connected = false);
+      }
+    } catch (_) {
+      // If loading messages fails, still connect WS for own sessions
+      final auth = ref.read(authProvider);
+      final isAgentSession =
+          sess['source_channel'] == 'agent' || sess['participant_type'] == 'agent';
+      final isOwnSession =
+          !isAgentSession && (sess['user_id'] as String?) == auth.userId;
+      if (isOwnSession) _reconnectWs();
+    }
+    _scrollToBottom();
+  }
+
+  ChatMessage _parseHistoryMessage(Map<String, dynamic> m) {
+    final role = m['role'] as String? ?? 'assistant';
+    final content = m['content'] as String? ?? '';
+
+    if (role == 'tool_call') {
+      return ChatMessage(
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          ToolCallInfo(
+            name: m['toolName'] as String? ?? '',
+            args: m['toolArgs'],
+            result: m['toolResult'] as String?,
+          ),
+        ],
+      );
+    }
+
+    // Parse file/image markers in user messages
+    if (role == 'user') {
+      final newFmt = RegExp(r'^\[file:([^\]]+)\]\n?').firstMatch(content);
+      if (newFmt != null) {
+        return ChatMessage(
+          role: role,
+          fileName: newFmt.group(1),
+          content: content.substring(newFmt.end).trim(),
+        );
+      }
+      final oldFmt = RegExp(r'^\[File: ([^\]]+)\]').firstMatch(content);
+      if (oldFmt != null) {
+        final qMatch = RegExp(r'\nQuestion: ([\s\S]+)$').firstMatch(content);
+        return ChatMessage(
+          role: role,
+          fileName: oldFmt.group(1),
+          content: qMatch?.group(1)?.trim() ?? '',
+        );
+      }
+      // Feishu/Slack upload format
+      final feishuFmt = RegExp(r'^\[文件已上传: (?:workspace/uploads/)?([^\]\n]+)\]').firstMatch(content);
+      if (feishuFmt != null) {
+        return ChatMessage(
+          role: role,
+          fileName: feishuFmt.group(1),
+          content: content.substring(feishuFmt.end).trim(),
+        );
+      }
+    }
+
+    return ChatMessage(role: role, content: content);
+  }
+
+  void _reconnectWs() {
+    _eventSub?.cancel();
+    _connSub?.cancel();
+    _closeCodeSub?.cancel();
+    _ws?.dispose();
+    _ws = null;
+
     final auth = ref.read(authProvider);
     if (auth.token == null) return;
 
@@ -103,14 +226,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       agentId: widget.agentId,
       token: auth.token!,
       serverHost: serverHost,
+      sessionId: _activeSession?['id'] as String?,
     );
 
     _connSub = _ws!.connectionState.listen((connected) {
       if (mounted) setState(() => _connected = connected);
     });
-
     _eventSub = _ws!.events.listen(_handleWsEvent);
+    _closeCodeSub = _ws!.closeCodes.listen(_handleCloseCode);
     _ws!.connect();
+  }
+
+  void _handleCloseCode(int code) {
+    if (!mounted) return;
+    if (code == 4003) {
+      setState(() => _agentExpired = true);
+    } else if (code == 4002) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Agent 配置错误，请检查模型设置')),
+      );
+    }
   }
 
   void _handleWsEvent(WsEvent event) {
@@ -135,12 +270,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           }
           break;
         case WsEventType.done:
-          final toolCalls = _pendingToolCalls.isNotEmpty ? List<ToolCallInfo>.from(_pendingToolCalls) : null;
+          final toolCalls = _pendingToolCalls.isNotEmpty
+              ? List<ToolCallInfo>.from(_pendingToolCalls)
+              : null;
           final thinking = _thinkingContent.isNotEmpty ? _thinkingContent : null;
           _pendingToolCalls.clear();
           _streamContent = '';
           _thinkingContent = '';
-          // Replace last assistant message with final
           if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
             _messages[_messages.length - 1] = ChatMessage(
               role: 'assistant',
@@ -156,6 +292,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               thinking: thinking,
             ));
           }
+          // Silently refresh session list to update last_message_at
+          _loadSessions(silent: true);
+          break;
+        case WsEventType.error:
+        case WsEventType.quotaExceeded:
+          final errMsg = event.content ?? '请求失败';
+          // Dedup: don't add if last message is identical
+          if (_messages.isEmpty || _messages.last.content != '⚠️ $errMsg') {
+            _messages.add(ChatMessage(role: 'assistant', content: '⚠️ $errMsg'));
+          }
+          break;
+        case WsEventType.triggerNotification:
+          _messages.add(ChatMessage(role: 'assistant', content: event.content ?? ''));
+          _loadSessions(silent: true);
           break;
         case WsEventType.legacy:
           _messages.add(ChatMessage(
@@ -224,7 +374,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _sendMessage() {
-    if (_ws == null || !_connected) return;
+    if (_ws == null || !_connected || _isReadOnly) return;
     final text = _inputCtrl.text.trim();
     if (text.isEmpty && _attachedFile == null) return;
 
@@ -276,7 +426,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _scrollToBottom();
   }
 
-  /// Get file type emoji matching React implementation
   String _fileEmoji(String fileName) {
     final ext = fileName.split('.').last.toLowerCase();
     if (ext == 'pdf') return '📄';
@@ -290,10 +439,31 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].contains(ext);
   }
 
+  String _formatSessionTime(String? isoStr) {
+    if (isoStr == null) return '';
+    try {
+      final dt = DateTime.parse(isoStr).toLocal();
+      final now = DateTime.now();
+      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+        final h = dt.hour.toString().padLeft(2, '0');
+        final m = dt.minute.toString().padLeft(2, '0');
+        return '$h:$m';
+      }
+      return '${dt.month}/${dt.day}';
+    } catch (_) {
+      return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppColors.bgPrimary,
+      endDrawer: Drawer(
+        backgroundColor: AppColors.bgSecondary,
+        child: _buildSessionsPanel(),
+      ),
       appBar: AppBar(
         backgroundColor: AppColors.bgSecondary,
         title: Row(
@@ -313,14 +483,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_agent?['name'] as String? ?? '...', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(
+                    _agent?['name'] as String? ?? '...',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                   Row(
                     children: [
                       Container(
                         width: 5, height: 5,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: _connected ? AppColors.statusRunning : AppColors.statusStopped,
+                          color: _connected
+                              ? AppColors.statusRunning
+                              : AppColors.statusStopped,
                         ),
                       ),
                       const SizedBox(width: 5),
@@ -328,6 +503,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         _connected ? '已连接' : '未连接',
                         style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
                       ),
+                      if (_activeSession != null) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _activeSession!['title'] as String? ?? '',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textTertiary,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -335,32 +523,134 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.forum_outlined, size: 20),
+            tooltip: '会话列表',
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+          ),
+        ],
       ),
-      body: Column(
+      body: _agentExpired ? _buildExpiredBanner() : Column(
         children: [
+          Expanded(
+            child: _isReadOnly ? _buildHistoryView() : _buildChatView(),
+          ),
+          if (!_isReadOnly) _buildInputArea(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpiredBanner() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.timer_off, size: 48, color: AppColors.textTertiary),
+            const SizedBox(height: 16),
+            const Text(
+              'Agent 已过期，暂停服务',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '请在 Agent 设置中更新过期时间',
+              style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatView() {
+    if (_activeSession == null && !_sessionsLoading) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
+            const SizedBox(height: 12),
+            Text(
+              '开始与 ${_agent?['name'] ?? 'Agent'} 对话',
+              style: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _createSession,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('新建会话'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _messages.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
+                const SizedBox(height: 12),
+                Text(
+                  '开始与 ${_agent?['name'] ?? 'Agent'} 对话',
+                  style: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                const Text('支持文本和文件上传',
+                    style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+              ],
+            ),
+          )
+        : ListView.builder(
+            controller: _scrollCtrl,
+            padding: const EdgeInsets.all(16),
+            itemCount: _messages.length,
+            itemBuilder: (context, i) => _buildMessage(_messages[i]),
+          );
+  }
+
+  Widget _buildHistoryView() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: AppColors.bgElevated,
+          child: Row(
+            children: [
+              const Icon(Icons.visibility, size: 14, color: AppColors.textTertiary),
+              const SizedBox(width: 6),
+              Text(
+                '只读 · ${_activeSession?['username'] ?? '其他用户'}的会话',
+                style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+              ),
+            ],
+          ),
+        ),
         Expanded(
-          child: _messages.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
-                      const SizedBox(height: 12),
-                      Text('开始与 ${_agent?['name'] ?? 'Agent'} 对话',
-                          style: const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
-                      const SizedBox(height: 8),
-                      const Text('支持文本和文件上传', style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
-                    ],
-                  ),
+          child: _historyMsgs.isEmpty
+              ? const Center(
+                  child: Text('暂无消息',
+                      style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                 )
               : ListView.builder(
-                  controller: _scrollCtrl,
                   padding: const EdgeInsets.all(16),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, i) => _buildMessage(_messages[i]),
+                  itemCount: _historyMsgs.length,
+                  itemBuilder: (context, i) => _buildMessage(_historyMsgs[i]),
                 ),
         ),
+      ],
+    );
+  }
 
+  Widget _buildInputArea() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
         // Attached file preview
         if (_attachedFile != null)
           Container(
@@ -386,7 +676,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     padding: EdgeInsets.only(right: 6),
                     child: Icon(Icons.attach_file, size: 16, color: AppColors.textTertiary),
                   ),
-                Expanded(child: Text(_attachedFile!.name, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                Expanded(
+                  child: Text(_attachedFile!.name,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                ),
                 IconButton(
                   onPressed: () => setState(() => _attachedFile = null),
                   icon: const Icon(Icons.close, size: 14),
@@ -396,8 +689,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ],
             ),
           ),
-
-        // Input area
+        // Input row
         Container(
           padding: const EdgeInsets.all(12),
           decoration: const BoxDecoration(
@@ -408,7 +700,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               IconButton(
                 onPressed: !_connected || _uploading ? null : _handleFileSelect,
                 icon: _uploading
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.attach_file, size: 20),
                 color: AppColors.textTertiary,
                 tooltip: '上传文件',
@@ -426,8 +722,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   },
                   child: TextField(
                     controller: _inputCtrl,
-                    enabled: _connected,
-                    focusNode: FocusNode(),
+                    enabled: _connected && !_isReadOnly,
                     decoration: InputDecoration(
                       hintText: _attachedFile != null
                           ? '询问关于 ${_attachedFile!.name}...'
@@ -444,7 +739,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: _connected && (_inputCtrl.text.trim().isNotEmpty || _attachedFile != null)
+                onPressed: _connected &&
+                        !_isReadOnly &&
+                        (_inputCtrl.text.trim().isNotEmpty || _attachedFile != null)
                     ? _sendMessage
                     : null,
                 child: const Text('发送'),
@@ -453,20 +750,242 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSessionsPanel() {
+    final displaySessions = _chatScope == 'mine'
+        ? _sessions
+        : (_allUserFilter.isEmpty
+            ? _allSessions
+            : _allSessions
+                .where((s) =>
+                    (s['username'] ?? s['user_id']) == _allUserFilter)
+                .toList());
+
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                const Text('会话', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => _scaffoldKey.currentState?.closeEndDrawer(),
+                  color: AppColors.textTertiary,
+                ),
+              ],
+            ),
+          ),
+          // Scope tabs
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                _buildScopeTab('我的会话', 'mine'),
+                const SizedBox(width: 4),
+                _buildScopeTab('所有用户', 'all'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // New session button (mine only)
+          if (_chatScope == 'mine')
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _createSession,
+                  icon: const Icon(Icons.add, size: 14),
+                  label: const Text('新建会话', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    side: const BorderSide(color: AppColors.borderSubtle),
+                    foregroundColor: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          // User filter (all sessions)
+          if (_chatScope == 'all')
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: DropdownButtonFormField<String>(
+                initialValue: _allUserFilter,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  border: OutlineInputBorder(),
+                ),
+                style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                dropdownColor: AppColors.bgElevated,
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('所有用户')),
+                  ...{for (final s in _allSessions) s['username'] ?? s['user_id']}
+                      .where((u) => u != null)
+                      .map((u) => DropdownMenuItem(value: u as String, child: Text(u))),
+                ],
+                onChanged: (v) => setState(() => _allUserFilter = v ?? ''),
+              ),
+            ),
+          const Divider(height: 1, color: AppColors.borderSubtle),
+          // Session list
+          Expanded(
+            child: _sessionsLoading
+                ? const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary),
+                  )
+                : displaySessions.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text(
+                          _chatScope == 'mine' ? '暂无会话\n点击「新建会话」开始' : '暂无会话',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, height: 1.6),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: displaySessions.length,
+                        itemBuilder: (ctx, i) => _buildSessionItem(displaySessions[i]),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScopeTab(String label, String scope) {
+    final isActive = _chatScope == scope;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() => _chatScope = scope);
+          if (scope == 'all') _loadAllSessions();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isActive ? AppColors.accentPrimary : Colors.transparent,
+                width: 2,
+              ),
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              color: isActive ? AppColors.textPrimary : AppColors.textTertiary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSessionItem(Map<String, dynamic> sess) {
+    final isActive = _activeSession?['id'] == sess['id'];
+    final title = sess['title'] as String? ?? '未命名会话';
+    final channel = sess['source_channel'] as String?;
+    final msgCount = sess['message_count'] as int? ?? 0;
+    final timeStr = _formatSessionTime(
+        sess['last_message_at'] as String? ?? sess['created_at'] as String?);
+
+    final channelLabels = {'feishu': '飞书', 'discord': 'Discord', 'slack': 'Slack'};
+    final chLabel = channelLabels[channel];
+
+    return InkWell(
+      onTap: () {
+        _selectSession(sess);
+        _scaffoldKey.currentState?.closeEndDrawer();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: isActive ? AppColors.accentPrimary : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          color: isActive ? AppColors.bgTertiary : Colors.transparent,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      color: AppColors.textPrimary,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    maxLines: 1,
+                  ),
+                ),
+                if (chLabel != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    margin: const EdgeInsets.only(left: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgTertiary,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text(chLabel,
+                        style: const TextStyle(fontSize: 9, color: AppColors.textTertiary)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                if (isActive && _connected)
+                  Container(
+                    width: 5, height: 5,
+                    margin: const EdgeInsets.only(right: 4),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.statusRunning,
+                    ),
+                  ),
+                Text(
+                  timeStr,
+                  style: const TextStyle(fontSize: 10, color: AppColors.textTertiary),
+                ),
+                if (msgCount > 0) ...[
+                  const Spacer(),
+                  Text(
+                    '$msgCount',
+                    style: const TextStyle(fontSize: 10, color: AppColors.textTertiary),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildMessage(ChatMessage msg) {
     final isUser = msg.role == 'user';
-
-    // Build bubble content
     final bubbleChildren = <Widget>[];
 
-    // File attachment with emoji icons (matching React)
+    // File attachment
     if (msg.fileName != null) {
       if (_isImageFile(msg.fileName!) && msg.imageUrl != null) {
-        // Image preview
         bubbleChildren.add(Container(
           margin: const EdgeInsets.only(bottom: 4),
           constraints: const BoxConstraints(maxWidth: 240, maxHeight: 180),
@@ -476,7 +995,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
           clipBehavior: Clip.antiAlias,
           child: Image.memory(
-            base64Decode(msg.imageUrl!.replaceFirst(RegExp(r'^data:image/[^;]+;base64,'), '')),
+            base64Decode(msg.imageUrl!
+                .replaceFirst(RegExp(r'^data:image/[^;]+;base64,'), '')),
             fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => const Padding(
               padding: EdgeInsets.all(12),
@@ -485,7 +1005,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
         ));
       } else {
-        // File badge with type emoji
         final emoji = _fileEmoji(msg.fileName!);
         bubbleChildren.add(Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -514,7 +1033,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
     }
 
-    // Thinking (only for assistant)
+    // Thinking (assistant only)
     if (!isUser && msg.thinking != null && msg.thinking!.isNotEmpty) {
       bubbleChildren.add(Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -531,14 +1050,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('💭 ', style: TextStyle(fontSize: 12)),
-              Text('思考中', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF9382DC))),
+              Text('思考中',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF9382DC))),
             ],
           ),
           children: [
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 300),
               child: SingleChildScrollView(
-                child: Text(msg.thinking!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
+                child: Text(msg.thinking!,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
               ),
             ),
           ],
@@ -546,7 +1071,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ));
     }
 
-    // Tool calls (only for assistant)
+    // Tool calls (assistant only)
     if (!isUser && msg.toolCalls != null && msg.toolCalls!.isNotEmpty) {
       bubbleChildren.add(Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -565,7 +1090,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               const SizedBox(width: 4),
               Text(
                 '${msg.toolCalls!.length} 个工具调用',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.accentPrimary),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.accentPrimary),
               ),
             ],
           ),
@@ -583,18 +1111,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(tc.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accentPrimary)),
+                  Text(tc.name,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accentPrimary)),
                   if (tc.args != null)
                     Text(
                       tc.args is String ? tc.args : jsonEncode(tc.args),
-                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textTertiary),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          color: AppColors.textTertiary),
                     ),
                   if (tc.result != null)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
                       constraints: const BoxConstraints(maxHeight: 120),
                       child: SingleChildScrollView(
-                        child: Text(tc.result!, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
+                        child: Text(tc.result!,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                color: AppColors.textSecondary)),
                       ),
                     ),
                 ],
@@ -609,14 +1148,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (msg.content.isNotEmpty) {
       bubbleChildren.add(
         isUser
-            ? Text(msg.content, style: const TextStyle(fontSize: 14, height: 1.6, color: Colors.white))
+            ? Text(msg.content,
+                style: const TextStyle(fontSize: 14, height: 1.6, color: Colors.white))
             : MarkdownRenderer(data: msg.content),
       );
     }
 
-    // Build the full message row
     if (isUser) {
-      // User: right-aligned, accent background, avatar on right
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Row(
@@ -652,7 +1190,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ),
       );
     } else {
-      // Assistant: left-aligned, elevated background, avatar on left
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Row(
@@ -694,6 +1231,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void dispose() {
     _eventSub?.cancel();
     _connSub?.cancel();
+    _closeCodeSub?.cancel();
     _ws?.dispose();
     _inputCtrl.dispose();
     _inputFocus.dispose();

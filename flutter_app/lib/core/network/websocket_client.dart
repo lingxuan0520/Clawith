@@ -46,28 +46,36 @@ class ToolCallInfo {
   ToolCallInfo({required this.name, this.args, this.result});
 }
 
-enum WsEventType { chunk, thinking, toolCall, done, legacy }
+enum WsEventType {
+  chunk,
+  thinking,
+  toolCall,
+  done,
+  legacy,
+  error,
+  quotaExceeded,
+  triggerNotification,
+}
 
 class WsEvent {
   final WsEventType type;
   final String? content;
+  final String? role;
   final String? toolName;
   final dynamic toolArgs;
   final String? toolResult;
-  final String? role;
 
   WsEvent({
     required this.type,
     this.content,
+    this.role,
     this.toolName,
     this.toolArgs,
     this.toolResult,
-    this.role,
   });
 
   factory WsEvent.fromJson(Map<String, dynamic> json) {
-    final type = json['type'] as String?;
-    switch (type) {
+    switch (json['type'] as String?) {
       case 'chunk':
         return WsEvent(type: WsEventType.chunk, content: json['content'] as String?);
       case 'thinking':
@@ -82,6 +90,17 @@ class WsEvent {
         );
       case 'done':
         return WsEvent(type: WsEventType.done, content: json['content'] as String?);
+      case 'error':
+        final msg = json['content'] as String? ??
+            json['detail'] as String? ??
+            json['message'] as String? ??
+            '请求失败';
+        return WsEvent(type: WsEventType.error, content: msg);
+      case 'quota_exceeded':
+        final msg = json['content'] as String? ?? '配额已用尽';
+        return WsEvent(type: WsEventType.quotaExceeded, content: msg);
+      case 'trigger_notification':
+        return WsEvent(type: WsEventType.triggerNotification, content: json['content'] as String?);
       default:
         return WsEvent(
           type: WsEventType.legacy,
@@ -98,14 +117,18 @@ class WebSocketClient {
   final String agentId;
   final String token;
   final String serverHost;
+  final String? sessionId;
   Timer? _reconnectTimer;
   bool _disposed = false;
+  bool _permanentError = false;
 
   final StreamController<WsEvent> _eventController = StreamController.broadcast();
   final StreamController<bool> _connectionController = StreamController.broadcast();
+  final StreamController<int> _closeCodeController = StreamController.broadcast();
 
   Stream<WsEvent> get events => _eventController.stream;
   Stream<bool> get connectionState => _connectionController.stream;
+  Stream<int> get closeCodes => _closeCodeController.stream;
   bool _connected = false;
   bool get isConnected => _connected;
 
@@ -113,15 +136,17 @@ class WebSocketClient {
     required this.agentId,
     required this.token,
     required this.serverHost,
+    this.sessionId,
   });
 
   void connect() {
-    if (_disposed) return;
+    if (_disposed || _permanentError) return;
     _close();
 
     final scheme = serverHost.startsWith('https') ? 'wss' : 'ws';
     final host = serverHost.replaceFirst(RegExp(r'^https?://'), '');
-    final wsUrl = '$scheme://$host/ws/chat/$agentId?token=$token';
+    final sessionParam = sessionId != null ? '&session_id=$sessionId' : '';
+    final wsUrl = '$scheme://$host/ws/chat/$agentId?token=$token$sessionParam';
 
     try {
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -138,22 +163,32 @@ class WebSocketClient {
           }
         },
         onDone: () {
+          final code = _channel?.closeCode;
           _connected = false;
           _connectionController.add(false);
-          _scheduleReconnect();
+          if (code == 4002 || code == 4003) {
+            _permanentError = true;
+            _closeCodeController.add(code!);
+          } else if (!_disposed) {
+            _scheduleReconnect();
+          }
         },
         onError: (e) {
           debugPrint('WS error: $e');
           _connected = false;
           _connectionController.add(false);
-          _scheduleReconnect();
+          if (!_disposed && !_permanentError) {
+            _scheduleReconnect();
+          }
         },
       );
     } catch (e) {
       debugPrint('WS connect error: $e');
       _connected = false;
       _connectionController.add(false);
-      _scheduleReconnect();
+      if (!_disposed && !_permanentError) {
+        _scheduleReconnect();
+      }
     }
   }
 
@@ -164,7 +199,7 @@ class WebSocketClient {
   }
 
   void _scheduleReconnect() {
-    if (_disposed) return;
+    if (_disposed || _permanentError) return;
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 2), connect);
   }
@@ -182,5 +217,6 @@ class WebSocketClient {
     _close();
     _eventController.close();
     _connectionController.close();
+    _closeCodeController.close();
   }
 }
