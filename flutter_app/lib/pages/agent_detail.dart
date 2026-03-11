@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -297,7 +298,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingTasks = false);
-      _showSnack('加载任务失败: $e');
+      _showSnack('加载任务失败: ${_errMsg(e)}');
     }
   }
 
@@ -403,8 +404,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       ]);
       if (!mounted) return;
       setState(() {
-        _humanRelationships = results[0] as List<dynamic>;
-        _agentRelationships = results[1] as List<dynamic>;
+        _humanRelationships = results[0];
+        _agentRelationships = results[1];
         _loadingRelationships = false;
       });
     } catch (e) {
@@ -430,7 +431,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingWorkspace = false);
-      _showSnack('加载文件失败: $e');
+      _showSnack('加载文件失败: ${_errMsg(e)}');
     }
   }
 
@@ -446,7 +447,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingActivity = false);
-      _showSnack('加载活动失败: $e');
+      _showSnack('加载活动失败: ${_errMsg(e)}');
     }
   }
 
@@ -486,7 +487,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       await _fetchAgent();
       _showSnack('智能体已启动');
     } catch (e) {
-      _showSnack('启动失败: $e');
+      _showSnack('启动失败: ${_errMsg(e)}');
     }
   }
 
@@ -496,7 +497,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       await _fetchAgent();
       _showSnack('智能体已停止');
     } catch (e) {
-      _showSnack('停止失败: $e');
+      _showSnack('停止失败: ${_errMsg(e)}');
     }
   }
 
@@ -512,7 +513,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       context.go('/dashboard');
       _showSnack('智能体已删除');
     } catch (e) {
-      _showSnack('删除失败: $e');
+      _showSnack('删除失败: ${_errMsg(e)}');
     }
   }
 
@@ -532,7 +533,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingRole = false);
-      _showSnack('保存失败: $e');
+      _showSnack('保存失败: ${_errMsg(e)}');
     }
   }
 
@@ -563,7 +564,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _creatingTask = false);
-      _showSnack('创建任务失败: $e');
+      _showSnack('创建任务失败: ${_errMsg(e)}');
     }
   }
 
@@ -581,7 +582,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingSoul = false);
-      _showSnack('保存 soul.md 失败: $e');
+      _showSnack('保存 soul.md 失败: ${_errMsg(e)}');
     }
   }
 
@@ -590,7 +591,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       await _api.toggleAgentTool(widget.agentId, toolId, enabled);
       _fetchToolsData();
     } catch (e) {
-      _showSnack('工具开关失败: $e');
+      _showSnack('工具开关失败: ${_errMsg(e)}');
     }
   }
 
@@ -622,7 +623,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingSettings = false);
-      _showSnack('保存设置失败: $e');
+      _showSnack('保存设置失败: ${_errMsg(e)}');
     }
   }
 
@@ -643,7 +644,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _viewingFileName = name;
       });
     } catch (e) {
-      _showSnack('读取文件失败: $e');
+      _showSnack('读取文件失败: ${_errMsg(e)}');
     }
   }
 
@@ -657,7 +658,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _viewingSkillName = name;
       });
     } catch (e) {
-      _showSnack('读取技能文件失败: $e');
+      _showSnack('读取技能文件失败: ${_errMsg(e)}');
     }
   }
 
@@ -672,7 +673,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('技能已删除');
       _fetchSkillsData();
     } catch (e) {
-      _showSnack('删除技能失败: $e');
+      _showSnack('删除技能失败: ${_errMsg(e)}');
     }
   }
 
@@ -688,7 +689,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('文件已删除');
       _fetchWorkspaceFiles(_currentPath);
     } catch (e) {
-      _showSnack('删除文件失败: $e');
+      _showSnack('删除文件失败: ${_errMsg(e)}');
     }
   }
 
@@ -703,7 +704,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('触发器已删除');
       _fetchPulseData();
     } catch (e) {
-      _showSnack('删除触发器失败: $e');
+      _showSnack('删除触发器失败: ${_errMsg(e)}');
     }
   }
 
@@ -713,7 +714,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       if (!mounted) return;
       _showContentDialog(name, res['content'] as String? ?? '(empty)');
     } catch (e) {
-      _showSnack('读取记忆文件失败: $e');
+      _showSnack('读取记忆文件失败: ${_errMsg(e)}');
     }
   }
 
@@ -728,7 +729,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('通道已删除');
       _fetchSettingsData();
     } catch (e) {
-      _showSnack('删除通道失败: $e');
+      _showSnack('删除通道失败: ${_errMsg(e)}');
     }
   }
 
@@ -743,7 +744,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('计划已删除');
       _fetchSchedules();
     } catch (e) {
-      _showSnack('删除计划失败: $e');
+      _showSnack('删除计划失败: ${_errMsg(e)}');
     }
   }
 
@@ -763,7 +764,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingName = false);
-      _showSnack('更新名称失败: $e');
+      _showSnack('更新名称失败: ${_errMsg(e)}');
     }
   }
 
@@ -772,7 +773,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       await _api.updateTrigger(widget.agentId, triggerId, {'enabled': enabled});
       _fetchPulseData();
     } catch (e) {
-      _showSnack('更新触发器失败: $e');
+      _showSnack('更新触发器失败: ${_errMsg(e)}');
     }
   }
 
@@ -782,7 +783,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('任务已触发');
       _fetchTasks();
     } catch (e) {
-      _showSnack('触发任务失败: $e');
+      _showSnack('触发任务失败: ${_errMsg(e)}');
     }
   }
 
@@ -792,7 +793,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('计划已手动触发');
       _fetchSchedules();
     } catch (e) {
-      _showSnack('触发计划失败: $e');
+      _showSnack('触发计划失败: ${_errMsg(e)}');
     }
   }
 
@@ -825,7 +826,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _creatingSchedule = false);
-      _showSnack('创建计划失败: $e');
+      _showSnack('创建计划失败: ${_errMsg(e)}');
     }
   }
 
@@ -837,7 +838,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('关系已删除');
       _fetchRelationshipsData();
     } catch (e) {
-      _showSnack('删除关系失败: $e');
+      _showSnack('删除关系失败: ${_errMsg(e)}');
     }
   }
 
@@ -849,7 +850,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('关系已删除');
       _fetchRelationshipsData();
     } catch (e) {
-      _showSnack('删除关系失败: $e');
+      _showSnack('删除关系失败: ${_errMsg(e)}');
     }
   }
 
@@ -874,7 +875,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('通道已创建');
       _fetchSettingsData();
     } catch (e) {
-      _showSnack('创建通道失败: $e');
+      _showSnack('创建通道失败: ${_errMsg(e)}');
     }
   }
 
@@ -926,7 +927,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   await _fetchAgentSilent();
                   _showSnack('已设置为永不过期');
                 } catch (e) {
-                  _showSnack('设置失败: $e');
+                  _showSnack('设置失败: ${_errMsg(e)}');
                 }
               },
             ),
@@ -949,7 +950,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           await _fetchAgentSilent();
           _showSnack('过期时间已更新');
         } catch (e) {
-          _showSnack('设置失败: $e');
+          _showSnack('设置失败: ${_errMsg(e)}');
         }
       },
       style: OutlinedButton.styleFrom(
@@ -967,6 +968,21 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
     );
+  }
+
+  String _errMsg(dynamic e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final detail = data['detail'] as String?;
+        if (detail != null && detail.isNotEmpty) return detail;
+        final msg = data['message'] as String?;
+        if (msg != null && msg.isNotEmpty) return msg;
+      }
+      final sc = e.response?.statusCode;
+      return sc != null ? 'HTTP $sc' : '网络错误';
+    }
+    return e.toString();
   }
 
   Future<bool?> _showConfirmDialog(String title, String message) {

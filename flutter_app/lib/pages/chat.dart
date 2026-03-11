@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -408,7 +409,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('上传失败: $e')),
+          SnackBar(content: Text('上传失败: ${_errMsg(e)}')),
         );
       }
     } finally {
@@ -1353,6 +1354,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _scrollCtrl.dispose();
     super.dispose();
   }
+}
+
+String _errMsg(dynamic e) {
+  if (e is DioException) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final detail = data['detail'] as String?;
+      if (detail != null && detail.isNotEmpty) return detail;
+      final msg = data['message'] as String?;
+      if (msg != null && msg.isNotEmpty) return msg;
+    }
+    final sc = e.response?.statusCode;
+    return sc != null ? 'HTTP $sc' : '网络错误';
+  }
+  return e.toString();
 }
 
 class _AttachedFile {
