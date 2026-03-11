@@ -52,14 +52,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   String _streamContent = '';
   String _thinkingContent = '';
   final List<ToolCallInfo> _pendingToolCalls = [];
+  bool _waitingForResponse = false;
+
+  // Smart scroll
+  bool _showScrollToBottom = false;
 
   @override
   void initState() {
     super.initState();
     _inputCtrl.addListener(() { if (mounted) setState(() {}); });
+    _scrollCtrl.addListener(_onScroll);
     _loadAgent();
     _loadSessions();
     _checkVisionSupport();
+  }
+
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final maxExtent = _scrollCtrl.position.maxScrollExtent;
+    final current = _scrollCtrl.offset;
+    final isNearBottom = (maxExtent - current) < 150;
+    if (_showScrollToBottom == isNearBottom) {
+      setState(() => _showScrollToBottom = !isNearBottom);
+    }
   }
 
   Future<void> _loadAgent() async {
@@ -175,7 +190,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           !isAgentSession && (sess['user_id'] as String?) == auth.userId;
       if (isOwnSession) _reconnectWs();
     }
-    _scrollToBottom();
+    _scrollToBottom(force: true);
   }
 
   ChatMessage _parseHistoryMessage(Map<String, dynamic> m) {
@@ -271,10 +286,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     setState(() {
       switch (event.type) {
         case WsEventType.thinking:
+          _waitingForResponse = false;
+
           _thinkingContent += event.content ?? '';
           _updateOrAddAssistant(content: _streamContent, thinking: _thinkingContent);
           break;
         case WsEventType.chunk:
+          _waitingForResponse = false;
+
           _streamContent += event.content ?? '';
           _updateOrAddAssistant(content: _streamContent, thinking: _thinkingContent);
           break;
@@ -288,6 +307,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           }
           break;
         case WsEventType.done:
+          _waitingForResponse = false;
           final toolCalls = _pendingToolCalls.isNotEmpty
               ? List<ToolCallInfo>.from(_pendingToolCalls)
               : null;
@@ -315,6 +335,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           break;
         case WsEventType.error:
         case WsEventType.quotaExceeded:
+          _waitingForResponse = false;
           final errMsg = event.content ?? '请求失败';
           // Dedup: don't add if last message is identical
           if (_messages.isEmpty || _messages.last.content != '⚠️ $errMsg') {
@@ -347,11 +368,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool force = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
+      if (!_scrollCtrl.hasClients) return;
+      final maxExtent = _scrollCtrl.position.maxScrollExtent;
+      final current = _scrollCtrl.offset;
+      final isNearBottom = (maxExtent - current) < 150;
+      if (force || isNearBottom) {
         _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
+          maxExtent,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
@@ -448,8 +473,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
 
     _inputCtrl.clear();
-    setState(() => _attachedFile = null);
-    _scrollToBottom();
+    setState(() {
+      _attachedFile = null;
+      _waitingForResponse = true;
+    });
+    _scrollToBottom(force: true);
   }
 
   String _fileEmoji(String fileName) {
@@ -615,7 +643,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     }
 
-    return _messages.isEmpty
+    return _messages.isEmpty && !_waitingForResponse
         ? Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -632,12 +660,64 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ],
             ),
           )
-        : ListView.builder(
-            controller: _scrollCtrl,
-            padding: const EdgeInsets.all(16),
-            itemCount: _messages.length,
-            itemBuilder: (context, i) => _buildMessage(_messages[i]),
+        : Stack(
+            children: [
+              ListView.builder(
+                controller: _scrollCtrl,
+                padding: const EdgeInsets.all(16),
+                itemCount: _messages.length + (_waitingForResponse ? 1 : 0),
+                itemBuilder: (context, i) {
+                  if (i == _messages.length && _waitingForResponse) {
+                    return _buildTypingIndicator();
+                  }
+                  return _buildMessage(_messages[i]);
+                },
+              ),
+              if (_showScrollToBottom)
+                Positioned(
+                  bottom: 12,
+                  right: 12,
+                  child: FloatingActionButton.small(
+                    onPressed: () => _scrollToBottom(force: true),
+                    backgroundColor: AppColors.bgElevated,
+                    foregroundColor: AppColors.textSecondary,
+                    elevation: 2,
+                    tooltip: '滚动到底部',
+                    child: const Icon(Icons.keyboard_arrow_down, size: 20),
+                  ),
+                ),
+            ],
           );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: AppColors.bgTertiary,
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: const Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.bgElevated,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: const _TypingDots(),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildHistoryView() {
@@ -1020,15 +1100,24 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             border: Border.all(color: AppColors.borderSubtle),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Image.memory(
-            base64Decode(msg.imageUrl!
-                .replaceFirst(RegExp(r'^data:image/[^;]+;base64,'), '')),
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Padding(
-              padding: EdgeInsets.all(12),
-              child: Icon(Icons.broken_image, color: AppColors.textTertiary),
-            ),
-          ),
+          child: msg.imageUrl!.startsWith('http')
+              ? Image.network(
+                  msg.imageUrl!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Icon(Icons.broken_image, color: AppColors.textTertiary),
+                  ),
+                )
+              : Image.memory(
+                  base64Decode(msg.imageUrl!
+                      .replaceFirst(RegExp(r'^data:image/[^;]+;base64,'), '')),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Icon(Icons.broken_image, color: AppColors.textTertiary),
+                  ),
+                ),
         ));
       } else {
         final emoji = _fileEmoji(msg.fileName!);
@@ -1272,4 +1361,58 @@ class _AttachedFile {
   final String? path;
   final String? imageUrl;
   _AttachedFile({required this.name, required this.text, this.path, this.imageUrl});
+}
+
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final delay = i / 3.0;
+            double phase = (t - delay) % 1.0;
+            if (phase < 0) phase += 1.0;
+            final opacity = phase < 0.5 ? phase * 2 : (1.0 - phase) * 2;
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.textTertiary.withValues(alpha: 0.3 + opacity * 0.7),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
 }
