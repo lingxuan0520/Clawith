@@ -44,7 +44,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
       setState(() {
         _agents = agentList;
         _player = OfficePlayer(
-          position: Vector2(3.0 * kTileSize, 10.0 * kTileSize),
+          position: Vector2(16.0 * kRenderTileSize, 20.0 * kRenderTileSize),
           onInteract: _onInteract,
         );
         _npcs = _createNpcs(agentList);
@@ -71,8 +71,8 @@ class _OfficePageState extends ConsumerState<OfficePage> {
         agentName: a['name']?.toString() ?? 'Agent',
         agentStatus: status,
         agentTask: taskHint,
-        colorVariant: i % 8,
-        position: Vector2(p[0] * kTileSize, p[1] * kTileSize),
+        colorVariant: i % 16,
+        position: Vector2(p[0] * kRenderTileSize, p[1] * kRenderTileSize),
         onPlayerContact: (npc) {
           if (mounted) setState(() => _nearbyNpc = npc);
         },
@@ -149,7 +149,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
               ),
             ],
             cameraConfig: CameraConfig(
-              zoom: 3.0,
+              zoom: 1.5,
               moveOnlyMapArea: true,
               startFollowPlayer: true,
             ),

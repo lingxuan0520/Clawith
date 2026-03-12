@@ -26,7 +26,7 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
     this.onPlayerLeave,
   }) : super(
           position: position,
-          size: Vector2(14, 14),
+          size: Vector2(28, 56),
           speed: 0,
           animation: SimpleDirectionAnimation(
             idleRight: SpriteAnimation.load(
@@ -34,8 +34,8 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
               SpriteAnimationData.sequenced(
                 amount: 2,
                 stepTime: 0.8,
-                textureSize: Vector2(16, 16),
-                texturePosition: Vector2(0, (colorVariant % 8) * 16.0),
+                textureSize: Vector2(16, 32),
+                texturePosition: Vector2(0, (colorVariant % 16) * 32.0),
               ),
             ),
             runRight: SpriteAnimation.load(
@@ -43,8 +43,8 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
               SpriteAnimationData.sequenced(
                 amount: 2,
                 stepTime: 0.6,
-                textureSize: Vector2(16, 16),
-                texturePosition: Vector2(0, (colorVariant % 8) * 16.0),
+                textureSize: Vector2(16, 32),
+                texturePosition: Vector2(0, (colorVariant % 16) * 32.0),
               ),
             ),
             enabledFlipX: false,
@@ -56,8 +56,8 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
   Future<void> onLoad() async {
     await super.onLoad();
     add(RectangleHitbox(
-      size: Vector2(42, 42),
-      position: Vector2(-14, -14),
+      size: Vector2(80, 80),
+      position: Vector2(-26, -12),
       collisionType: CollisionType.passive,
       isSolid: false,
     ));
@@ -100,24 +100,23 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
         text: label,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 3.8,
+          fontSize: 7,
           fontWeight: FontWeight.bold,
-          shadows: [Shadow(color: Colors.black, blurRadius: 2)],
+          shadows: [Shadow(color: Colors.black, blurRadius: 3)],
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    // background pill
     final bgRect = Rect.fromCenter(
-      center: Offset(size.x / 2, -7),
-      width: tp.width + 4,
-      height: tp.height + 2,
+      center: Offset(size.x / 2, -12),
+      width: tp.width + 6,
+      height: tp.height + 3,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(bgRect, const Radius.circular(2)),
-      Paint()..color = Colors.black.withAlpha(160),
+      RRect.fromRectAndRadius(bgRect, const Radius.circular(3)),
+      Paint()..color = Colors.black.withAlpha(170),
     );
-    tp.paint(canvas, Offset((size.x - tp.width) / 2, bgRect.top + 1));
+    tp.paint(canvas, Offset((size.x - tp.width) / 2, bgRect.top + 1.5));
   }
 
   // ── Status badge above name ────────────────────────
@@ -138,12 +137,10 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
   }
 
   void _renderRunningBadge(Canvas canvas) {
-    // Spinning arc to show "busy / working"
-    final center = Offset(size.x / 2, -16);
-    const radius = 4.0;
-    final angle = _time * 4.0; // rotation speed
+    final center = Offset(size.x / 2, -28);
+    const radius = 7.0;
+    final angle = _time * 4.0;
 
-    // Background circle
     canvas.drawCircle(center, radius,
         Paint()..color = const Color(0xFF1A2A1A));
     canvas.drawCircle(
@@ -152,34 +149,31 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
         Paint()
           ..color = const Color(0xFF34D399)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.8);
+          ..strokeWidth = 1.2);
 
-    // Spinning arc
     final arcPaint = Paint()
       ..color = const Color(0xFF34D399)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
+      ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - 0.5),
+      Rect.fromCircle(center: center, radius: radius - 1),
       angle,
       math.pi * 1.2,
       false,
       arcPaint,
     );
 
-    // "▶" play icon in center
     final iconTp = TextPainter(
       text: const TextSpan(
         text: '▶',
-        style: TextStyle(color: Color(0xFF34D399), fontSize: 3),
+        style: TextStyle(color: Color(0xFF34D399), fontSize: 5),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
     iconTp.paint(
         canvas, Offset(center.dx - iconTp.width / 2, center.dy - iconTp.height / 2));
 
-    // Task label (truncated) below spinning circle
     if (agentTask != null && agentTask!.isNotEmpty) {
       final task = agentTask!.length > 12
           ? '${agentTask!.substring(0, 11)}…'
@@ -189,51 +183,49 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
           text: task,
           style: const TextStyle(
             color: Color(0xFF34D399),
-            fontSize: 3.2,
-            shadows: [Shadow(color: Colors.black, blurRadius: 2)],
+            fontSize: 5.5,
+            shadows: [Shadow(color: Colors.black, blurRadius: 3)],
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, Offset((size.x - tp.width) / 2, -11));
+      tp.paint(canvas, Offset((size.x - tp.width) / 2, -19));
     }
   }
 
   void _renderIdleBadge(Canvas canvas) {
-    // Pulsing yellow dot — "available"
-    final pulse = (math.sin(_time * 2.5) + 1) / 2; // 0..1
+    final pulse = (math.sin(_time * 2.5) + 1) / 2;
     final alpha = (140 + (pulse * 115)).toInt();
-    final center = Offset(size.x / 2, -16);
+    final center = Offset(size.x / 2, -28);
     canvas.drawCircle(
-        center, 3.5, Paint()..color = Color.fromARGB(alpha ~/ 3, 251, 191, 36));
+        center, 6.0, Paint()..color = Color.fromARGB(alpha ~/ 3, 251, 191, 36));
     canvas.drawCircle(
-        center, 2.5, Paint()..color = Color.fromARGB(alpha, 251, 191, 36));
+        center, 4.0, Paint()..color = Color.fromARGB(alpha, 251, 191, 36));
 
     final tp = TextPainter(
       text: const TextSpan(
         text: 'Idle',
         style: TextStyle(
           color: Color(0xFFFBBF24),
-          fontSize: 3.2,
-          shadows: [Shadow(color: Colors.black, blurRadius: 2)],
+          fontSize: 5.5,
+          shadows: [Shadow(color: Colors.black, blurRadius: 3)],
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(canvas, Offset((size.x - tp.width) / 2, -11));
+    tp.paint(canvas, Offset((size.x - tp.width) / 2, -19));
   }
 
   void _renderErrorBadge(Canvas canvas) {
-    // Red exclamation
-    final center = Offset(size.x / 2, -16);
-    canvas.drawCircle(center, 3.5,
+    final center = Offset(size.x / 2, -28);
+    canvas.drawCircle(center, 6.0,
         Paint()..color = const Color(0xFFEF4444));
     final tp = TextPainter(
       text: const TextSpan(
         text: '!',
         style: TextStyle(
           color: Colors.white,
-          fontSize: 5,
+          fontSize: 9,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -247,36 +239,34 @@ class AgentNpc extends SimpleNpc with Sensor<Player> {
         text: 'Error',
         style: TextStyle(
           color: Color(0xFFEF4444),
-          fontSize: 3.2,
-          shadows: [Shadow(color: Colors.black, blurRadius: 2)],
+          fontSize: 5.5,
+          shadows: [Shadow(color: Colors.black, blurRadius: 3)],
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    labelTp.paint(canvas, Offset((size.x - labelTp.width) / 2, -11));
+    labelTp.paint(canvas, Offset((size.x - labelTp.width) / 2, -19));
   }
 
   void _renderOfflineBadge(Canvas canvas) {
-    // Grey dot — offline/stopped
-    final center = Offset(size.x / 2, -16);
-    canvas.drawCircle(center, 2.5,
+    final center = Offset(size.x / 2, -28);
+    canvas.drawCircle(center, 4.0,
         Paint()..color = const Color(0xFF4B5563));
     canvas.drawCircle(
         center,
-        2.5,
+        4.0,
         Paint()
           ..color = const Color(0xFF6B7280)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.5);
+          ..strokeWidth = 0.8);
   }
 
-  // ── Contact glow ──────────────────────────────────
   void _renderContactGlow(Canvas canvas) {
     final pulse = (math.sin(_time * 5) + 1) / 2;
     final alpha = (60 + (pulse * 80)).toInt();
     canvas.drawCircle(
       Offset(size.x / 2, size.y / 2),
-      10,
+      18,
       Paint()..color = Color.fromARGB(alpha, 90, 150, 255),
     );
   }

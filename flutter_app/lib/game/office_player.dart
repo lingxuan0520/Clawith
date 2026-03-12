@@ -1,6 +1,8 @@
 import 'package:bonfire/bonfire.dart';
 
 /// The user's character controlled via joystick.
+/// Sprite: player.png — 64×128 (4 frames × 4 dirs, each frame 16×32)
+/// Row 0: Down, Row 1: Left, Row 2: Right, Row 3: Up
 class OfficePlayer extends SimplePlayer with BlockMovementCollision {
   final void Function()? onInteract;
 
@@ -9,25 +11,25 @@ class OfficePlayer extends SimplePlayer with BlockMovementCollision {
     this.onInteract,
   }) : super(
           position: position,
-          size: Vector2(14, 14),
-          speed: 60,
+          size: Vector2(28, 56), // 16×32 scaled up slightly
+          speed: 120,
           animation: SimpleDirectionAnimation(
-            // Down (facing camera) — row 0 in spritesheet
+            // Down (facing camera) — row 0
             idleDown: SpriteAnimation.load(
               'player/player.png',
               SpriteAnimationData.sequenced(
                 amount: 1,
                 stepTime: 1,
-                textureSize: Vector2(16, 16),
+                textureSize: Vector2(16, 32),
                 texturePosition: Vector2(0, 0),
               ),
             ),
             runDown: SpriteAnimation.load(
               'player/player.png',
               SpriteAnimationData.sequenced(
-                amount: 3,
+                amount: 4,
                 stepTime: 0.15,
-                textureSize: Vector2(16, 16),
+                textureSize: Vector2(16, 32),
                 texturePosition: Vector2(0, 0),
               ),
             ),
@@ -37,17 +39,17 @@ class OfficePlayer extends SimplePlayer with BlockMovementCollision {
               SpriteAnimationData.sequenced(
                 amount: 1,
                 stepTime: 1,
-                textureSize: Vector2(16, 16),
-                texturePosition: Vector2(0, 16),
+                textureSize: Vector2(16, 32),
+                texturePosition: Vector2(0, 32),
               ),
             ),
             runLeft: SpriteAnimation.load(
               'player/player.png',
               SpriteAnimationData.sequenced(
-                amount: 3,
+                amount: 4,
                 stepTime: 0.15,
-                textureSize: Vector2(16, 16),
-                texturePosition: Vector2(0, 16),
+                textureSize: Vector2(16, 32),
+                texturePosition: Vector2(0, 32),
               ),
             ),
             // Right — row 2
@@ -56,17 +58,17 @@ class OfficePlayer extends SimplePlayer with BlockMovementCollision {
               SpriteAnimationData.sequenced(
                 amount: 1,
                 stepTime: 1,
-                textureSize: Vector2(16, 16),
-                texturePosition: Vector2(0, 32),
+                textureSize: Vector2(16, 32),
+                texturePosition: Vector2(0, 64),
               ),
             ),
             runRight: SpriteAnimation.load(
               'player/player.png',
               SpriteAnimationData.sequenced(
-                amount: 3,
+                amount: 4,
                 stepTime: 0.15,
-                textureSize: Vector2(16, 16),
-                texturePosition: Vector2(0, 32),
+                textureSize: Vector2(16, 32),
+                texturePosition: Vector2(0, 64),
               ),
             ),
             // Up — row 3
@@ -75,17 +77,17 @@ class OfficePlayer extends SimplePlayer with BlockMovementCollision {
               SpriteAnimationData.sequenced(
                 amount: 1,
                 stepTime: 1,
-                textureSize: Vector2(16, 16),
-                texturePosition: Vector2(0, 48),
+                textureSize: Vector2(16, 32),
+                texturePosition: Vector2(0, 96),
               ),
             ),
             runUp: SpriteAnimation.load(
               'player/player.png',
               SpriteAnimationData.sequenced(
-                amount: 3,
+                amount: 4,
                 stepTime: 0.15,
-                textureSize: Vector2(16, 16),
-                texturePosition: Vector2(0, 48),
+                textureSize: Vector2(16, 32),
+                texturePosition: Vector2(0, 96),
               ),
             ),
             enabledFlipX: false,
@@ -96,8 +98,8 @@ class OfficePlayer extends SimplePlayer with BlockMovementCollision {
   Future<void> onLoad() async {
     await super.onLoad();
     add(RectangleHitbox(
-      size: Vector2(10, 10),
-      position: Vector2(2, 4),
+      size: Vector2(20, 20),
+      position: Vector2(4, 36),
       collisionType: CollisionType.active,
     ));
   }
