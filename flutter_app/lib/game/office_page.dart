@@ -149,7 +149,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
               ),
             ],
             cameraConfig: CameraConfig(
-              zoom: 0.7,
+              zoom: 1.2,
               moveOnlyMapArea: true,
               startFollowPlayer: true,
             ),

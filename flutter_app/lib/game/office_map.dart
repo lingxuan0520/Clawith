@@ -1,14 +1,15 @@
 import 'package:bonfire/bonfire.dart';
 import 'package:bonfire/map/tiled/reader/tiled_asset_reader.dart';
 
-// Tile constants — must match the Tiled map (48px tiles, native resolution)
+// Tile constants — 48px source tiles, rendered at 16px for proper map scale
 const kTileSize = 48.0;
-const kRenderTileSize = 48.0;
+const kRenderTileSize = 16.0;
 
 /// Builds the virtual office map from the Tiled JSON export.
 WorldMap buildOfficeMap() {
   return WorldMapByTiled(
     TiledAssetReader(asset: 'tiled/office_map.json'),
+    forceTileSize: Vector2.all(kRenderTileSize),
   );
 }
 
