@@ -80,10 +80,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   String _timeAgo(String? dateStr) {
     if (dateStr == null) return '-';
     final diff = DateTime.now().difference(DateTime.parse(dateStr));
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+    if (diff.inMinutes < 1) return '刚刚';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
+    if (diff.inHours < 24) return '${diff.inHours}小时前';
+    return '${diff.inDays}天前';
   }
 
   String _formatTokens(num n) {

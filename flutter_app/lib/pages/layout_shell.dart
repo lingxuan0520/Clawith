@@ -281,7 +281,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
               const Divider(height: 1),
               // Nav items
               const SizedBox(height: 4),
-              _navItem(Icons.storefront, '广场', '/plaza', currentLocation),
+              _navItem(Icons.workspaces, '工作台', '/plaza', currentLocation),
               _navItem(Icons.dashboard, '仪表盘', '/dashboard', currentLocation),
               // 消息（Agent间协作收件箱，暂时隐藏）
               // _navItemWithBadge(Icons.mail_outline, '消息', '/messages', currentLocation, _unreadCount),

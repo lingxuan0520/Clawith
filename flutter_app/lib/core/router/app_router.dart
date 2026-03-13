@@ -34,7 +34,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       final isLoginRoute = location == '/login';
-      if (!isLoggedIn && !isLoginRoute) return '/login';
+      final isPublicRoute = location == '/login' || location == '/privacy';
+      if (!isLoggedIn && !isPublicRoute) return '/login';
       if (isLoggedIn && isLoginRoute) return '/plaza';
       return null;
     },

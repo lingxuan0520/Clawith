@@ -14,7 +14,13 @@ class PrivacyPolicyPage extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.go('/login');
+            }
+          },
         ),
         title: const Text('隐私政策', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
       ),
