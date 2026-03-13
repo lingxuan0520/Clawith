@@ -341,8 +341,9 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
               _navItem(Icons.add, '新建 Agent', '/agents/new', currentLocation),
               if (auth.isAdmin)
                 _navItem(Icons.settings, '我的公司', '/enterprise', currentLocation),
-              if (auth.isPlatformAdmin)
-                _navItem(Icons.confirmation_number, '邀请码', '/invitations', currentLocation),
+              // 邀请码管理（2B 功能，2C 暂时隐藏）
+              // if (auth.isPlatformAdmin)
+              //   _navItem(Icons.confirmation_number, '邀请码', '/invitations', currentLocation),
               const Divider(height: 1),
               // Footer: user info + theme + language
               Padding(
