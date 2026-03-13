@@ -88,8 +88,8 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
 
   void _navigate(String path) {
     _scaffoldKey.currentState?.closeDrawer();
-    // Agent detail/chat are outside ShellRoute — use push to preserve back stack
-    if (path.startsWith('/agents/')) {
+    // Pages outside ShellRoute — use push to preserve back stack
+    if (path.startsWith('/agents/') || path == '/office') {
       context.push(path);
     } else {
       context.go(path);
