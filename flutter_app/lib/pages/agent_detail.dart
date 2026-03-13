@@ -1185,7 +1185,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.go('/dashboard'),
+          onPressed: () => context.pop(),
         ),
         title: _editingName
             ? Row(
