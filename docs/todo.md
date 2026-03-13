@@ -10,7 +10,7 @@
 
 ### 认证
 
-- [ ] **AUTH-06** 首字母彩色头像：Apple 用户无头像时，根据用户名首字母生成彩色背景头像
+- [x] **AUTH-06** 首字母彩色头像：Apple 用户无头像时，根据用户名首字母生成彩色背景头像
 
 ### 2C 体验改造
 
@@ -78,9 +78,9 @@
 
 ### 上架必做
 
-- [ ] **LAUNCH-01** App 进入后台时停止前端轮询（AppLifecycleListener）
-- [ ] **LAUNCH-02** 账号删除功能（Apple App Store 强制要求）
-- [ ] **LAUNCH-03** 隐私政策页面
+- [x] **LAUNCH-01** App 进入后台时停止前端轮询（AppLifecycleListener）
+- [x] **LAUNCH-02** 账号删除功能（Apple App Store 强制要求）
+- [x] **LAUNCH-03** 隐私政策页面
 - [x] **LAUNCH-04** WebSocket 重连机制：exponential backoff（2s→4s→8s→...→30s 上限，最多 10 次）+ App 回前台时主动重连
 
 ---

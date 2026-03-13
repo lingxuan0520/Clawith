@@ -340,7 +340,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
               const Divider(height: 1),
               _navItem(Icons.add, '新建 Agent', '/agents/new', currentLocation),
               if (auth.isAdmin)
-                _navItem(Icons.settings, '企业设置', '/enterprise', currentLocation),
+                _navItem(Icons.settings, '我的公司', '/enterprise', currentLocation),
               if (auth.isPlatformAdmin)
                 _navItem(Icons.confirmation_number, '邀请码', '/invitations', currentLocation),
               const Divider(height: 1),

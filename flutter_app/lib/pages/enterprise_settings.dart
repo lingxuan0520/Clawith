@@ -26,9 +26,9 @@ class _EnterpriseSettingsPageState
     '模型池',
     '工具',
     '技能',
-    '配额管理',
     '知识库',
-    '组织架构',
+    // '配额管理',  // 2B feature — hidden for 2C
+    // '组织架构',  // 2B feature — hidden for 2C
   ];
 
   @override
@@ -50,7 +50,7 @@ class _EnterpriseSettingsPageState
       appBar: AppBar(
         backgroundColor: AppColors.bgPrimary,
         title: const Text(
-          '企业设置',
+          '我的公司',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -77,9 +77,9 @@ class _EnterpriseSettingsPageState
           _LlmModelsTab(),
           _ToolsTab(),
           _SkillsTab(),
-          _QuotasUsersTab(),
           _KnowledgeBaseTab(),
-          _OrgTab(),
+          // _QuotasUsersTab(),  // 2B feature — hidden for 2C
+          // _OrgTab(),          // 2B feature — hidden for 2C
         ],
       ),
     );

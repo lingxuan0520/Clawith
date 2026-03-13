@@ -6,14 +6,13 @@ import 'package:go_router/go_router.dart';
 import '../core/theme/app_theme.dart';
 import '../services/api.dart';
 
-/// 5-step agent creation wizard, ported from React AgentCreate.tsx.
+/// 4-step agent creation wizard, ported from React AgentCreate.tsx.
 ///
 /// Steps:
 ///   0 - Basic Info & Model
 ///   1 - Personality & Boundaries
 ///   2 - Skills
 ///   3 - Permissions
-///   4 - Channel (Feishu / Slack / Discord)
 class AgentCreatePage extends ConsumerStatefulWidget {
   const AgentCreatePage({super.key});
 
@@ -46,14 +45,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     'template_id': '',
     'max_tokens_per_day': 100000,
     'max_tokens_per_month': 3000000,
-    'feishu_app_id': '',
-    'feishu_app_secret': '',
-    'feishu_encrypt_key': '',
-    'slack_bot_token': '',
-    'slack_signing_secret': '',
-    'discord_application_id': '',
-    'discord_bot_token': '',
-    'discord_public_key': '',
     'skill_ids': <String>[],
   };
 
@@ -64,21 +55,12 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   final _boundariesCtrl = TextEditingController();
   final _maxDayCtrl = TextEditingController(text: '100000');
   final _maxMonthCtrl = TextEditingController(text: '3000000');
-  final _feishuAppIdCtrl = TextEditingController();
-  final _feishuAppSecretCtrl = TextEditingController();
-  final _feishuEncryptKeyCtrl = TextEditingController();
-  final _slackBotTokenCtrl = TextEditingController();
-  final _slackSigningSecretCtrl = TextEditingController();
-  final _discordAppIdCtrl = TextEditingController();
-  final _discordBotTokenCtrl = TextEditingController();
-  final _discordPublicKeyCtrl = TextEditingController();
 
   static const _stepLabels = [
-    'Basic Info & Model',
-    'Personality & Boundaries',
-    'Skills',
-    'Permissions',
-    'Channel',
+    '基本信息',
+    '性格设定',
+    '技能',
+    '权限',
   ];
 
   // ── Lifecycle ─────────────────────────────────────────────
@@ -96,14 +78,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     _boundariesCtrl.dispose();
     _maxDayCtrl.dispose();
     _maxMonthCtrl.dispose();
-    _feishuAppIdCtrl.dispose();
-    _feishuAppSecretCtrl.dispose();
-    _feishuEncryptKeyCtrl.dispose();
-    _slackBotTokenCtrl.dispose();
-    _slackSigningSecretCtrl.dispose();
-    _discordAppIdCtrl.dispose();
-    _discordBotTokenCtrl.dispose();
-    _discordPublicKeyCtrl.dispose();
     super.dispose();
   }
 
@@ -125,7 +99,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Failed to load resources: $e';
+        _errorMessage = '加载资源失败: $e';
         _loadingResources = false;
       });
     }
@@ -141,14 +115,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         int.tryParse(_maxDayCtrl.text.trim()) ?? 100000;
     _form['max_tokens_per_month'] =
         int.tryParse(_maxMonthCtrl.text.trim()) ?? 3000000;
-    _form['feishu_app_id'] = _feishuAppIdCtrl.text.trim();
-    _form['feishu_app_secret'] = _feishuAppSecretCtrl.text.trim();
-    _form['feishu_encrypt_key'] = _feishuEncryptKeyCtrl.text.trim();
-    _form['slack_bot_token'] = _slackBotTokenCtrl.text.trim();
-    _form['slack_signing_secret'] = _slackSigningSecretCtrl.text.trim();
-    _form['discord_application_id'] = _discordAppIdCtrl.text.trim();
-    _form['discord_bot_token'] = _discordBotTokenCtrl.text.trim();
-    _form['discord_public_key'] = _discordPublicKeyCtrl.text.trim();
   }
 
   // ── Validation per step ───────────────────────────────────
@@ -157,18 +123,17 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     switch (_currentStep) {
       case 0:
         if ((_form['name'] as String).isEmpty) {
-          _showError('Agent name is required.');
+          _showError('请输入 Agent 名称');
           return false;
         }
         if ((_form['primary_model_id'] as String).isEmpty) {
-          _showError('Please select a primary model.');
+          _showError('请选择主模型');
           return false;
         }
         return true;
       case 1:
       case 2:
       case 3:
-      case 4:
         return true;
       default:
         return true;
@@ -226,28 +191,16 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         data['skill_ids'] = skillIds;
       }
 
-      // Channel config — only include if at least one channel field is filled.
-      _addIfNotEmpty(data, 'feishu_app_id', _form['feishu_app_id']);
-      _addIfNotEmpty(data, 'feishu_app_secret', _form['feishu_app_secret']);
-      _addIfNotEmpty(data, 'feishu_encrypt_key', _form['feishu_encrypt_key']);
-      _addIfNotEmpty(data, 'slack_bot_token', _form['slack_bot_token']);
-      _addIfNotEmpty(
-          data, 'slack_signing_secret', _form['slack_signing_secret']);
-      _addIfNotEmpty(
-          data, 'discord_application_id', _form['discord_application_id']);
-      _addIfNotEmpty(data, 'discord_bot_token', _form['discord_bot_token']);
-      _addIfNotEmpty(data, 'discord_public_key', _form['discord_public_key']);
-
       final result = await ApiService.instance.createAgent(data);
       if (!mounted) return;
 
       final newId = result['id'] as String;
-      context.go('/agents/$newId');
+      context.push('/agents/$newId');
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _errorMessage = 'Failed to create agent: $e';
+        _errorMessage = '创建失败: $e';
       });
     }
   }
@@ -266,10 +219,10 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: const Text('Create Agent'),
+        title: const Text('招募新员工'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/dashboard'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: _loadingResources
@@ -433,14 +386,14 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
             OutlinedButton.icon(
               onPressed: _goPrevious,
               icon: const Icon(Icons.chevron_left, size: 18),
-              label: const Text('Previous'),
+              label: const Text('上一步'),
             ),
           const Spacer(),
           if (!isLast)
             ElevatedButton.icon(
               onPressed: _goNext,
               icon: const Icon(Icons.chevron_right, size: 18),
-              label: const Text('Next'),
+              label: const Text('下一步'),
             ),
           if (isLast)
             ElevatedButton.icon(
@@ -453,7 +406,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
                           strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.check, size: 18),
-              label: Text(_submitting ? 'Creating...' : 'Create Agent'),
+              label: Text(_submitting ? '创建中...' : '创建 Agent'),
             ),
         ],
       ),
@@ -471,8 +424,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         return _buildStepSkills();
       case 3:
         return _buildStepPermissions();
-      case 4:
-        return _buildStepChannel();
       default:
         return const SizedBox.shrink();
     }
@@ -483,37 +434,37 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   // ────────────────────────────────────────────────────────────
   Widget _buildStepBasicInfo() {
     return _StepCard(
-      title: 'Basic Info & Model',
-      subtitle: 'Provide the core identity and model configuration.',
+      title: '基本信息与模型',
+      subtitle: '设置 Agent 的名称、角色和使用的 AI 模型。',
       children: [
         // Name
-        _FieldLabel('Agent Name *'),
+        _FieldLabel('Agent 名称 *'),
         const SizedBox(height: 6),
         TextField(
           controller: _nameCtrl,
-          decoration: const InputDecoration(hintText: 'e.g. Research Helper'),
+          decoration: const InputDecoration(hintText: '例：研究助手'),
         ),
         const SizedBox(height: 18),
 
         // Role description
-        _FieldLabel('Role Description'),
+        _FieldLabel('角色描述'),
         const SizedBox(height: 6),
         TextField(
           controller: _roleDescCtrl,
           maxLines: 3,
           decoration: const InputDecoration(
-              hintText: 'Describe what this agent does...'),
+              hintText: '描述这个 Agent 的职责...'),
         ),
         const SizedBox(height: 18),
 
         // Template
-        _FieldLabel('Template'),
+        _FieldLabel('模板'),
         const SizedBox(height: 6),
         _buildDropdown<String>(
           value: (_form['template_id'] as String).isEmpty
               ? null
               : _form['template_id'] as String,
-          hint: 'Select a template (optional)',
+          hint: '选择模板（可选）',
           items: _templates.map((t) {
             final id = t['id']?.toString() ?? '';
             final name = t['name']?.toString() ?? id;
@@ -524,17 +475,17 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         const SizedBox(height: 18),
 
         // Primary model
-        _FieldLabel('Primary Model *'),
+        _FieldLabel('主模型 *'),
         const SizedBox(height: 6),
         if (_llmModels.isEmpty)
-          const Text('提示：请先前往「企业设置 → 模型池」添加 LLM 模型',
+          const Text('提示：请先前往「我的公司 → 模型池」添加 LLM 模型',
               style: TextStyle(fontSize: 12, color: AppColors.textTertiary))
         else
         _buildDropdown<String>(
           value: (_form['primary_model_id'] as String).isEmpty
               ? null
               : _form['primary_model_id'] as String,
-          hint: 'Select primary LLM model',
+          hint: '选择主 AI 模型',
           items: _llmModels.map((m) {
             final id = m['id']?.toString() ?? '';
             final label = (m['label'] as String?)?.isNotEmpty == true
@@ -556,7 +507,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         const SizedBox(height: 18),
 
         // Fallback model
-        _FieldLabel('Fallback Model'),
+        _FieldLabel('备用模型'),
         const SizedBox(height: 6),
         if (_llmModels.isEmpty)
           const SizedBox.shrink()
@@ -565,7 +516,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
           value: (_form['fallback_model_id'] as String).isEmpty
               ? null
               : _form['fallback_model_id'] as String,
-          hint: 'Select fallback LLM model (optional)',
+          hint: '选择备用模型（可选）',
           items: _llmModels.map((m) {
             final id = m['id']?.toString() ?? '';
             final label = (m['label'] as String?)?.isNotEmpty == true
@@ -593,7 +544,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _FieldLabel('Max Tokens / Day'),
+                  _FieldLabel('每日 Token 上限'),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _maxDayCtrl,
@@ -610,7 +561,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _FieldLabel('Max Tokens / Month'),
+                  _FieldLabel('每月 Token 上限'),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _maxMonthCtrl,
@@ -633,28 +584,26 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   // ────────────────────────────────────────────────────────────
   Widget _buildStepPersonality() {
     return _StepCard(
-      title: 'Personality & Boundaries',
-      subtitle: 'Define how the agent behaves and what it should avoid.',
+      title: '性格与边界',
+      subtitle: '定义 Agent 的沟通风格和行为边界。',
       children: [
-        _FieldLabel('Personality'),
+        _FieldLabel('性格特征'),
         const SizedBox(height: 6),
         TextField(
           controller: _personalityCtrl,
           maxLines: 6,
           decoration: const InputDecoration(
-            hintText:
-                'Describe the personality traits, tone, and style of communication...',
+            hintText: '描述性格特征、语气和沟通风格...',
           ),
         ),
         const SizedBox(height: 20),
-        _FieldLabel('Boundaries'),
+        _FieldLabel('行为边界'),
         const SizedBox(height: 6),
         TextField(
           controller: _boundariesCtrl,
           maxLines: 6,
           decoration: const InputDecoration(
-            hintText:
-                'List topics or actions the agent must avoid...',
+            hintText: '列出 Agent 必须避免的话题或行为...',
           ),
         ),
       ],
@@ -668,14 +617,14 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     final selectedIds = _form['skill_ids'] as List<String>;
 
     return _StepCard(
-      title: 'Skills',
-      subtitle: 'Select the skills this agent should have.',
+      title: '技能',
+      subtitle: '选择这个 Agent 应具备的技能。',
       children: [
         if (_skills.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Text(
-              'No skills available.',
+              '暂无可用技能',
               style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
             ),
           )
@@ -762,19 +711,17 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   // ────────────────────────────────────────────────────────────
   Widget _buildStepPermissions() {
     return _StepCard(
-      title: 'Permissions',
-      subtitle: 'Configure the visibility and access level of this agent.',
+      title: '权限设置',
+      subtitle: '配置 Agent 的可见范围和访问权限。',
       children: [
-        // Scope
-        _FieldLabel('Permission Scope'),
+        // Scope — 2C: only "self" is meaningful
+        _FieldLabel('可见范围'),
         const SizedBox(height: 6),
         _buildDropdown<String>(
           value: _form['permission_scope_type'] as String,
-          hint: 'Select scope',
+          hint: '选择范围',
           items: const [
-            DropdownMenuItem(value: 'self', child: Text('Self only')),
-            DropdownMenuItem(value: 'department', child: Text('Department')),
-            DropdownMenuItem(value: 'company', child: Text('Company')),
+            DropdownMenuItem(value: 'self', child: Text('仅自己')),
           ],
           onChanged: (v) =>
               setState(() => _form['permission_scope_type'] = v ?? 'self'),
@@ -782,118 +729,18 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         const SizedBox(height: 20),
 
         // Access level
-        _FieldLabel('Access Level'),
+        _FieldLabel('访问级别'),
         const SizedBox(height: 6),
         _buildDropdown<String>(
           value: _form['permission_access_level'] as String,
-          hint: 'Select access level',
+          hint: '选择访问级别',
           items: const [
-            DropdownMenuItem(value: 'read', child: Text('Read')),
-            DropdownMenuItem(value: 'write', child: Text('Write')),
-            DropdownMenuItem(value: 'admin', child: Text('Admin')),
+            DropdownMenuItem(value: 'read', child: Text('只读')),
+            DropdownMenuItem(value: 'write', child: Text('读写')),
+            DropdownMenuItem(value: 'admin', child: Text('管理员')),
           ],
           onChanged: (v) =>
               setState(() => _form['permission_access_level'] = v ?? 'read'),
-        ),
-      ],
-    );
-  }
-
-  // ────────────────────────────────────────────────────────────
-  //  STEP 4 — Channel Configuration
-  // ────────────────────────────────────────────────────────────
-  Widget _buildStepChannel() {
-    return Column(
-      children: [
-        // Feishu
-        _StepCard(
-          title: 'Feishu Bot',
-          subtitle: 'Optional. Configure Feishu (Lark) integration.',
-          children: [
-            _FieldLabel('App ID'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _feishuAppIdCtrl,
-              decoration: const InputDecoration(hintText: 'Feishu App ID'),
-            ),
-            const SizedBox(height: 14),
-            _FieldLabel('App Secret'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _feishuAppSecretCtrl,
-              obscureText: true,
-              decoration:
-                  const InputDecoration(hintText: 'Feishu App Secret'),
-            ),
-            const SizedBox(height: 14),
-            _FieldLabel('Encrypt Key'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _feishuEncryptKeyCtrl,
-              obscureText: true,
-              decoration:
-                  const InputDecoration(hintText: 'Feishu Encrypt Key'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Slack
-        _StepCard(
-          title: 'Slack Bot',
-          subtitle: 'Optional. Configure Slack integration.',
-          children: [
-            _FieldLabel('Bot Token'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _slackBotTokenCtrl,
-              obscureText: true,
-              decoration:
-                  const InputDecoration(hintText: 'xoxb-...'),
-            ),
-            const SizedBox(height: 14),
-            _FieldLabel('Signing Secret'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _slackSigningSecretCtrl,
-              obscureText: true,
-              decoration:
-                  const InputDecoration(hintText: 'Slack Signing Secret'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Discord
-        _StepCard(
-          title: 'Discord Bot',
-          subtitle: 'Optional. Configure Discord integration.',
-          children: [
-            _FieldLabel('Application ID'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _discordAppIdCtrl,
-              decoration:
-                  const InputDecoration(hintText: 'Discord Application ID'),
-            ),
-            const SizedBox(height: 14),
-            _FieldLabel('Bot Token'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _discordBotTokenCtrl,
-              obscureText: true,
-              decoration:
-                  const InputDecoration(hintText: 'Discord Bot Token'),
-            ),
-            const SizedBox(height: 14),
-            _FieldLabel('Public Key'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _discordPublicKeyCtrl,
-              decoration:
-                  const InputDecoration(hintText: 'Discord Public Key'),
-            ),
-          ],
         ),
       ],
     );
