@@ -220,9 +220,9 @@
 | GET | `/enterprise/system-settings/{key}` | 获取系统设置 | ✅ |
 | PUT | `/enterprise/system-settings/{key}` | 更新系统设置 | ✅ |
 | GET | `/enterprise/system-settings/notification_bar/public` | 公告栏 | 公开 |
-| POST | `/enterprise/invitation-codes` | 批量创建邀请码 | ✅ |
-| GET | `/enterprise/invitation-codes` | 获取邀请码列表 | ✅ |
-| DELETE | `/enterprise/invitation-codes/{id}` | 禁用邀请码 | ✅ |
+| POST | `/enterprise/invitation-codes` | 批量创建邀请码 | 🚫 保留不启用 |
+| GET | `/enterprise/invitation-codes` | 获取邀请码列表 | 🚫 保留不启用 |
+| DELETE | `/enterprise/invitation-codes/{id}` | 禁用邀请码 | 🚫 保留不启用 |
 
 ### POST `/enterprise/llm-models` 请求体
 
@@ -396,7 +396,7 @@
 
 ---
 
-## 十五、通用响应格式
+## 十六、通用响应格式
 
 ### 成功响应
 

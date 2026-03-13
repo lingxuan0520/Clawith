@@ -109,8 +109,8 @@ enterprise_info
 | creator_id | UUID | FK(users) | 创建者 ID |
 | tenant_id | UUID | FK(tenants) | 所属公司 |
 | status | ENUM | DEFAULT 'stopped' | `creating`/`running`/`idle`/`stopped`/`error` |
-| container_id | VARCHAR | NULLABLE | Docker 容器 ID |
-| container_port | INTEGER | NULLABLE | 容器端口 |
+| container_id | VARCHAR | NULLABLE | ⚠️ 遗留字段（原版每 Agent 独立容器，2C 架构已改为共享进程） |
+| container_port | INTEGER | NULLABLE | ⚠️ 遗留字段（同上） |
 | primary_model_id | UUID | FK(llm_models), NULLABLE | 主模型 |
 | fallback_model_id | UUID | FK(llm_models), NULLABLE | 备选模型 |
 | autonomy_policy | JSONB | NULLABLE | 三级自主性策略 |
@@ -206,6 +206,7 @@ enterprise_info
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | id | UUID | PK | 模型 ID |
+| tenant_id | UUID | FK(tenants), NOT NULL | 所属租户（每个用户的模型池隔离） |
 | provider | VARCHAR | NOT NULL | 供应商（openai/anthropic/deepseek 等） |
 | model | VARCHAR | NOT NULL | 模型名称（如 gpt-4o） |
 | api_key_encrypted | VARCHAR | NOT NULL | 加密存储的 API Key |
@@ -508,6 +509,14 @@ enterprise_info
 ```
 
 > L1=自主执行，L2=执行后通知，L3=需审批
+>
+> **App 界面显示名称**（代码内部仍存储 L1/L2/L3）：
+>
+> | 代码值 | App 显示 | 用户说明 |
+> |--------|---------|---------|
+> | L1 | **自动执行** | Agent 自己处理，不打扰你 |
+> | L2 | **执行并通知** | Agent 先做了，做完告诉你 |
+> | L3 | **需要审批** | Agent 先请示你，你同意了才做 |
 
 ### `enterprise_info.content`（按 info_type 不同）
 

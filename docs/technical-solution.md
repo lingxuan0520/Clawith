@@ -1,7 +1,7 @@
 # Soloship 技术方案
 
-> **版本**: v1.0
-> **更新日期**: 2026-03-11
+> **版本**: v1.1
+> **更新日期**: 2026-03-12
 
 ---
 
@@ -125,14 +125,19 @@ opc_ref/
 
 ## 四、Agent 运行时方案
 
-### 4.1 容器隔离
+### 4.1 单容器共享架构
 
-每个 Agent 实例运行在独立的 Docker 容器中（OpenClaw Gateway 进程）：
+> **v1.1 架构变更**: 原版 Clawith 为 2B 设计，每个 Agent 运行在独立 Docker 容器中。
+> Soloship 为 2C 产品，用户规模可能达到数百甚至上千，每用户平均 5 个 Agent，
+> 若沿用独立容器方案将产生数千个容器，完全不可行。
+> 因此改为所有 Agent 共享同一个后端进程，工具调用链（call_llm + agent_tools）作为内嵌模块运行。
 
-- **镜像**: `openclaw:local`（可配置）
-- **网络**: `soloship_network` bridge 网络
-- **文件挂载**: `/data/agents/<agent_id>/` 独立目录
-- **生命周期**: 后端通过 Docker SDK 管理容器的创建、启动、停止、删除
+所有 Agent 运行在同一个 FastAPI 后端进程中：
+
+- **无独立容器**: Agent 不再拥有独立的 Docker 容器，状态通过数据库管理
+- **内嵌工具调用引擎**: `call_llm()` + `agent_tools.py` + `mcp_client.py` 为所有 Agent 提供 LLM 工具调用链（MCP 集成、web_search 等）
+- **文件隔离**: 每个 Agent 仍有独立的文件目录 `/data/agents/<id>/`，由后端直接读写
+- **网络**: Docker Compose 内 `soloship_network` bridge 网络（backend + postgres + redis）
 
 ### 4.2 Agent 文件结构
 
@@ -150,10 +155,19 @@ opc_ref/
 
 ### 4.3 LLM 模型管理
 
-- 平台管理员在企业设置中配置**模型池**（多个 LLM 供应商）
+- 用户在企业设置中配置**模型池**（多个 LLM 供应商）
 - 每个 Agent 从池中选择**主模型**和**备选模型**
 - 支持供应商: OpenAI、Anthropic、DeepSeek、Azure 等
 - API Key 加密存储在数据库中
+
+### 4.4 工具调用引擎
+
+后端内嵌的工具调用引擎，为 Agent 提供以下核心能力：
+
+- **LLM 工具调用链**: Agent 对话时，`call_llm()` 负责将 LLM 返回的 tool_call 请求分发到 `agent_tools.py` 中对应的工具执行，并将结果回传 LLM 继续推理
+- **MCP 集成**: 通过 `mcp_client.py` 接入外部 MCP Server 工具（web_search、代码执行等）
+- **多轮调用**: 支持 LLM → tool_call → result → LLM 的多轮循环（`max_tool_rounds` 控制上限，默认 50）
+- **共享进程**: 所有 Agent 共用同一个后端进程，通过 Agent ID 区分上下文
 
 ---
 
@@ -182,7 +196,7 @@ opc_ref/
 ### 6.1 开发环境（当前）
 
 Docker Compose 本地部署：
-- backend: FastAPI + Uvicorn
+- backend: FastAPI + Uvicorn + 内嵌工具调用引擎
 - postgres: PostgreSQL 15 Alpine
 - redis: Redis 7 Alpine
 
@@ -190,10 +204,10 @@ Docker Compose 本地部署：
 
 | 组件 | 方案 |
 |------|------|
-| 后端 | 云服务器 + Docker Compose / K8s |
+| 后端 | 云服务器 + Docker Compose（单容器后端） |
 | 数据库 | 云 RDS（PostgreSQL） |
 | 缓存 | 云 Redis |
-| 对象存储 | Agent 文件迁移到 S3/OSS |
+| 文件存储 | 本地文件系统 + 定期备份到云存储 |
 | CDN | 静态资源加速 |
 | SSL | Let's Encrypt / 云证书 |
 | App 分发 | TestFlight（iOS）/ APK 直装（Android） |
@@ -207,7 +221,7 @@ Docker Compose 本地部署：
 | 认证 | Firebase Social Auth + 平台 JWT |
 | API 鉴权 | Bearer Token 验证（2C 模式下无角色校验，所有用户默认 `platform_admin`） |
 | 数据隔离 | Tenant ID 作为查询过滤条件 |
-| Agent 隔离 | 独立 Docker 容器 + 独立文件目录 |
+| Agent 隔离 | 文件目录隔离 `/data/agents/<id>/` + 数据库 Tenant ID 过滤 |
 | 密钥存储 | LLM API Key 加密存储（`api_key_encrypted`） |
 | CORS | 白名单域名限制 |
 | SQL 注入防护 | SQLAlchemy ORM 参数化查询 |
