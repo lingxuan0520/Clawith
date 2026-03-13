@@ -51,7 +51,7 @@
   - [ ] Mind Tab：soul.md 编辑保存、memory 文件列表
   - [ ] Tools Tab：工具列表、开关状态
   - [ ] Skills Tab：技能文件查看
-  - [x] Relationships Tab：人类同事关系、Agent 同事关系管理
+  - [x] Relationships Tab：人类同事关系、Agent 同事关系管理 → **已隐藏（2C 暂不需要）**
   - [ ] Workspace Tab：文件浏览器、上传/下载/删除
   - [ ] Activity Tab：活动日志按类型过滤
   - [ ] Settings Tab：模型切换、Token 限额修改、删除 Agent
@@ -81,7 +81,7 @@
 - [ ] **LAUNCH-01** App 进入后台时停止前端轮询（AppLifecycleListener）
 - [ ] **LAUNCH-02** 账号删除功能（Apple App Store 强制要求）
 - [ ] **LAUNCH-03** 隐私政策页面
-- [ ] **LAUNCH-04** WebSocket 重连机制：exponential backoff（2s→4s→8s→...→30s 上限，最多 10 次）+ App 回前台时主动重连
+- [x] **LAUNCH-04** WebSocket 重连机制：exponential backoff（2s→4s→8s→...→30s 上限，最多 10 次）+ App 回前台时主动重连
 
 ---
 

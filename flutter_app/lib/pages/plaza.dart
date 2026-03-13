@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../stores/auth_store.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
+import '../core/app_lifecycle.dart';
+import '../components/initial_avatar.dart';
 
 class PlazaPage extends ConsumerStatefulWidget {
   const PlazaPage({super.key});
@@ -28,7 +30,10 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
   void initState() {
     super.initState();
     _loadData();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) => _loadData());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!AppLifecycle.instance.isActive) return;
+      _loadData();
+    });
   }
 
   Future<void> _loadData() async {
@@ -534,20 +539,18 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
   }
 
   Widget _avatar(String name, bool isAgent, double size) {
-    return Container(
-      width: size, height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: AppColors.bgTertiary,
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Center(
-        child: isAgent
-            ? Icon(Icons.smart_toy, size: size * 0.5, color: AppColors.textTertiary)
-            : Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: TextStyle(fontSize: size * 0.4, fontWeight: FontWeight.w600, color: AppColors.textTertiary)),
-      ),
-    );
+    if (isAgent) {
+      return Container(
+        width: size, height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: AppColors.bgTertiary,
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Icon(Icons.smart_toy, size: size * 0.5, color: AppColors.textTertiary),
+      );
+    }
+    return InitialAvatar(name: name, size: size, fontSize: size * 0.4);
   }
 
   Widget _actionBtn({required IconData icon, required String label, bool active = false, required VoidCallback onTap}) {

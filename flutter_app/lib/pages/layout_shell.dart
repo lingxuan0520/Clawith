@@ -7,6 +7,8 @@ import '../stores/auth_store.dart';
 import '../stores/app_store.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
+import '../core/app_lifecycle.dart';
+import '../components/initial_avatar.dart';
 
 class LayoutShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -32,6 +34,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     _loadTenants();
     _loadUnreadCount();
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!AppLifecycle.instance.isActive) return;
       _loadAgents();
       _loadUnreadCount();
     });
@@ -344,8 +347,8 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                             borderRadius: BorderRadius.circular(8),
                             child: (avatarUrl != null && avatarUrl.isNotEmpty)
                                 ? Image.network(avatarUrl, width: 32, height: 32, fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => _defaultAvatar())
-                                : _defaultAvatar(),
+                                    errorBuilder: (_, __, ___) => InitialAvatar(name: auth.displayName))
+                                : InitialAvatar(name: auth.displayName),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -418,18 +421,6 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _defaultAvatar() {
-    return Container(
-      width: 32, height: 32,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: AppColors.bgTertiary,
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: const Icon(Icons.person, size: 18, color: AppColors.textTertiary),
     );
   }
 

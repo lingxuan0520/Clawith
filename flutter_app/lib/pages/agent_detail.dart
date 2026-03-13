@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../core/theme/app_theme.dart';
+import '../core/app_lifecycle.dart';
 import '../services/api.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,6 +153,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     _pollTimer = Timer.periodic(
       const Duration(seconds: 15),
       (_) {
+        if (!AppLifecycle.instance.isActive) return;
         if (mounted) _fetchAgentSilent();
       },
     );

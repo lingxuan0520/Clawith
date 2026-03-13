@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/app_lifecycle.dart';
 import '../stores/app_store.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
@@ -24,7 +25,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   void initState() {
     super.initState();
     _loadData();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) => _loadData());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!AppLifecycle.instance.isActive) return;
+      _loadData();
+    });
   }
 
   Future<void> _loadData() async {

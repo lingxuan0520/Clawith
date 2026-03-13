@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
+import '../core/app_lifecycle.dart';
 import '../services/api.dart';
 
 class MessagesPage extends ConsumerStatefulWidget {
@@ -27,7 +28,10 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
   void initState() {
     super.initState();
     _loadMessages();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) => _loadMessages());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!AppLifecycle.instance.isActive) return;
+      _loadMessages();
+    });
   }
 
   Future<void> _loadMessages() async {
