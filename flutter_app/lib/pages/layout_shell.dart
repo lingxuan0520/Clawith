@@ -412,9 +412,12 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                                 if (mounted) nav.go('/login');
                               } else if (value == 'delete') {
                                 _confirmDeleteAccount();
+                              } else if (value == 'privacy') {
+                                context.push('/privacy');
                               }
                             },
                             itemBuilder: (_) => [
+                              const PopupMenuItem(value: 'privacy', child: Text('隐私政策', style: TextStyle(fontSize: 13))),
                               const PopupMenuItem(value: 'logout', child: Text('退出登录', style: TextStyle(fontSize: 13))),
                               const PopupMenuItem(value: 'delete', child: Text('删除账号', style: TextStyle(fontSize: 13, color: AppColors.error))),
                             ],

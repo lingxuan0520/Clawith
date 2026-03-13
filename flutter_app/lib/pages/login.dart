@@ -234,6 +234,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 16),
+                            GestureDetector(
+                              onTap: () => context.push('/privacy'),
+                              child: const Text(
+                                '隐私政策',
+                                style: TextStyle(fontSize: 12, color: AppColors.textTertiary, decoration: TextDecoration.underline),
+                              ),
+                            ),
                           ],
                         ),
                       ),

@@ -14,6 +14,7 @@ import '../../pages/messages.dart';
 import '../../pages/enterprise_settings.dart';
 import '../../pages/invitation_codes.dart';
 import '../../game/office_page.dart';
+import '../../pages/privacy_policy.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -65,6 +66,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/office',
         builder: (context, state) => const OfficePage(),
+      ),
+      // Privacy policy — accessible from login and settings
+      GoRoute(
+        path: '/privacy',
+        builder: (context, state) => const PrivacyPolicyPage(),
       ),
       ShellRoute(
         builder: (context, state, child) => LayoutShell(child: child),
