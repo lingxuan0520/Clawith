@@ -53,9 +53,9 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
     final d = DateTime.tryParse(iso);
     if (d == null) return '';
     final diff = DateTime.now().difference(d);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inMinutes < 1) return '刚刚';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
+    if (diff.inHours < 24) return '${diff.inHours}小时前';
     return '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
@@ -91,7 +91,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                 if (unreadCount > 0)
                   TextButton(
                     onPressed: _markAllRead,
-                    child: Text('Mark all read ($unreadCount)', style: const TextStyle(fontSize: 13)),
+                    child: Text('全部标为已读 ($unreadCount)', style: const TextStyle(fontSize: 13)),
                   ),
               ],
             ),

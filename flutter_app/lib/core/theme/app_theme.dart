@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Dark theme colors — high contrast
-  static const bgPrimary = Color(0xFF101216);
-  static const bgSecondary = Color(0xFF181C24);
-  static const bgTertiary = Color(0xFF222834);
-  static const bgElevated = Color(0xFF1E2330);
-  static const bgHover = Color(0xFF262D3C);
+  static const bgPrimary = Color(0xFF13161C);
+  static const bgSecondary = Color(0xFF1C2028);
+  static const bgTertiary = Color(0xFF252C38);
+  static const bgElevated = Color(0xFF212838);
+  static const bgHover = Color(0xFF2A3242);
 
   static const textPrimary = Color(0xFFF0F1F4);
-  static const textSecondary = Color(0xFFBCC2CE);
-  static const textTertiary = Color(0xFF8A92A4);
+  static const textSecondary = Color(0xFFC8CED8);
+  static const textTertiary = Color(0xFF9CA4B8);
 
-  static const borderSubtle = Color(0xFF2E3446);
-  static const borderDefault = Color(0xFF3A4258);
+  static const borderSubtle = Color(0xFF343C50);
+  static const borderDefault = Color(0xFF424A60);
   static const borderStrong = Color(0xFF4A5370);
 
   static const accentPrimary = Color(0xFF5A96FF);

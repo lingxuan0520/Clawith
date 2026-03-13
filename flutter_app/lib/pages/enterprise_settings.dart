@@ -222,7 +222,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
       Future.delayed(
           const Duration(seconds: 2), () => mounted ? setState(() => _nameSaved = false) : null);
     } catch (_) {
-      _showError('Failed to save company name');
+      _showError('保存公司名称失败');
     }
     setState(() => _nameSaving = false);
   }
@@ -237,7 +237,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
       Future.delayed(
           const Duration(seconds: 2), () => mounted ? setState(() => _introSaved = false) : null);
     } catch (_) {
-      _showError('Failed to save company intro');
+      _showError('保存公司简介失败');
     }
     setState(() => _introSaving = false);
   }
@@ -252,7 +252,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
       Future.delayed(
           const Duration(seconds: 2), () => mounted ? setState(() => _notifSaved = false) : null);
     } catch (_) {
-      _showError('Failed to save notification bar');
+      _showError('保存通知栏失败');
     }
     setState(() => _notifSaving = false);
   }
@@ -270,7 +270,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
       Future.delayed(
           const Duration(seconds: 2), () => mounted ? setState(() => _platSaved = false) : null);
     } catch (_) {
-      _showError('Failed to save platform settings');
+      _showError('保存平台配置失败');
     }
     setState(() => _platSaving = false);
   }
@@ -288,9 +288,9 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
       padding: const EdgeInsets.all(24),
       children: [
         // ── Notification Bar Config ──
-        _buildSectionHeader('Notification Bar',
+        _buildSectionHeader('通知栏',
             subtitle:
-                'Display a notification bar at the top of the page, visible to all users.'),
+                '在页面顶部显示通知栏，所有用户可见。'),
         const SizedBox(height: 8),
         _SectionCard(
           child: Column(
@@ -309,7 +309,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text('Enable notification bar',
+                  const Text('启用通知栏',
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -322,13 +322,13 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                 style:
                     const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                 decoration: const InputDecoration(
-                  labelText: 'Notification text',
-                  hintText: 'e.g. v2.1 released with new features!',
+                  labelText: '通知内容',
+                  hintText: '例如：v2.1 发布，包含新功能！',
                 ),
               ),
               if (_notifEnabled && _notifTextCtl.text.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Text('Preview:',
+                const Text('预览:',
                     style:
                         TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                 const SizedBox(height: 4),
@@ -362,7 +362,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
         const SizedBox(height: 24),
 
         // ── Company Name ──
-        _buildSectionHeader('Company Name'),
+        _buildSectionHeader('公司名称'),
         const SizedBox(height: 8),
         _SectionCard(
           child: Row(
@@ -373,7 +373,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                   style: const TextStyle(
                       fontSize: 14, color: AppColors.textPrimary),
                   decoration: const InputDecoration(
-                    hintText: 'Enter company name',
+                    hintText: '请输入公司名称',
                   ),
                   onSubmitted: (_) => _saveCompanyName(),
                 ),
@@ -392,9 +392,9 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
         const SizedBox(height: 24),
 
         // ── Company Intro ──
-        _buildSectionHeader('Company Intro',
+        _buildSectionHeader('公司简介',
             subtitle:
-                "Describe your company's mission, products, and culture. This information is included in every agent conversation as context."),
+                "描述你公司的使命、产品和文化。这些信息会作为上下文包含在每个 Agent 的对话中。"),
         const SizedBox(height: 8),
         _SectionCard(
           child: Column(
@@ -411,7 +411,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                     height: 1.6),
                 decoration: const InputDecoration(
                   hintText:
-                      '# Company Name\n\n## About Us\nDescribe your company here...',
+                      '# 公司名称\n\n## 关于我们\n在这里描述你的公司...',
                   alignLabelWithHint: true,
                 ),
               ),
@@ -425,7 +425,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                   ),
                   const Spacer(),
                   const Text(
-                    "This content appears in every agent's system prompt",
+                    "此内容会出现在每个 Agent 的系统提示词中",
                     style: TextStyle(
                         fontSize: 11, color: AppColors.textTertiary),
                   ),
@@ -438,7 +438,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
         const SizedBox(height: 24),
 
         // ── Platform Configuration ──
-        _buildSectionHeader('Platform Configuration'),
+        _buildSectionHeader('平台配置'),
         const SizedBox(height: 8),
         _SectionCard(
           child: Column(
@@ -450,7 +450,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Public Base URL',
+                        const Text('公开访问地址',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -465,7 +465,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text('Public Base URL for external access',
+                        const Text('用于外部访问的公开地址',
                             style: TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textTertiary)),
@@ -477,7 +477,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Max Conversation Rounds',
+                        const Text('最大对话轮数',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -494,7 +494,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                            'Maximum back-and-forth rounds between agents',
+                            'Agent 之间最大来回对话轮数',
                             style: TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textTertiary)),
@@ -582,7 +582,7 @@ class _ThemeColorPickerState extends ConsumerState<_ThemeColorPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Theme Accent Color',
+        const Text('主题强调色',
             style: TextStyle(
                 fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
         const SizedBox(height: 12),
@@ -639,7 +639,7 @@ class _ThemeColorPickerState extends ConsumerState<_ThemeColorPicker> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 textStyle: const TextStyle(fontSize: 12),
               ),
-              child: const Text('Apply'),
+              child: const Text('应用'),
             ),
             if (currentColor != null) ...[
               const SizedBox(width: 8),
@@ -649,7 +649,7 @@ class _ThemeColorPickerState extends ConsumerState<_ThemeColorPicker> {
                   foregroundColor: AppColors.textTertiary,
                   textStyle: const TextStyle(fontSize: 12),
                 ),
-                child: const Text('Reset'),
+                child: const Text('重置'),
               ),
               const SizedBox(width: 8),
               Container(
@@ -1609,11 +1609,11 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
               ),
             ),
             const SizedBox(width: 8),
-            _buildBadge(enabled ? 'Enabled' : 'Disabled',
+            _buildBadge(enabled ? '已启用' : '已禁用',
                 enabled ? AppColors.success : AppColors.warning),
             if (vision) ...[
               const SizedBox(width: 6),
-              _buildBadge('Vision', const Color(0xFF6366F1)),
+              _buildBadge('视觉', const Color(0xFF6366F1)),
             ],
             const SizedBox(width: 8),
             IconButton(
@@ -1698,18 +1698,18 @@ class _ToolsTabState extends State<_ToolsTab>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
-        title: const Text('Delete Tool',
+        title: const Text('删除工具',
             style: TextStyle(color: AppColors.textPrimary)),
-        content: Text('Delete "$displayName"?',
+        content: Text('确定删除 "$displayName" 吗？',
             style: const TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+              child: const Text('取消')),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
               child:
-                  const Text('Delete', style: TextStyle(color: AppColors.error))),
+                  const Text('删除', style: TextStyle(color: AppColors.error))),
         ],
       ),
     );
@@ -1718,7 +1718,7 @@ class _ToolsTabState extends State<_ToolsTab>
       await _dio.delete('/tools/$toolId');
       _loadTools();
     } catch (_) {
-      _showError('Failed to delete tool');
+      _showError('删除工具失败');
     }
   }
 
@@ -1757,11 +1757,11 @@ class _ToolsTabState extends State<_ToolsTab>
       _loadTools();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Imported ${tool['name']}')),
+          SnackBar(content: Text('已导入 ${tool['name']}')),
         );
       }
     } catch (_) {
-      _showError('Failed to import tool');
+      _showError('导入工具失败');
     }
   }
 
@@ -1785,7 +1785,7 @@ class _ToolsTabState extends State<_ToolsTab>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Global Tools',
+            const Text('全局工具',
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1793,7 +1793,7 @@ class _ToolsTabState extends State<_ToolsTab>
             ElevatedButton.icon(
               onPressed: () => setState(() => _showAddMCP = true),
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('MCP Server'),
+              label: const Text('MCP 服务器'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accentPrimary,
                 foregroundColor: Colors.white,
@@ -1809,13 +1809,13 @@ class _ToolsTabState extends State<_ToolsTab>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Add MCP Server',
+                const Text('添加 MCP 服务器',
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary)),
                 const SizedBox(height: 12),
-                const Text('Server Name',
+                const Text('服务器名称',
                     style: TextStyle(
                         fontSize: 12, color: AppColors.textSecondary)),
                 const SizedBox(height: 4),

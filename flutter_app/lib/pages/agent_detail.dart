@@ -999,7 +999,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
+            child: const Text('关闭'),
           ),
         ],
       ),
@@ -1021,10 +1021,10 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       final dt = DateTime.parse(ts.toString()).toLocal();
       final diff = DateTime.now().difference(dt);
-      if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
-      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-      if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays < 30) return '${diff.inDays}d ago';
+      if (diff.inSeconds < 60) return '${diff.inSeconds}秒前';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
+      if (diff.inHours < 24) return '${diff.inHours}小时前';
+      if (diff.inDays < 30) return '${diff.inDays}天前';
       return DateFormat('MMM d').format(dt);
     } catch (_) {
       return '';
@@ -1034,15 +1034,15 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   String _statusLabel(String? status) {
     switch (status) {
       case 'running':
-        return 'Running';
+        return '运行中';
       case 'idle':
-        return 'Idle';
+        return '待机';
       case 'stopped':
         return '已停止';
       case 'error':
         return '错误';
       default:
-        return status ?? 'Unknown';
+        return status ?? '未知';
     }
   }
 
@@ -1113,11 +1113,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const Icon(Icons.error_outline, color: AppColors.error, size: 48),
               const SizedBox(height: 16),
               Text(
-                _error ?? 'Agent not found',
+                _error ?? '未找到 Agent',
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _fetchAgent, child: const Text('Retry')),
+              ElevatedButton(onPressed: _fetchAgent, child: const Text('重试')),
             ],
           ),
         ),
@@ -1125,7 +1125,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
 
     final agent = _agent!;
-    final name = agent['name'] as String? ?? 'Unnamed Agent';
+    final name = agent['name'] as String? ?? '未命名 Agent';
     final status = agent['status'] as String? ?? 'stopped';
 
     return Scaffold(
@@ -1218,7 +1218,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ),
           IconButton(
             icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
-            tooltip: 'Refresh',
+            tooltip: '刷新',
             onPressed: _fetchAgent,
           ),
         ],
@@ -1358,7 +1358,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Model: $model',
+                            '模型: $model',
                             style: const TextStyle(color: AppColors.textTertiary, fontSize: 12),
                           ),
                         ],
@@ -1379,7 +1379,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     _actionBtn(Icons.chat_bubble_outline, '聊天', AppColors.accentPrimary, () {
                       context.push('/agents/${widget.agentId}/chat');
                     }),
-                    _actionBtn(Icons.refresh, 'Refresh', AppColors.textSecondary, _fetchAgent),
+                    _actionBtn(Icons.refresh, '刷新', AppColors.textSecondary, _fetchAgent),
                   ],
                 ),
               ],
@@ -1398,7 +1398,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
-                        'Role Description',
+                        '角色描述',
                         style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -1416,7 +1416,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     maxLines: 5,
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                     decoration: const InputDecoration(
-                      hintText: 'Describe what this agent does...',
+                      hintText: '描述这个 Agent 的职责...',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -1440,7 +1440,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                                 height: 16,
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
-                            : const Text('Save'),
+                            : const Text('保存'),
                       ),
                     ],
                   ),
@@ -1469,16 +1469,16 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(icon: Icons.analytics, label: 'Metrics'),
+                const _SectionHeader(icon: Icons.analytics, label: '数据统计'),
                 const SizedBox(height: 16),
-                _tokenBar('Token Usage', tokensUsed.toDouble(), tokensLimit.toDouble()),
+                _tokenBar('Token 用量', tokensUsed.toDouble(), tokensLimit.toDouble()),
                 const SizedBox(height: 12),
                 if (dailyLimit > 0)
-                  _tokenBar('Daily Tokens', dailyTokens.toDouble(), dailyLimit.toDouble()),
+                  _tokenBar('每日 Token', dailyTokens.toDouble(), dailyLimit.toDouble()),
                 if (dailyLimit > 0) const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: _metricTile('Messages', messagesCount.toString(), Icons.message)),
+                    Expanded(child: _metricTile('消息数', messagesCount.toString(), Icons.message)),
                     const SizedBox(width: 12),
                     Expanded(child: _metricTile('已完成任务', tasksCompleted.toString(), Icons.check_circle)),
                   ],
@@ -1494,7 +1494,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionHeader(icon: Icons.history, label: 'Recent Activity'),
+                  const _SectionHeader(icon: Icons.history, label: '近期活动'),
                   const SizedBox(height: 12),
                   ..._recentActivity.take(5).map((a) {
                     final act = a as Map<String, dynamic>;
@@ -1531,12 +1531,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(icon: Icons.info_outline, label: 'Information'),
+                const _SectionHeader(icon: Icons.info_outline, label: '基本信息'),
                 const SizedBox(height: 12),
                 _infoRow('Agent ID', widget.agentId),
-                _infoRow('Created', _fmtTs(createdAt)),
-                _infoRow('Updated', _fmtTs(updatedAt)),
-                _infoRow('Model', model),
+                _infoRow('创建时间', _fmtTs(createdAt)),
+                _infoRow('更新时间', _fmtTs(updatedAt)),
+                _infoRow('模型', model),
                 _infoRow('状态', _statusLabel(status)),
               ],
             ),
@@ -1650,13 +1650,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ),
           const SizedBox(height: 8),
           const Text(
-            'Open the chat interface to interact with this agent.',
+            '打开聊天界面与此 Agent 互动。',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             icon: const Icon(Icons.open_in_new, size: 18),
-            label: const Text('Open Chat'),
+            label: const Text('打开聊天'),
             onPressed: () => context.push('/agents/${widget.agentId}/chat'),
           ),
         ],
@@ -1692,7 +1692,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const SizedBox(width: 8),
               ElevatedButton.icon(
                 icon: const Icon(Icons.add, size: 16),
-                label: const Text('New Task'),
+                label: const Text('新建任务'),
                 onPressed: () => setState(() => _showCreateTask = !_showCreateTask),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1721,14 +1721,14 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   TextField(
                     controller: _taskTitleCtrl,
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                    decoration: const InputDecoration(labelText: 'Title', hintText: 'Enter task title...'),
+                    decoration: const InputDecoration(labelText: '标题', hintText: '输入任务标题...'),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _taskDescCtrl,
                     maxLines: 3,
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                    decoration: const InputDecoration(labelText: 'Description', hintText: 'Describe the task...'),
+                    decoration: const InputDecoration(labelText: '描述', hintText: '描述任务内容...'),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
