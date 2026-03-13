@@ -26,7 +26,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final List<ChatMessage> _historyMsgs = [];
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
-  final _inputFocus = FocusNode();
+
   WebSocketClient? _ws;
   StreamSubscription? _eventSub;
   StreamSubscription? _connSub;
@@ -112,9 +112,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ..addAll(data.cast<Map<String, dynamic>>());
         _sessionsLoading = false;
       });
-      // Auto-select first session on initial load
-      if (!silent && _activeSession == null && _sessions.isNotEmpty) {
-        await _selectSession(_sessions.first);
+      // Auto-select first session, or auto-create if none exist
+      if (!silent && _activeSession == null) {
+        if (_sessions.isNotEmpty) {
+          await _selectSession(_sessions.first);
+        } else {
+          await _createSession();
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _sessionsLoading = false);
@@ -818,14 +822,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: KeyboardListener(
-                  focusNode: _inputFocus,
-                  onKeyEvent: (event) {
+                child: Focus(
+                  onKeyEvent: (node, event) {
                     if (event is KeyDownEvent &&
                         event.logicalKey == LogicalKeyboardKey.enter &&
                         !HardwareKeyboard.instance.isShiftPressed) {
                       _sendMessage();
+                      return KeyEventResult.handled;
                     }
+                    return KeyEventResult.ignored;
                   },
                   child: TextField(
                     controller: _inputCtrl,
@@ -1277,9 +1282,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Spacer(flex: 3),
+            const Spacer(flex: 1),
             Flexible(
-              flex: 7,
+              flex: 9,
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -1322,7 +1327,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ),
             const SizedBox(width: 10),
             Flexible(
-              flex: 7,
+              flex: 9,
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -1336,7 +1341,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ),
               ),
             ),
-            const Spacer(flex: 3),
+            const Spacer(flex: 1),
           ],
         ),
       );
@@ -1350,7 +1355,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _closeCodeSub?.cancel();
     _ws?.dispose();
     _inputCtrl.dispose();
-    _inputFocus.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }

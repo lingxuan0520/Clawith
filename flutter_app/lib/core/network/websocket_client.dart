@@ -121,6 +121,9 @@ class WebSocketClient {
   Timer? _reconnectTimer;
   bool _disposed = false;
   bool _permanentError = false;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 10;
+  static const int _maxReconnectDelaySec = 30;
 
   final StreamController<WsEvent> _eventController = StreamController.broadcast();
   final StreamController<bool> _connectionController = StreamController.broadcast();
@@ -151,6 +154,7 @@ class WebSocketClient {
     try {
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       _connected = true;
+      _reconnectAttempts = 0;
       _connectionController.add(true);
 
       _subscription = _channel!.stream.listen(
@@ -200,8 +204,15 @@ class WebSocketClient {
 
   void _scheduleReconnect() {
     if (_disposed || _permanentError) return;
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      debugPrint('WS max reconnect attempts reached ($_maxReconnectAttempts)');
+      return;
+    }
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 2), connect);
+    final delaySec = (2 << _reconnectAttempts).clamp(2, _maxReconnectDelaySec);
+    _reconnectAttempts++;
+    debugPrint('WS reconnecting in ${delaySec}s (attempt $_reconnectAttempts/$_maxReconnectAttempts)');
+    _reconnectTimer = Timer(Duration(seconds: delaySec), connect);
   }
 
   void _close() {

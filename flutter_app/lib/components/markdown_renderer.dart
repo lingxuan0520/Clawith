@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/app_theme.dart';
 
@@ -18,21 +20,15 @@ class MarkdownRenderer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (selectable) {
-      return MarkdownBody(
-        data: data,
-        selectable: true,
-        shrinkWrap: shrinkWrap,
-        styleSheet: _buildStyleSheet(context),
-        onTapLink: (text, href, title) => _launchUrl(href),
-      );
-    }
-
     return MarkdownBody(
       data: data,
+      selectable: selectable,
       shrinkWrap: shrinkWrap,
       styleSheet: _buildStyleSheet(context),
       onTapLink: (text, href, title) => _launchUrl(href),
+      builders: {
+        'code': _CodeBlockBuilder(),
+      },
     );
   }
 
@@ -48,12 +44,8 @@ class MarkdownRenderer extends StatelessWidget {
         backgroundColor: AppColors.bgTertiary,
         color: AppColors.textPrimary,
       ),
-      codeblockDecoration: BoxDecoration(
-        color: AppColors.bgTertiary,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      codeblockPadding: const EdgeInsets.all(12),
+      codeblockDecoration: const BoxDecoration(),
+      codeblockPadding: EdgeInsets.zero,
       blockquoteDecoration: BoxDecoration(
         border: Border(left: BorderSide(color: AppColors.accentPrimary, width: 3)),
       ),
@@ -75,5 +67,124 @@ class MarkdownRenderer extends StatelessWidget {
     if (uri != null) {
       launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+}
+
+class _CodeBlockBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    // Only handle fenced code blocks (multi-line), not inline code
+    if (element.tag != 'code') return null;
+    final parent = element.attributes['class'];
+    // Inline code has no language class and is within a <p> tag
+    // Check if this looks like a code block (has language or contains newlines)
+    final text = element.textContent;
+    final isBlock = parent != null || text.contains('\n');
+    if (!isBlock) return null;
+
+    final language = parent?.replaceFirst('language-', '') ?? '';
+
+    return _CodeBlockWidget(code: text, language: language);
+  }
+}
+
+class _CodeBlockWidget extends StatefulWidget {
+  final String code;
+  final String language;
+  const _CodeBlockWidget({required this.code, required this.language});
+
+  @override
+  State<_CodeBlockWidget> createState() => _CodeBlockWidgetState();
+}
+
+class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
+  bool _copied = false;
+
+  void _copy() {
+    Clipboard.setData(ClipboardData(text: widget.code));
+    setState(() => _copied = true);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.bgTertiary,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header with language label and copy button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.bgElevated,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            ),
+            child: Row(
+              children: [
+                if (widget.language.isNotEmpty)
+                  Text(
+                    widget.language,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textTertiary,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: _copy,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _copied ? Icons.check : Icons.copy,
+                        size: 14,
+                        color: _copied ? Colors.green : AppColors.textTertiary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _copied ? '已复制' : '复制',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _copied ? Colors.green : AppColors.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Code content
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.all(12),
+            child: SelectableText(
+              widget.code,
+              style: const TextStyle(
+                fontSize: 13,
+                fontFamily: 'monospace',
+                color: AppColors.textPrimary,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
