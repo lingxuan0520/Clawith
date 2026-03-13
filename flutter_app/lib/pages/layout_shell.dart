@@ -99,6 +99,42 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     }
   }
 
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        title: const Text('删除账号', style: TextStyle(color: AppColors.error)),
+        content: const Text(
+          '此操作不可撤回。你的所有数据（Agent、聊天记录、任务等）将被永久删除。\n\n确定要删除账号吗？',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确认删除', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ApiService.instance.deleteAccount();
+      if (!mounted) return;
+      final nav = GoRouter.of(context);
+      await ref.read(authProvider.notifier).logout();
+      if (mounted) nav.go('/login');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除失败: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
@@ -363,18 +399,25 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                               ],
                             ),
                           ),
-                          IconButton(
-                            onPressed: () async {
-                              final nav = GoRouter.of(context);
-                              await ref.read(authProvider.notifier).logout();
-                              if (mounted) nav.go('/login');
-                            },
-                            icon: const Icon(Icons.logout, size: 16),
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_horiz, size: 16, color: AppColors.textTertiary),
                             iconSize: 16,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
-                            color: AppColors.textTertiary,
-                            tooltip: '退出登录',
+                            color: AppColors.bgElevated,
+                            onSelected: (value) async {
+                              if (value == 'logout') {
+                                final nav = GoRouter.of(context);
+                                await ref.read(authProvider.notifier).logout();
+                                if (mounted) nav.go('/login');
+                              } else if (value == 'delete') {
+                                _confirmDeleteAccount();
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(value: 'logout', child: Text('退出登录', style: TextStyle(fontSize: 13))),
+                              const PopupMenuItem(value: 'delete', child: Text('删除账号', style: TextStyle(fontSize: 13, color: AppColors.error))),
+                            ],
                           ),
                         ],
                       ),

@@ -30,6 +30,10 @@ class ApiService {
     return r.data as Map<String, dynamic>;
   }
 
+  Future<void> deleteAccount() async {
+    await _dio.delete('/auth/me');
+  }
+
   Future<Map<String, dynamic>> getRegistrationConfig() async {
     final r = await _dio.get('/auth/registration-config');
     return r.data as Map<String, dynamic>;

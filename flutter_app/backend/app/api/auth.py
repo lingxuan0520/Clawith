@@ -156,6 +156,105 @@ async def update_me(
     return UserOut.model_validate(current_user)
 
 
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete the current user account and all associated data.
+
+    Required by Apple App Store guidelines.
+    """
+    from sqlalchemy import delete as sa_delete, update as sa_update
+    from app.models.agent import Agent, AgentTemplate
+    from app.models.audit import AuditLog, ApprovalRequest, ChatMessage
+    from app.models.chat_session import ChatSession
+    from app.models.task import Task, TaskLog
+    from app.models.schedule import AgentSchedule
+    from app.models.participant import Participant
+    from app.models.plaza import PlazaPost, PlazaComment, PlazaLike
+
+    user_id = current_user.id
+
+    # 1. Get all agent IDs owned by this user
+    agent_result = await db.execute(select(Agent.id).where(Agent.creator_id == user_id))
+    agent_ids = [row[0] for row in agent_result.all()]
+
+    if agent_ids:
+        # 2. Delete agent child data (tables without DB-level CASCADE)
+        await db.execute(sa_delete(ChatMessage).where(ChatMessage.agent_id.in_(agent_ids)))
+        await db.execute(sa_delete(ChatSession).where(ChatSession.agent_id.in_(agent_ids)))
+        await db.execute(sa_delete(ApprovalRequest).where(ApprovalRequest.agent_id.in_(agent_ids)))
+
+        # TaskLogs via tasks
+        task_result = await db.execute(select(Task.id).where(Task.agent_id.in_(agent_ids)))
+        task_ids = [row[0] for row in task_result.all()]
+        if task_ids:
+            await db.execute(sa_delete(TaskLog).where(TaskLog.task_id.in_(task_ids)))
+        await db.execute(sa_delete(Task).where(Task.agent_id.in_(agent_ids)))
+
+        # Activity logs (no FK constraint, but clean up)
+        try:
+            from app.models.activity_log import AgentActivityLog
+            await db.execute(sa_delete(AgentActivityLog).where(AgentActivityLog.agent_id.in_(agent_ids)))
+        except Exception:
+            pass
+
+        # Channel configs
+        try:
+            from app.models.channel_config import ChannelConfig
+            await db.execute(sa_delete(ChannelConfig).where(ChannelConfig.agent_id.in_(agent_ids)))
+        except Exception:
+            pass
+
+        # Agent participants
+        for aid in agent_ids:
+            await db.execute(sa_delete(Participant).where(Participant.type == "agent", Participant.ref_id == aid))
+
+        # 3. Delete agents (DB-level CASCADE handles: schedules, triggers, tools, relationships)
+        await db.execute(sa_delete(Agent).where(Agent.creator_id == user_id))
+
+    # 4. Delete user's own chat data (if any remain)
+    await db.execute(sa_delete(ChatMessage).where(ChatMessage.user_id == user_id))
+    await db.execute(sa_delete(ChatSession).where(ChatSession.user_id == user_id))
+
+    # 5. Delete user's tasks
+    user_task_result = await db.execute(select(Task.id).where(Task.created_by == user_id))
+    user_task_ids = [row[0] for row in user_task_result.all()]
+    if user_task_ids:
+        await db.execute(sa_delete(TaskLog).where(TaskLog.task_id.in_(user_task_ids)))
+    await db.execute(sa_delete(Task).where(Task.created_by == user_id))
+
+    # 6. Delete schedules created by user
+    await db.execute(sa_delete(AgentSchedule).where(AgentSchedule.created_by == user_id))
+
+    # 7. Delete user participant record
+    await db.execute(sa_delete(Participant).where(Participant.type == "user", Participant.ref_id == user_id))
+
+    # 8. Delete plaza content
+    await db.execute(sa_delete(PlazaLike).where(PlazaLike.author_type == "human", PlazaLike.author_id == user_id))
+    await db.execute(sa_delete(PlazaComment).where(PlazaComment.author_type == "human", PlazaComment.author_id == user_id))
+    await db.execute(sa_delete(PlazaPost).where(PlazaPost.author_type == "human", PlazaPost.author_id == user_id))
+
+    # 9. Set NULL on nullable references
+    await db.execute(sa_update(AuditLog).where(AuditLog.user_id == user_id).values(user_id=None))
+    await db.execute(sa_update(ApprovalRequest).where(ApprovalRequest.resolved_by == user_id).values(resolved_by=None))
+    await db.execute(sa_update(AgentTemplate).where(AgentTemplate.created_by == user_id).values(created_by=None))
+
+    # 10. Delete user workspace files
+    import shutil
+    from pathlib import Path
+    for base in [Path("/tmp/clawith_workspaces"), Path("/tmp/clawith_persistent")]:
+        for aid in agent_ids:
+            agent_dir = base / str(aid)
+            if agent_dir.exists():
+                shutil.rmtree(agent_dir, ignore_errors=True)
+
+    # 11. Delete the user record
+    await db.execute(sa_delete(User).where(User.id == user_id))
+    await db.commit()
+
+
 # ─── Firebase Auth ─────────────────────────────────────
 
 FIREBASE_PROJECT_ID = "soloship-57b40"
