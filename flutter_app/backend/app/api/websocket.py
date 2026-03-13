@@ -716,14 +716,30 @@ async def websocket_chat(
             if llm_model:
                 try:
                     print(f"[WS] Calling LLM {llm_model.model} (streaming)...")
-                    
+
+                    _ws_closed = False
+
+                    async def _safe_send(data: dict):
+                        """Send JSON to websocket, silently ignore if client disconnected."""
+                        nonlocal _ws_closed
+                        if _ws_closed:
+                            return
+                        try:
+                            await websocket.send_json(data)
+                        except (RuntimeError, Exception) as _send_err:
+                            if "close message" in str(_send_err).lower() or "closed" in str(_send_err).lower():
+                                _ws_closed = True
+                                print(f"[WS] Client disconnected during streaming, suppressing further sends")
+                            else:
+                                raise
+
                     async def stream_to_ws(text: str):
                         """Send each chunk to client in real-time."""
-                        await websocket.send_json({"type": "chunk", "content": text})
-                    
+                        await _safe_send({"type": "chunk", "content": text})
+
                     async def tool_call_to_ws(data: dict):
                         """Send tool call info to client and persist completed ones."""
-                        await websocket.send_json({"type": "tool_call", **data})
+                        await _safe_send({"type": "tool_call", **data})
                         # Save completed tool calls to DB so they persist in chat history
                         if data.get("status") == "done":
                             try:
@@ -745,10 +761,10 @@ async def websocket_chat(
                                     await _tc_db.commit()
                             except Exception as _tc_err:
                                 print(f"[WS] Failed to save tool_call: {_tc_err}")
-                    
+
                     async def thinking_to_ws(text: str):
                         """Send thinking chunks to client for collapsible display."""
-                        await websocket.send_json({"type": "thinking", "content": text})
+                        await _safe_send({"type": "thinking", "content": text})
 
                     assistant_response = await call_llm(
                         llm_model,
@@ -835,12 +851,15 @@ async def websocket_chat(
             print("[WS] Assistant message saved")
 
             # Send done signal with final content (for non-streaming clients)
-            await websocket.send_json({
-                "type": "done",
-                "role": "assistant",
-                "content": assistant_response,
-            })
-            print("[WS] Response done sent to client")
+            try:
+                await websocket.send_json({
+                    "type": "done",
+                    "role": "assistant",
+                    "content": assistant_response,
+                })
+                print("[WS] Response done sent to client")
+            except RuntimeError:
+                print("[WS] Client already disconnected, skipping done signal")
 
     except WebSocketDisconnect:
         print(f"[WS] Client disconnected: {agent_name}")

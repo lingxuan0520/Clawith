@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/theme/app_theme.dart';
 import '../core/network/websocket_client.dart';
@@ -525,6 +526,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ),
       appBar: AppBar(
         backgroundColor: AppColors.bgSecondary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => context.pop(),
+        ),
         title: Row(
           children: [
             Container(

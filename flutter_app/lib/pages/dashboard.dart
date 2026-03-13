@@ -331,7 +331,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final activity = _activityByAgent[id]?.isNotEmpty == true ? _activityByAgent[id]!.first : null;
 
     return InkWell(
-      onTap: () => context.go('/agents/$id'),
+      onTap: () => context.push('/agents/$id'),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

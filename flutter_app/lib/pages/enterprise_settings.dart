@@ -22,13 +22,13 @@ class _EnterpriseSettingsPageState
   late TabController _tabController;
 
   static const _tabLabels = [
-    'Company Info',
-    'Model Pool (LLM)',
-    'Tools',
-    'Skills',
-    'Quotas & Users',
-    'Knowledge Base',
-    'Org Structure',
+    '公司信息',
+    '模型池',
+    '工具',
+    '技能',
+    '配额管理',
+    '知识库',
+    '组织架构',
   ];
 
   @override
@@ -50,7 +50,7 @@ class _EnterpriseSettingsPageState
       appBar: AppBar(
         backgroundColor: AppColors.bgPrimary,
         title: const Text(
-          'Enterprise Settings',
+          '企业设置',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -1177,7 +1177,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
     ('qwen', 'Qwen (DashScope)'),
     ('zhipu', 'Zhipu'),
     ('openrouter', 'OpenRouter'),
-    ('custom', 'Custom'),
+    ('custom', '自定义'),
   ];
 
   @override
@@ -1246,7 +1246,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
       });
       _loadModels();
     } catch (e) {
-      _showError('Failed to save model');
+      _showError('保存模型失败');
     }
   }
 
@@ -1255,18 +1255,18 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
-        title: const Text('Delete Model',
+        title: const Text('删除模型',
             style: TextStyle(color: AppColors.textPrimary)),
-        content: const Text('Are you sure you want to delete this model?',
+        content: const Text('确定要删除这个模型吗？',
             style: TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+              child: const Text('取消')),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
               child:
-                  const Text('Delete', style: TextStyle(color: AppColors.error))),
+                  const Text('删除', style: TextStyle(color: AppColors.error))),
         ],
       ),
     );
@@ -1286,18 +1286,18 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: AppColors.bgElevated,
-            title: const Text('Model In Use',
+            title: const Text('模型使用中',
                 style: TextStyle(color: AppColors.textPrimary)),
             content: Text(
-                'This model is used by: $agents\n\nDelete anyway?',
+                '此模型正在被以下 Agent 使用: $agents\n\n确定删除吗？',
                 style: const TextStyle(color: AppColors.textSecondary)),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel')),
+                  child: const Text('取消')),
               TextButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Force Delete',
+                  child: const Text('强制删除',
                       style: TextStyle(color: AppColors.error))),
             ],
           ),
@@ -1308,7 +1308,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
           _loadModels();
         }
       } else {
-        _showError('Failed to delete model');
+        _showError('删除模型失败');
       }
     }
   }
@@ -1335,7 +1335,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
           child: ElevatedButton.icon(
             onPressed: _openAddForm,
             icon: const Icon(Icons.add, size: 16),
-            label: const Text('Add Model'),
+            label: const Text('添加模型'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accentPrimary,
               foregroundColor: Colors.white,
@@ -1351,7 +1351,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _editingModelId != null ? 'Edit Model' : 'Add Model',
+                  _editingModelId != null ? '编辑模型' : '添加模型',
                   style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1364,7 +1364,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Provider',
+                          const Text('供应商',
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -1405,7 +1405,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Model',
+                          const Text('模型名称',
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -1432,7 +1432,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Label',
+                          const Text('显示名称',
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -1455,7 +1455,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Base URL',
+                          const Text('自定义 Base URL',
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -1492,7 +1492,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                           fontSize: 13, color: AppColors.textPrimary),
                       decoration: InputDecoration(
                         hintText: _editingModelId != null
-                            ? 'Leave blank to keep existing'
+                            ? '留空保持不变'
                             : 'sk-...',
                       ),
                     ),
@@ -1517,13 +1517,13 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                         TextSpan(
                           children: [
                             TextSpan(
-                                text: 'Supports Vision (Multimodal)',
+                                text: '支持视觉（多模态）',
                                 style: TextStyle(
                                     fontSize: 13,
                                     color: AppColors.textPrimary)),
                             TextSpan(
                                 text:
-                                    ' -- Enable for models that can analyze images',
+                                    ' — 勾选后可分析图片',
                                 style: TextStyle(
                                     fontSize: 11,
                                     color: AppColors.textTertiary)),
@@ -1542,7 +1542,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                         _showForm = false;
                         _editingModelId = null;
                       }),
-                      child: const Text('Cancel'),
+                      child: const Text('取消'),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
@@ -1552,7 +1552,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                                       _apiKeyCtl.text.isNotEmpty)
                               ? _saveModel
                               : null,
-                      child: const Text('Save'),
+                      child: const Text('保存'),
                     ),
                   ],
                 ),
@@ -1567,7 +1567,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
           const Center(
             child: Padding(
               padding: EdgeInsets.all(40),
-              child: Text('No models configured',
+              child: Text('暂无模型配置',
                   style:
                       TextStyle(color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -1620,14 +1620,14 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
               icon: const Icon(Icons.edit_outlined,
                   size: 16, color: AppColors.textSecondary),
               onPressed: () => _openEditForm(m),
-              tooltip: 'Edit',
+              tooltip: '编辑',
               visualDensity: VisualDensity.compact,
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline,
                   size: 16, color: AppColors.error),
               onPressed: () => _deleteModel(m['id'] as String),
-              tooltip: 'Delete',
+              tooltip: '删除',
               visualDensity: VisualDensity.compact,
             ),
           ],

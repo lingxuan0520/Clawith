@@ -522,6 +522,31 @@ async def ensure_workspace(agent_id: uuid.UUID) -> Path:
         except Exception:
             (ws / "soul.md").write_text("# Personality\n\n_Describe your role and responsibilities._\n", encoding="utf-8")
 
+    # Create default user.md if missing — owner profile for the agent
+    if not (ws / "user.md").exists():
+        try:
+            from app.models.agent import Agent as _AgentModel
+            from app.models.user import User as _UserModel
+            async with async_session() as _udb:
+                _ar = await _udb.execute(select(_AgentModel).where(_AgentModel.id == agent_id))
+                _agent = _ar.scalar_one_or_none()
+                if _agent and _agent.creator_id:
+                    _ur = await _udb.execute(select(_UserModel).where(_UserModel.id == _agent.creator_id))
+                    _user = _ur.scalar_one_or_none()
+                    if _user:
+                        _lines = ["# User Profile", "", f"- **Name**: {_user.display_name or _user.username}", f"- **Email**: {_user.email}"]
+                        _lines.append("")
+                        _lines.append("## Preferences")
+                        _lines.append("")
+                        _lines.append("_Agent will learn and record user preferences here over time._")
+                        (ws / "user.md").write_text("\n".join(_lines) + "\n", encoding="utf-8")
+                    else:
+                        (ws / "user.md").write_text("# User Profile\n\n_Information about your owner. Update as you learn more._\n", encoding="utf-8")
+                else:
+                    (ws / "user.md").write_text("# User Profile\n\n_Information about your owner. Update as you learn more._\n", encoding="utf-8")
+        except Exception:
+            (ws / "user.md").write_text("# User Profile\n\n_Information about your owner. Update as you learn more._\n", encoding="utf-8")
+
     # Always sync tasks from DB
     await _sync_tasks_to_file(agent_id, ws)
 

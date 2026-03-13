@@ -178,6 +178,11 @@ async def build_agent_context(agent_id: uuid.UUID, agent_name: str, role_descrip
     if relationships.startswith("# "):
         relationships = "\n".join(relationships.split("\n")[1:]).strip()
 
+    # --- User Profile ---
+    user_profile = _read_file_safe(tool_ws / "user.md", 2000) or _read_file_safe(data_ws / "user.md", 2000)
+    if user_profile.startswith("# "):
+        user_profile = "\n".join(user_profile.split("\n")[1:]).strip()
+
     # --- Compose system prompt ---
     from datetime import datetime, timezone, timedelta
     cst = timezone(timedelta(hours=8))
@@ -216,6 +221,9 @@ async def build_agent_context(agent_id: uuid.UUID, agent_name: str, role_descrip
 
     if relationships and "暂无" not in relationships and "None yet" not in relationships:
         parts.append(f"\n## Relationships\n{relationships}")
+
+    if user_profile and "_Information about your owner" not in user_profile and "_Agent will learn" not in user_profile:
+        parts.append(f"\n## User Profile\n{user_profile}")
 
     # --- Agenda (Pulse engine) ---
     agenda = (
@@ -263,6 +271,7 @@ You have a dedicated workspace with this structure:
   - agenda.md      → Your task agenda (ALWAYS read this first when waking up)
   - task_history.md → Archive of completed tasks
   - soul.md        → Your personality definition
+  - user.md        → Your owner's profile and preferences
   - memory/memory.md → Your long-term memory and notes
   - memory/reflections.md → Your autonomous thinking journal
   - skills/        → Your skill definition files (one .md per skill)
@@ -284,6 +293,10 @@ You have a dedicated workspace with this structure:
    Even if you saw a file before, you MUST call the tool again to get current data.
 
 4. **Use `write_file` to update memory/memory.md with important information.**
+
+5. **Use `write_file` to update user.md when you learn new things about your owner.**
+   - Record their preferences, communication style, work habits, and important context
+   - This helps you serve them better in future conversations
 
 5. **Use `write_file` to update agenda.md with your current tasks and progress.**
    - Keep your agenda concise and organized (进行中 / 等待中 / 近期已完成)

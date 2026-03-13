@@ -83,11 +83,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   String? _viewingSkillContent;
   String? _viewingSkillName;
 
-  // ── Relationships ─────────────────────────────────────────
-  List<dynamic> _humanRelationships = [];
-  List<dynamic> _agentRelationships = [];
-  bool _loadingRelationships = false;
-
   // ── Workspace ────────────────────────────────────────────
   List<dynamic> _workspaceFiles = [];
   String _currentPath = '';
@@ -141,7 +136,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     '思维',
     '工具',
     '技能',
-    '关系',
     '工作区',
     '活动',
     '设置',
@@ -222,15 +216,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _fetchSkillsData();
         break;
       case 7:
-        _fetchRelationshipsData();
-        break;
-      case 8:
         _fetchWorkspaceFiles();
         break;
-      case 9:
+      case 8:
         _fetchActivity();
         break;
-      case 10:
+      case 9:
         _fetchSettingsData();
         break;
     }
@@ -392,25 +383,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingSkills = false);
-    }
-  }
-
-  Future<void> _fetchRelationshipsData() async {
-    setState(() => _loadingRelationships = true);
-    try {
-      final results = await Future.wait([
-        _api.getRelationships(widget.agentId).catchError((_) => <dynamic>[]),
-        _api.getAgentRelationships(widget.agentId).catchError((_) => <dynamic>[]),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _humanRelationships = results[0];
-        _agentRelationships = results[1];
-        _loadingRelationships = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loadingRelationships = false);
     }
   }
 
@@ -827,30 +799,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       if (!mounted) return;
       setState(() => _creatingSchedule = false);
       _showSnack('创建计划失败: ${_errMsg(e)}');
-    }
-  }
-
-  Future<void> _deleteHumanRelationship(String relId) async {
-    final confirmed = await _showConfirmDialog('删除关系', '确认删除此人际关系吗？');
-    if (confirmed != true) return;
-    try {
-      await _api.deleteRelationship(widget.agentId, relId);
-      _showSnack('关系已删除');
-      _fetchRelationshipsData();
-    } catch (e) {
-      _showSnack('删除关系失败: ${_errMsg(e)}');
-    }
-  }
-
-  Future<void> _deleteAgentRelationship(String relId) async {
-    final confirmed = await _showConfirmDialog('删除关系', '确认删除此智能体关系吗？');
-    if (confirmed != true) return;
-    try {
-      await _api.deleteAgentRelationship(widget.agentId, relId);
-      _showSnack('关系已删除');
-      _fetchRelationshipsData();
-    } catch (e) {
-      _showSnack('删除关系失败: ${_errMsg(e)}');
     }
   }
 
@@ -1295,7 +1243,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           _buildMindTab(),
           _buildToolsTab(),
           _buildSkillsTab(),
-          _buildRelationshipsTab(),
           _buildWorkspaceTab(),
           _buildActivityTab(),
           _buildSettingsTab(agent),
@@ -1428,7 +1375,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     else
                       _actionBtn(Icons.play_arrow, '启动', AppColors.success, _startAgent),
                     _actionBtn(Icons.chat_bubble_outline, '聊天', AppColors.accentPrimary, () {
-                      context.go('/agents/${widget.agentId}/chat');
+                      context.push('/agents/${widget.agentId}/chat');
                     }),
                     _actionBtn(Icons.refresh, 'Refresh', AppColors.textSecondary, _fetchAgent),
                   ],
@@ -1708,7 +1655,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ElevatedButton.icon(
             icon: const Icon(Icons.open_in_new, size: 18),
             label: const Text('Open Chat'),
-            onPressed: () => context.go('/agents/${widget.agentId}/chat'),
+            onPressed: () => context.push('/agents/${widget.agentId}/chat'),
           ),
         ],
       ),
@@ -2712,166 +2659,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   // ═══════════════════════════════════════════════════════════
-  // TAB 7 : Relationships
+  // TAB 7 : Workspace (file browser)
   // ═══════════════════════════════════════════════════════════
-
-  Widget _buildRelationshipsTab() {
-    if (_loadingRelationships) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-    }
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Human Relationships
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text('人际关系', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18),
-                      onPressed: _fetchRelationshipsData,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (_humanRelationships.isEmpty)
-                  const Text('暂无人际关系', style: TextStyle(color: AppColors.textTertiary, fontSize: 13))
-                else
-                  ..._humanRelationships.map((r) {
-                    final member = r['member'] as Map<String, dynamic>?;
-                    final label = r['relation_label'] as String? ?? r['relation'] as String? ?? '';
-                    final relId = r['id']?.toString() ?? '';
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgTertiary,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.borderSubtle),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor: AppColors.bgElevated,
-                            child: Text(
-                              (member?['name'] as String? ?? '?').substring(0, 1),
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(member?['name'] as String? ?? '未知', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-                                if (member?['title'] != null)
-                                  Text(member!['title'] as String, style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                                if (r['description'] != null && (r['description'] as String).isNotEmpty)
-                                  Text(r['description'] as String, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.accentSubtle,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.accentText)),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                            onPressed: () => _deleteHumanRelationship(relId),
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(4),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Agent-to-Agent Relationships
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('智能体关系', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                const SizedBox(height: 12),
-                if (_agentRelationships.isEmpty)
-                  const Text('暂无智能体关系', style: TextStyle(color: AppColors.textTertiary, fontSize: 13))
-                else
-                  ..._agentRelationships.map((r) {
-                    final label = r['relation_label'] as String? ?? r['relation'] as String? ?? '';
-                    final relId = r['id']?.toString() ?? '';
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgTertiary,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.borderSubtle),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36, height: 36,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              color: AppColors.bgElevated,
-                              border: Border.all(color: AppColors.borderSubtle),
-                            ),
-                            child: const Icon(Icons.smart_toy, size: 20, color: AppColors.textTertiary),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(r['target_agent_name'] as String? ?? '未知智能体', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-                                if (r['description'] != null && (r['description'] as String).isNotEmpty)
-                                  Text(r['description'] as String, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.accentSubtle,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.accentText)),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                            onPressed: () => _deleteAgentRelationship(relId),
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(4),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // ═══════════════════════════════════════════════════════════
   // TAB 8 : Workspace (file browser)
