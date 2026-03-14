@@ -32,13 +32,13 @@ class PrivacyPolicyPage extends StatelessWidget {
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Soloship 隐私政策', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                Text('OhClaw 隐私政策', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                 SizedBox(height: 8),
                 Text('最后更新：2026 年 3 月 14 日', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
                 SizedBox(height: 24),
 
                 _Section(title: '1. 我们收集的信息', content:
-                  '当你使用 Soloship 时，我们会收集以下信息：\n\n'
+                  '当你使用 OhClaw 时，我们会收集以下信息：\n\n'
                   '• 账户信息：你的姓名、电子邮件地址（通过 Google 或 Apple 登录获取）\n'
                   '• 使用数据：你与 AI Agent 的对话内容、创建的任务和文件\n'
                   '• 设备信息：设备类型、操作系统版本（用于改善兼容性）\n'
@@ -46,7 +46,7 @@ class PrivacyPolicyPage extends StatelessWidget {
 
                 _Section(title: '2. 我们如何使用信息', content:
                   '我们使用收集的信息用于：\n\n'
-                  '• 提供和维护 Soloship 服务\n'
+                  '• 提供和维护 OhClaw 服务\n'
                   '• 处理你与 AI Agent 的对话请求\n'
                   '• 改善产品体验和修复问题\n'
                   '• 发送重要的服务通知'),
@@ -77,15 +77,15 @@ class PrivacyPolicyPage extends StatelessWidget {
                   '这些服务有各自的隐私政策，请参阅其官方文档。'),
 
                 _Section(title: '7. 儿童隐私', content:
-                  'Soloship 不面向 13 岁以下的儿童。我们不会故意收集儿童的个人信息。'),
+                  'OhClaw 不面向 13 岁以下的儿童。我们不会故意收集儿童的个人信息。'),
 
                 _Section(title: '8. 隐私政策变更', content:
                   '我们可能会不时更新本隐私政策。更新后的政策将在 App 内发布，并更新"最后更新"日期。'
-                  '继续使用 Soloship 即表示你同意修改后的政策。'),
+                  '继续使用 OhClaw 即表示你同意修改后的政策。'),
 
                 _Section(title: '9. 联系我们', content:
                   '如果你对本隐私政策有任何疑问，请通过以下方式联系我们：\n\n'
-                  '• 电子邮件：support@soloship.app'),
+                  '• 电子邮件：support@ohclaw.app'),
 
                 SizedBox(height: 40),
               ],

@@ -13,11 +13,11 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const ProviderScope(child: ClawithApp()));
+  runApp(const ProviderScope(child: OhClawApp()));
 }
 
-class ClawithApp extends ConsumerWidget {
-  const ClawithApp({super.key});
+class OhClawApp extends ConsumerWidget {
+  const OhClawApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,7 +26,7 @@ class ClawithApp extends ConsumerWidget {
     final isDark = appState.themeMode == 'dark';
 
     return MaterialApp.router(
-      title: 'Soloship',
+      title: 'OhClaw',
       debugShowCheckedModeBanner: false,
       theme: isDark
           ? AppTheme.darkTheme(accentHex: appState.accentColor)

@@ -1,4 +1,4 @@
-"""Clawith Backend — FastAPI Application Entry Point."""
+"""OhClaw Backend — FastAPI Application Entry Point."""
 
 from contextlib import asynccontextmanager
 
@@ -58,6 +58,7 @@ async def lifespan(app: FastAPI):
     import sys
     import os
     from app.services.trigger_daemon import start_trigger_daemon
+    from app.services.heartbeat import start_heartbeat
     from app.services.tool_seeder import seed_builtin_tools
     from app.services.template_seeder import seed_agent_templates
 
@@ -133,6 +134,7 @@ async def lifespan(app: FastAPI):
 
         for name, coro in [
             ("trigger_daemon", start_trigger_daemon()),
+            ("heartbeat", start_heartbeat()),
         ]:
             task = asyncio.create_task(coro, name=name)
             task.add_done_callback(_bg_task_error)

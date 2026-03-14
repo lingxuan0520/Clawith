@@ -97,6 +97,20 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   String _logFilter = 'all';
   String? _expandedLogId;
 
+  // ── Relationships ──────────────────────────────────────────
+  List<dynamic> _humanRelationships = [];
+  List<dynamic> _agentRelationships = [];
+  bool _loadingRelationships = false;
+  List<dynamic> _allAgentsList = [];
+
+  // ── Skill presets ──────────────────────────────────────────
+  List<dynamic> _skillPresets = [];
+  bool _showSkillPresets = false;
+
+  // ── Tool config ────────────────────────────────────────────
+  String? _expandedToolId;
+  final _toolConfigControllers = <String, TextEditingController>{};
+
   // ── Header inline edit ─────────────────────────────────────
   bool _editingName = false;
   final _nameController = TextEditingController();
@@ -121,6 +135,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   final _channelTokenCtrl = TextEditingController();
   final _channelIdCtrl = TextEditingController();
   final _channelSecretCtrl = TextEditingController();
+  final _channelEncryptKeyCtrl = TextEditingController();
+  final _channelPublicKeyCtrl = TextEditingController();
 
   // ── Schedule creation ────────────────────────────────────
   bool _showCreateSchedule = false;
@@ -137,6 +153,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     '思维',
     '工具',
     '技能',
+    '关系',
     '工作区',
     '活动',
     '设置',
@@ -179,6 +196,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     _channelTokenCtrl.dispose();
     _channelIdCtrl.dispose();
     _channelSecretCtrl.dispose();
+    _channelEncryptKeyCtrl.dispose();
+    _channelPublicKeyCtrl.dispose();
     _scheduleNameCtrl.dispose();
     _scheduleCronCtrl.dispose();
     super.dispose();
@@ -218,12 +237,15 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _fetchSkillsData();
         break;
       case 7:
-        _fetchWorkspaceFiles();
+        _fetchRelationshipsData();
         break;
       case 8:
-        _fetchActivity();
+        _fetchWorkspaceFiles();
         break;
       case 9:
+        _fetchActivity();
+        break;
+      case 10:
         _fetchSettingsData();
         break;
     }
@@ -425,6 +447,56 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
   }
 
+  Future<void> _fetchRelationshipsData() async {
+    setState(() => _loadingRelationships = true);
+    try {
+      final results = await Future.wait([
+        _api.getRelationships(widget.agentId).catchError((_) => <dynamic>[]),
+        _api.getAgentRelationships(widget.agentId).catchError((_) => <dynamic>[]),
+        _api.listAgents().catchError((_) => <dynamic>[]),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _humanRelationships = results[0];
+        _agentRelationships = results[1];
+        _allAgentsList = results[2];
+        _loadingRelationships = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingRelationships = false);
+      _showSnack('加载关系失败: ${_errMsg(e)}');
+    }
+  }
+
+  Future<void> _deleteRelationship(String relId) async {
+    try {
+      await _api.deleteRelationship(widget.agentId, relId);
+      _fetchRelationshipsData();
+      _showSnack('已删除关系');
+    } catch (e) {
+      _showSnack('删除失败: ${_errMsg(e)}');
+    }
+  }
+
+  Future<void> _fetchSkillPresets() async {
+    try {
+      final skills = await _api.listSkills();
+      if (!mounted) return;
+      setState(() => _skillPresets = skills);
+    } catch (_) {}
+  }
+
+  Future<void> _importSkillPreset(String skillId) async {
+    try {
+      await _api.importSkill(widget.agentId, skillId);
+      _fetchSkillsData();
+      _showSnack('技能已导入');
+    } catch (e) {
+      _showSnack('导入失败: ${_errMsg(e)}');
+    }
+  }
+
   Future<void> _fetchSettingsData() async {
     setState(() => _loadingSettings = true);
     try {
@@ -569,6 +641,60 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
   }
 
+  Widget _buildToolConfigFields(String toolId, Map<String, dynamic> schema) {
+    final fields = (schema['fields'] as List?) ?? [];
+    if (fields.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('配置', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        ...fields.map((f) {
+          final field = f as Map<String, dynamic>;
+          final key = field['name'] as String? ?? field['key'] as String? ?? '';
+          final label = field['label'] as String? ?? key;
+          final isPassword = field['type'] == 'password';
+          final ctrlKey = '${toolId}_$key';
+          _toolConfigControllers[ctrlKey] ??= TextEditingController(text: field['value']?.toString() ?? '');
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TextField(
+              controller: _toolConfigControllers[ctrlKey],
+              obscureText: isPassword,
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: label,
+                isDense: true,
+                hintText: field['placeholder'] as String?,
+              ),
+            ),
+          );
+        }),
+        Align(
+          alignment: Alignment.centerRight,
+          child: ElevatedButton(
+            onPressed: () async {
+              final config = <String, dynamic>{};
+              for (final f in fields) {
+                final field = f as Map<String, dynamic>;
+                final key = field['name'] as String? ?? field['key'] as String? ?? '';
+                final ctrlKey = '${toolId}_$key';
+                config[key] = _toolConfigControllers[ctrlKey]?.text ?? '';
+              }
+              try {
+                await _api.updateToolConfig(widget.agentId, toolId, config);
+                _showSnack('工具配置已保存');
+              } catch (e) {
+                _showSnack('保存失败: ${_errMsg(e)}');
+              }
+            },
+            child: const Text('保存配置'),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _saveSettings() async {
     setState(() => _savingSettings = true);
     try {
@@ -686,7 +812,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       final res = await _api.readFile(widget.agentId, 'memory/$name');
       if (!mounted) return;
-      _showContentDialog(name, res['content'] as String? ?? '(empty)');
+      _showContentDialog(name, res['content'] as String? ?? '(空)');
     } catch (e) {
       _showSnack('读取记忆文件失败: ${_errMsg(e)}');
     }
@@ -830,7 +956,457 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   Future<void> _uploadWorkspaceFile() async {
-    _showSnack('请使用 Web 版本上传文件');
+    // Use file_picker to select a file
+    try {
+      final result = await _pickFile();
+      if (result == null) return;
+      await _api.uploadFileBytes(
+        widget.agentId,
+        result['bytes'] as List<int>,
+        result['name'] as String,
+        path: _currentPath.isEmpty ? 'workspace' : 'workspace/$_currentPath',
+      );
+      _showSnack('文件已上传');
+      _fetchWorkspaceFiles(_currentPath);
+    } catch (e) {
+      _showSnack('上传失败: ${_errMsg(e)}');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _pickFile() async {
+    // Simple approach using file_picker isn't available, so use a name+content dialog for text files
+    // For now, show create file dialog
+    return _showCreateFileDialog();
+  }
+
+  Future<Map<String, dynamic>?> _showCreateFileDialog() async {
+    final nameCtrl = TextEditingController();
+    final contentCtrl = TextEditingController();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('新建文件', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                decoration: const InputDecoration(labelText: '文件名', hintText: 'example.md', isDense: true),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: contentCtrl,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
+                maxLines: 8,
+                decoration: const InputDecoration(labelText: '内容', isDense: true, alignLabelWithHint: true),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, {'name': nameCtrl.text.trim(), 'content': contentCtrl.text});
+            },
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+    contentCtrl.dispose();
+    return result;
+  }
+
+  Future<void> _createWorkspaceFile() async {
+    final result = await _showCreateFileDialog();
+    if (result == null) return;
+    try {
+      final path = _currentPath.isEmpty ? result['name'] : '$_currentPath/${result['name']}';
+      await _api.writeFile(widget.agentId, path, result['content'] as String);
+      _showSnack('文件已创建');
+      _fetchWorkspaceFiles(_currentPath);
+    } catch (e) {
+      _showSnack('创建文件失败: ${_errMsg(e)}');
+    }
+  }
+
+  Future<void> _createWorkspaceFolder() async {
+    final nameCtrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        title: const Text('新建文件夹', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: TextField(
+          controller: nameCtrl,
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          decoration: const InputDecoration(labelText: '文件夹名', isDense: true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, nameCtrl.text.trim());
+            },
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+    if (name == null) return;
+    try {
+      // Create folder by writing a placeholder .gitkeep file inside it
+      final path = _currentPath.isEmpty ? '$name/.gitkeep' : '$_currentPath/$name/.gitkeep';
+      await _api.writeFile(widget.agentId, path, '');
+      _showSnack('文件夹已创建');
+      _fetchWorkspaceFiles(_currentPath);
+    } catch (e) {
+      _showSnack('创建文件夹失败: ${_errMsg(e)}');
+    }
+  }
+
+  Future<void> _editWorkspaceFile() async {
+    if (_viewingFileContent == null || _viewingFileName == null) return;
+    final ctrl = TextEditingController(text: _viewingFileContent);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('编辑 $_viewingFileName', style: const TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: TextField(
+            controller: ctrl,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
+            maxLines: null,
+            expands: true,
+            textAlignVertical: TextAlignVertical.top,
+            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (saved != true) { ctrl.dispose(); return; }
+    try {
+      final path = _currentPath.isEmpty ? _viewingFileName! : '$_currentPath/$_viewingFileName';
+      await _api.writeFile(widget.agentId, path, ctrl.text);
+      setState(() => _viewingFileContent = ctrl.text);
+      _showSnack('文件已保存');
+    } catch (e) {
+      _showSnack('保存失败: ${_errMsg(e)}');
+    }
+    ctrl.dispose();
+  }
+
+  Future<void> _createSkillFile() async {
+    final nameCtrl = TextEditingController(text: 'new_skill.md');
+    final contentCtrl = TextEditingController(text: '# Skill: 新技能\n\n## 触发条件\n当用户请求...\n\n## 执行步骤\n1. ...\n2. ...\n\n## 注意事项\n- ...\n');
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('新建技能', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                decoration: const InputDecoration(labelText: '文件名', isDense: true),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 200,
+                child: TextField(
+                  controller: contentCtrl,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: const InputDecoration(labelText: '内容', isDense: true, alignLabelWithHint: true, border: OutlineInputBorder()),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, {'name': nameCtrl.text.trim(), 'content': contentCtrl.text});
+            },
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+    contentCtrl.dispose();
+    if (result == null) return;
+    try {
+      await _api.writeFile(widget.agentId, 'skills/${result['name']}', result['content'] as String);
+      _showSnack('技能已创建');
+      _fetchSkillsData();
+    } catch (e) {
+      _showSnack('创建技能失败: ${_errMsg(e)}');
+    }
+  }
+
+  Future<void> _editSkillFile() async {
+    if (_viewingSkillContent == null || _viewingSkillName == null) return;
+    final ctrl = TextEditingController(text: _viewingSkillContent);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('编辑 $_viewingSkillName', style: const TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: TextField(
+            controller: ctrl,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+            maxLines: null,
+            expands: true,
+            textAlignVertical: TextAlignVertical.top,
+            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (saved != true) { ctrl.dispose(); return; }
+    try {
+      await _api.writeFile(widget.agentId, 'skills/$_viewingSkillName', ctrl.text);
+      setState(() => _viewingSkillContent = ctrl.text);
+      _showSnack('技能已保存');
+    } catch (e) {
+      _showSnack('保存失败: ${_errMsg(e)}');
+    }
+    ctrl.dispose();
+  }
+
+  Future<void> _showAddHumanRelationship() async {
+    final searchCtrl = TextEditingController();
+    String relType = 'collaborator';
+    final descCtrl = TextEditingController();
+    List<dynamic> searchResults = [];
+    Map<String, dynamic>? selectedMember;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.bgElevated,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text('添加人类关系', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: searchCtrl,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: const InputDecoration(labelText: '搜索成员', isDense: true, prefixIcon: Icon(Icons.search, size: 18)),
+                  onChanged: (val) async {
+                    if (val.length < 2) return;
+                    try {
+                      final members = await _api.listOrgMembers(search: val);
+                      setDialogState(() => searchResults = members);
+                    } catch (_) {}
+                  },
+                ),
+                if (searchResults.isNotEmpty)
+                  SizedBox(
+                    height: 120,
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: searchResults.map((m) {
+                        final member = m as Map<String, dynamic>;
+                        final name = member['display_name'] as String? ?? member['username'] as String? ?? '';
+                        final isSelected = selectedMember?['id'] == member['id'];
+                        return ListTile(
+                          dense: true,
+                          selected: isSelected,
+                          selectedTileColor: AppColors.accentPrimary.withValues(alpha: 0.1),
+                          title: Text(name, style: const TextStyle(fontSize: 13)),
+                          onTap: () => setDialogState(() { selectedMember = member; searchCtrl.text = name; searchResults = []; }),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: relType,
+                  decoration: const InputDecoration(labelText: '关系类型', isDense: true),
+                  dropdownColor: AppColors.bgElevated,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  items: const [
+                    DropdownMenuItem(value: 'direct_leader', child: Text('直属上级')),
+                    DropdownMenuItem(value: 'collaborator', child: Text('协作者')),
+                    DropdownMenuItem(value: 'stakeholder', child: Text('利益相关者')),
+                    DropdownMenuItem(value: 'team_member', child: Text('团队成员')),
+                    DropdownMenuItem(value: 'subordinate', child: Text('下属')),
+                    DropdownMenuItem(value: 'mentor', child: Text('导师')),
+                    DropdownMenuItem(value: 'other', child: Text('其他')),
+                  ],
+                  onChanged: (v) { if (v != null) setDialogState(() => relType = v); },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: const InputDecoration(labelText: '描述 (可选)', isDense: true),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            ElevatedButton(
+              onPressed: selectedMember == null ? null : () async {
+                try {
+                  await _api.updateRelationships(widget.agentId, [
+                    ..._humanRelationships,
+                    {
+                      'user_id': selectedMember!['id'],
+                      'relation_type': relType,
+                      'description': descCtrl.text.trim(),
+                    },
+                  ]);
+                  Navigator.pop(ctx);
+                  _fetchRelationshipsData();
+                  _showSnack('关系已添加');
+                } catch (e) {
+                  _showSnack('添加失败: ${_errMsg(e)}');
+                }
+              },
+              child: const Text('添加'),
+            ),
+          ],
+        ),
+      ),
+    );
+    searchCtrl.dispose();
+    descCtrl.dispose();
+  }
+
+  Future<void> _showAddAgentRelationship() async {
+    String? selectedAgentId;
+    String relType = 'collaborator';
+    final descCtrl = TextEditingController();
+    // Filter out current agent
+    final otherAgents = _allAgentsList.where((a) {
+      final ag = a as Map<String, dynamic>;
+      return ag['id']?.toString() != widget.agentId;
+    }).toList();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.bgElevated,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text('添加 Agent 关系', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedAgentId,
+                  decoration: const InputDecoration(labelText: '选择 Agent', isDense: true),
+                  dropdownColor: AppColors.bgElevated,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  isExpanded: true,
+                  items: otherAgents.map((a) {
+                    final ag = a as Map<String, dynamic>;
+                    return DropdownMenuItem(
+                      value: ag['id']?.toString(),
+                      child: Text(ag['name'] as String? ?? '未知', overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setDialogState(() => selectedAgentId = v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: relType,
+                  decoration: const InputDecoration(labelText: '关系类型', isDense: true),
+                  dropdownColor: AppColors.bgElevated,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  items: const [
+                    DropdownMenuItem(value: 'peer', child: Text('同级')),
+                    DropdownMenuItem(value: 'supervisor', child: Text('上级')),
+                    DropdownMenuItem(value: 'assistant', child: Text('助手')),
+                    DropdownMenuItem(value: 'collaborator', child: Text('协作者')),
+                    DropdownMenuItem(value: 'other', child: Text('其他')),
+                  ],
+                  onChanged: (v) { if (v != null) setDialogState(() => relType = v); },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: const InputDecoration(labelText: '描述 (可选)', isDense: true),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            ElevatedButton(
+              onPressed: selectedAgentId == null ? null : () async {
+                try {
+                  await _api.updateRelationships(widget.agentId, [
+                    ..._agentRelationships,
+                    {
+                      'target_agent_id': selectedAgentId,
+                      'relation_type': relType,
+                      'description': descCtrl.text.trim(),
+                    },
+                  ]);
+                  Navigator.pop(ctx);
+                  _fetchRelationshipsData();
+                  _showSnack('关系已添加');
+                } catch (e) {
+                  _showSnack('添加失败: ${_errMsg(e)}');
+                }
+              },
+              child: const Text('添加'),
+            ),
+          ],
+        ),
+      ),
+    );
+    descCtrl.dispose();
   }
 
   void _showExpiryEditor() {
@@ -912,6 +1488,43 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   // ─── Helpers ─────────────────────────────────────────────
+
+  static const _segmentLabelMap = {
+    'all': '全部',
+    'pending': '待处理',
+    'running': '进行中',
+    'completed': '已完成',
+    'failed': '失败',
+    'agenda': '日程',
+    'triggers': '触发器',
+    'monologue': '独白',
+    'history': '历史',
+    'user': '用户',
+    'system': '系统',
+    'error': '错误',
+  };
+
+  String _segmentLabel(String key) {
+    return _segmentLabelMap[key] ?? (key[0].toUpperCase() + key.substring(1));
+  }
+
+  String _taskStatusLabel(String status) {
+    switch (status) {
+      case 'completed':
+      case 'done':
+        return '已完成';
+      case 'running':
+      case 'in_progress':
+        return '进行中';
+      case 'failed':
+      case 'error':
+        return '失败';
+      case 'pending':
+        return '待处理';
+      default:
+        return status;
+    }
+  }
 
   void _showSnack(String msg) {
     if (!mounted) return;
@@ -1245,6 +1858,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           _buildMindTab(),
           _buildToolsTab(),
           _buildSkillsTab(),
+          _buildRelationshipsTab(),
           _buildWorkspaceTab(),
           _buildActivityTab(),
           _buildSettingsTab(agent),
@@ -1320,15 +1934,19 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
   Widget _buildOverviewTab(Map<String, dynamic> agent) {
     final status = agent['status'] as String? ?? 'stopped';
-    final model = agent['model'] as String? ?? 'default';
+    final model = agent['model'] as String? ?? '默认';
     final createdAt = agent['created_at'];
     final updatedAt = agent['updated_at'];
-    final tokensUsed = (_metrics?['tokens_used'] ?? 0) as num;
-    final tokensLimit = (_metrics?['tokens_limit'] ?? 100000) as num;
-    final messagesCount = (_metrics?['messages_count'] ?? 0) as num;
-    final tasksCompleted = (_metrics?['tasks_completed'] ?? 0) as num;
-    final dailyTokens = (_metrics?['daily_tokens_used'] ?? 0) as num;
-    final dailyLimit = (_metrics?['daily_token_limit'] ?? 0) as num;
+    final tokens = (_metrics?['tokens'] as Map<String, dynamic>?) ?? {};
+    final tasks = (_metrics?['tasks'] as Map<String, dynamic>?) ?? {};
+    final activity = (_metrics?['activity'] as Map<String, dynamic>?) ?? {};
+    final tokensUsed = (tokens['used_month'] ?? 0) as num;
+    final tokensLimit = (tokens['limit_month'] ?? 0) as num;
+    final dailyTokens = (tokens['used_today'] ?? 0) as num;
+    final dailyLimit = (tokens['limit_day'] ?? 0) as num;
+    final tasksCompleted = (tasks['done'] ?? 0) as num;
+    final tasksTotal = (tasks['total'] ?? 0) as num;
+    final actionsLast24h = (activity['actions_last_24h'] ?? 0) as num;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -1471,16 +2089,18 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               children: [
                 const _SectionHeader(icon: Icons.analytics, label: '数据统计'),
                 const SizedBox(height: 16),
-                _tokenBar('Token 用量', tokensUsed.toDouble(), tokensLimit.toDouble()),
+                _tokenBar('月度 Token', tokensUsed.toDouble(), tokensLimit > 0 ? tokensLimit.toDouble() : 100000),
                 const SizedBox(height: 12),
                 if (dailyLimit > 0)
                   _tokenBar('每日 Token', dailyTokens.toDouble(), dailyLimit.toDouble()),
                 if (dailyLimit > 0) const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: _metricTile('消息数', messagesCount.toString(), Icons.message)),
+                    Expanded(child: _metricTile('总任务', tasksTotal.toString(), Icons.assignment)),
                     const SizedBox(width: 12),
-                    Expanded(child: _metricTile('已完成任务', tasksCompleted.toString(), Icons.check_circle)),
+                    Expanded(child: _metricTile('已完成', tasksCompleted.toString(), Icons.check_circle)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _metricTile('24h操作', actionsLast24h.toString(), Icons.trending_up)),
                   ],
                 ),
               ],
@@ -1733,14 +2353,14 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     value: _taskPriority,
-                    decoration: const InputDecoration(labelText: 'Priority'),
+                    decoration: const InputDecoration(labelText: '优先级'),
                     dropdownColor: AppColors.bgElevated,
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                     items: const [
-                      DropdownMenuItem(value: 'low', child: Text('Low')),
-                      DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                      DropdownMenuItem(value: 'high', child: Text('High')),
-                      DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+                      DropdownMenuItem(value: 'low', child: Text('低')),
+                      DropdownMenuItem(value: 'medium', child: Text('中')),
+                      DropdownMenuItem(value: 'high', child: Text('高')),
+                      DropdownMenuItem(value: 'urgent', child: Text('紧急')),
                     ],
                     onChanged: (v) {
                       if (v != null) setState(() => _taskPriority = v);
@@ -1757,7 +2377,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: _creatingTask ? null : _createTask,
-                        child: _creatingTask ? _miniSpinner() : const Text('Create'),
+                        child: _creatingTask ? _miniSpinner() : const Text('创建'),
                       ),
                     ],
                   ),
@@ -1853,7 +2473,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 const SizedBox(height: 6),
                 ..._schedules.map((s) {
                   final sched = s as Map<String, dynamic>;
-                  final name = sched['name'] as String? ?? sched['cron'] as String? ?? 'Schedule';
+                  final name = sched['name'] as String? ?? sched['cron'] as String? ?? '计划';
                   final id = sched['id']?.toString() ?? '';
                   final enabled = sched['enabled'] == true || sched['is_active'] == true;
                   final nextFire = sched['next_fire_time'] ?? sched['next_run_at'];
@@ -1926,7 +2546,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   Widget _buildTaskItem(Map<String, dynamic> task) {
-    final title = task['title'] as String? ?? 'Untitled';
+    final title = task['title'] as String? ?? '无标题';
     final desc = task['description'] as String? ?? '';
     final status = task['status'] as String? ?? 'pending';
     final priority = task['priority'] as String? ?? 'medium';
@@ -1981,7 +2601,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             Row(
               children: [
                 Text(
-                  'Priority: ${priority[0].toUpperCase()}${priority.substring(1)}',
+                  '优先级: ${priority[0].toUpperCase()}${priority.substring(1)}',
                   style: TextStyle(color: _priorityColor(priority), fontSize: 11),
                 ),
                 const Spacer(),
@@ -2012,7 +2632,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             // Expanded task logs
             if (isExpanded && _taskLogs.isNotEmpty) ...[
               const Divider(height: 16, color: AppColors.borderSubtle),
-              const Text('Task Logs', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+              const Text('任务日志', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               ..._taskLogs.take(10).map((l) {
                 final log = l as Map<String, dynamic>;
@@ -2066,7 +2686,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Text(status, style: TextStyle(color: fg, fontSize: 10, fontWeight: FontWeight.w500)),
+      child: Text(_taskStatusLabel(status), style: TextStyle(color: fg, fontSize: 10, fontWeight: FontWeight.w500)),
     );
   }
 
@@ -2112,7 +2732,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         return _buildPulseContent(
           icon: Icons.calendar_today,
           iconColor: AppColors.accentPrimary,
-          title: 'Agenda',
+          title: '日程',
           content: _agendaContent,
           emptyMsg: '未找到日程文件。',
         );
@@ -2122,7 +2742,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         return _buildPulseContent(
           icon: Icons.psychology,
           iconColor: AppColors.accentPrimary,
-          title: 'Monologue',
+          title: '内心独白',
           content: _monologueContent,
           emptyMsg: '暂无内心独白内容。',
         );
@@ -2130,7 +2750,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         return _buildPulseContent(
           icon: Icons.history,
           iconColor: AppColors.warning,
-          title: 'Task History',
+          title: '任务历史',
           content: _taskHistoryContent,
           emptyMsg: '暂无任务历史。',
         );
@@ -2194,7 +2814,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               children: [
                 Icon(Icons.bolt, color: AppColors.warning, size: 18),
                 SizedBox(width: 8),
-                Text('Triggers', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                Text('触发器', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 12),
@@ -2305,7 +2925,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     maxLines: 15,
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
                     decoration: const InputDecoration(
-                      hintText: 'Define the agent\'s personality and core behavior...',
+                      hintText: '定义 Agent 的性格和核心行为...',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -2334,19 +2954,15 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ),
           const SizedBox(height: 16),
 
-          // Heartbeat
+          // Heartbeat (file only — settings controls are in Settings tab)
           _card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.favorite_outline, color: AppColors.error, size: 18),
-                    SizedBox(width: 8),
-                    Text('heartbeat.md', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                const _SectionHeader(icon: Icons.favorite_outline, label: '心跳指令'),
+                const SizedBox(height: 12),
+                const Text('heartbeat.md', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                const SizedBox(height: 4),
                 _codeBlock(_heartbeatContent, '未找到 heartbeat.md 文件。'),
               ],
             ),
@@ -2358,7 +2974,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(icon: Icons.memory, label: 'Memory Files'),
+                const _SectionHeader(icon: Icons.memory, label: '记忆文件'),
                 const SizedBox(height: 12),
                 if (_memoryFiles.isEmpty)
                   const Text(
@@ -2389,7 +3005,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                             if (modified != null)
                               Text(_fmtRelative(modified), style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
                             const SizedBox(width: 8),
-                            Text('$size B', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                            Text('$size 字节', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -2438,15 +3054,18 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
           // Platform Tools
           if (_platformTools.isNotEmpty) ...[
-            const Text('Platform Tools', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+            const Text('平台工具', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             ..._platformTools.map((t) {
               final tool = t as Map<String, dynamic>;
               final id = tool['id']?.toString() ?? '';
-              final name = tool['name'] as String? ?? 'Unknown';
+              final name = tool['name'] as String? ?? '未知';
               final description = tool['description'] as String? ?? '';
               final category = tool['category'] as String? ?? '';
               final enabled = agentToolMap[id] ?? false;
+              final configSchema = tool['config_schema'] as Map<String, dynamic>?;
+              final hasConfig = configSchema != null && (configSchema['fields'] as List?)?.isNotEmpty == true;
+              final isExpanded = _expandedToolId == id;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
@@ -2455,43 +3074,57 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppColors.borderSubtle),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Flexible(
-                                child: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
-                              ),
-                              if (category.isNotEmpty) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgTertiary,
-                                    borderRadius: BorderRadius.circular(4),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
                                   ),
-                                  child: Text(category, style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                                  if (category.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.bgTertiary,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(category, style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              if (description.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(description, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
                                 ),
-                              ],
                             ],
                           ),
-                          if (description.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(description, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                            ),
-                        ],
-                      ),
+                        ),
+                        if (hasConfig)
+                          IconButton(
+                            icon: Icon(isExpanded ? Icons.expand_less : Icons.settings, color: AppColors.textSecondary, size: 18),
+                            onPressed: () => setState(() => _expandedToolId = isExpanded ? null : id),
+                          ),
+                        Switch(
+                          value: enabled,
+                          onChanged: (v) => _toggleTool(id, v),
+                          activeColor: AppColors.accentPrimary,
+                        ),
+                      ],
                     ),
-                    Switch(
-                      value: enabled,
-                      onChanged: (v) => _toggleTool(id, v),
-                      activeColor: AppColors.accentPrimary,
-                    ),
+                    if (isExpanded && hasConfig) ...[
+                      const Divider(height: 16),
+                      _buildToolConfigFields(id, configSchema),
+                    ],
                   ],
                 ),
               );
@@ -2499,16 +3132,16 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ],
 
           if (_platformTools.isEmpty && _agentTools.isEmpty)
-            _emptyState('No tools available', 'No platform tools or agent-installed tools found.'),
+            _emptyState('暂无工具', '未找到平台工具或 Agent 安装的工具。'),
 
           // Agent-installed Tools
           if (_agentTools.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('Agent-Installed Tools', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+            const Text('Agent 安装的工具', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             ..._agentTools.map((t) {
               final tool = t as Map<String, dynamic>;
-              final name = tool['name'] as String? ?? tool['tool_id']?.toString() ?? 'Unknown';
+              final name = tool['name'] as String? ?? tool['tool_id']?.toString() ?? '未知';
               final enabled = tool['enabled'] == true;
               final toolId = tool['tool_id']?.toString() ?? tool['id']?.toString() ?? '';
               return Container(
@@ -2570,9 +3203,14 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _viewingSkillName ?? 'Skill',
+                    _viewingSkillName ?? '技能',
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: AppColors.accentPrimary, size: 18),
+                  tooltip: '编辑',
+                  onPressed: _editSkillFile,
                 ),
               ],
             ),
@@ -2609,16 +3247,64 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const Icon(Icons.auto_fix_high, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('Skills', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+                child: Text('技能', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               IconButton(icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18), onPressed: _fetchSkillsData),
+              IconButton(
+                icon: const Icon(Icons.add, color: AppColors.accentPrimary, size: 18),
+                tooltip: '新建技能',
+                onPressed: _createSkillFile,
+              ),
+              IconButton(
+                icon: const Icon(Icons.download, color: AppColors.accentPrimary, size: 18),
+                tooltip: '导入预设技能',
+                onPressed: () async {
+                  await _fetchSkillPresets();
+                  if (!mounted) return;
+                  setState(() => _showSkillPresets = !_showSkillPresets);
+                },
+              ),
             ],
           ),
         ),
         const SizedBox(height: 8),
+        // Skill presets panel
+        if (_showSkillPresets && _skillPresets.isNotEmpty) ...[
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.bgSecondary,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.accentPrimary.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('预设技能', style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _skillPresets.map((s) {
+                    final skill = s as Map<String, dynamic>;
+                    final id = skill['id']?.toString() ?? '';
+                    final name = skill['name'] as String? ?? '未知';
+                    return ActionChip(
+                      avatar: const Icon(Icons.add, size: 14),
+                      label: Text(name, style: const TextStyle(fontSize: 12)),
+                      onPressed: () => _importSkillPreset(id),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         Expanded(
           child: _skillFiles.isEmpty
-              ? _emptyState('No skills', 'No skill files found for this agent.')
+              ? _emptyState('暂无技能', '该 Agent 未找到技能文件。')
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: _skillFiles.length,
@@ -2637,7 +3323,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                         dense: true,
                         leading: const Icon(Icons.code, color: AppColors.accentPrimary, size: 20),
                         title: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
-                        subtitle: Text('$size bytes', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                        subtitle: Text('$size 字节', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -2661,7 +3347,182 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   // ═══════════════════════════════════════════════════════════
-  // TAB 7 : Workspace (file browser)
+  // TAB 7 : Relationships
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _buildRelationshipsTab() {
+    if (_loadingRelationships) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.people, color: AppColors.textSecondary, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('关系', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600))),
+              IconButton(icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18), onPressed: _fetchRelationshipsData),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Human relationships
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(icon: Icons.person, label: '人类关系'),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('添加', style: TextStyle(fontSize: 12)),
+                    onPressed: _showAddHumanRelationship,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (_humanRelationships.isEmpty)
+                  const Text('暂无人类关系配置。', style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic))
+                else
+                  ..._humanRelationships.map((r) {
+                    final rel = r as Map<String, dynamic>;
+                    final id = rel['id']?.toString() ?? '';
+                    final name = rel['user_name'] as String? ?? rel['name'] as String? ?? '未知';
+                    final type = rel['relation_type'] as String? ?? '';
+                    final desc = rel['description'] as String? ?? '';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgTertiary,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.borderSubtle),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.person, color: AppColors.accentPrimary, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
+                                if (type.isNotEmpty)
+                                  Text(_relationTypeLabel(type), style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                                if (desc.isNotEmpty)
+                                  Text(desc, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
+                            onPressed: () => _deleteRelationship(id),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Agent relationships
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(icon: Icons.smart_toy, label: 'Agent 关系'),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('添加', style: TextStyle(fontSize: 12)),
+                    onPressed: _showAddAgentRelationship,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (_agentRelationships.isEmpty)
+                  const Text('暂无 Agent 关系配置。', style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic))
+                else
+                  ..._agentRelationships.map((r) {
+                    final rel = r as Map<String, dynamic>;
+                    final id = rel['id']?.toString() ?? '';
+                    final name = rel['target_agent_name'] as String? ?? rel['name'] as String? ?? '未知';
+                    final type = rel['relation_type'] as String? ?? '';
+                    final desc = rel['description'] as String? ?? '';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgTertiary,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.borderSubtle),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.smart_toy, color: AppColors.warning, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
+                                if (type.isNotEmpty)
+                                  Text(_agentRelationTypeLabel(type), style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                                if (desc.isNotEmpty)
+                                  Text(desc, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
+                            onPressed: () => _deleteRelationship(id),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _relationTypeLabel(String type) {
+    const labels = {
+      'direct_leader': '直属上级',
+      'collaborator': '协作者',
+      'stakeholder': '利益相关者',
+      'team_member': '团队成员',
+      'subordinate': '下属',
+      'mentor': '导师',
+      'other': '其他',
+    };
+    return labels[type] ?? type;
+  }
+
+  String _agentRelationTypeLabel(String type) {
+    const labels = {
+      'peer': '同级',
+      'supervisor': '上级',
+      'assistant': '助手',
+      'collaborator': '协作者',
+      'other': '其他',
+    };
+    return labels[type] ?? type;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // TAB 8 : Workspace (file browser)
   // ═══════════════════════════════════════════════════════════
 
   // ═══════════════════════════════════════════════════════════
@@ -2687,9 +3548,14 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _viewingFileName ?? 'File',
+                    _viewingFileName ?? '文件',
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: AppColors.accentPrimary, size: 18),
+                  tooltip: '编辑',
+                  onPressed: _editWorkspaceFile,
                 ),
               ],
             ),
@@ -2728,24 +3594,34 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               if (_currentPath.isNotEmpty) ...[
                 InkWell(
                   onTap: () => _fetchWorkspaceFiles(),
-                  child: const Text('Root', style: TextStyle(color: AppColors.accentPrimary, fontSize: 13, decoration: TextDecoration.underline)),
+                  child: const Text('根目录', style: TextStyle(color: AppColors.accentPrimary, fontSize: 13, decoration: TextDecoration.underline)),
                 ),
                 const Text(' / ', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                 ..._buildBreadcrumbs(),
               ],
               if (_currentPath.isEmpty)
-                const Text('Workspace (root)', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                const Text('工作区 (根目录)', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
               const Spacer(),
               if (_currentPath.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.arrow_upward, color: AppColors.textSecondary, size: 18),
-                  tooltip: 'Go up',
+                  tooltip: '返回上级',
                   onPressed: () {
                     final parts = _currentPath.split('/');
                     parts.removeLast();
                     _fetchWorkspaceFiles(parts.join('/'));
                   },
                 ),
+              IconButton(
+                icon: const Icon(Icons.create_new_folder, color: AppColors.textSecondary, size: 18),
+                tooltip: '新建文件夹',
+                onPressed: _createWorkspaceFolder,
+              ),
+              IconButton(
+                icon: const Icon(Icons.note_add, color: AppColors.textSecondary, size: 18),
+                tooltip: '新建文件',
+                onPressed: _createWorkspaceFile,
+              ),
               IconButton(
                 icon: const Icon(Icons.upload_file, color: AppColors.textSecondary, size: 18),
                 tooltip: '上传文件',
@@ -2764,7 +3640,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           child: _loadingWorkspace
               ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
               : _workspaceFiles.isEmpty
-                  ? _emptyState('Empty directory', 'No files in this directory.')
+                  ? _emptyState('空目录', '该目录下没有文件。')
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       itemCount: _workspaceFiles.length,
@@ -2793,7 +3669,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                                 ? null
                                 : Row(
                                     children: [
-                                      Text('$size bytes', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                                      Text('$size 字节', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                                       if (modified != null) ...[
                                         const SizedBox(width: 12),
                                         Text(_fmtRelative(modified), style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
@@ -2879,7 +3755,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const Icon(Icons.history, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('Activity Log', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+                child: Text('活动日志', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               _segmentedControl(
                 options: const ['all', 'user', 'system', 'error'],
@@ -2901,7 +3777,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           child: _loadingActivity
               ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
               : _filteredActivities.isEmpty
-                  ? _emptyState('No activity', 'No activity has been recorded for this agent.')
+                  ? _emptyState('暂无活动', '该 Agent 尚未记录任何活动。')
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       itemCount: _filteredActivities.length,
@@ -3059,11 +3935,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(icon: Icons.settings, label: 'Model Configuration'),
+                const _SectionHeader(icon: Icons.settings, label: '模型配置'),
                 const SizedBox(height: 16),
-                _buildModelDropdown('Primary Model', _modelCtrl),
+                _buildModelDropdown('主模型', _modelCtrl),
                 const SizedBox(height: 12),
-                _buildModelDropdown('Fallback Model', _fallbackModelCtrl),
+                _buildModelDropdown('备用模型', _fallbackModelCtrl),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -3072,7 +3948,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                         controller: _maxTokensCtrl,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Max Tokens', hintText: '4096'),
+                        decoration: const InputDecoration(labelText: 'Token 上限', hintText: '4096'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -3081,7 +3957,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                         controller: _temperatureCtrl,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Temperature', hintText: '0.7'),
+                        decoration: const InputDecoration(labelText: '温度', hintText: '0.7'),
                       ),
                     ),
                   ],
@@ -3094,7 +3970,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                         controller: _contextWindowCtrl,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Context Window', hintText: '100'),
+                        decoration: const InputDecoration(labelText: '上下文窗口', hintText: '100'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -3103,13 +3979,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                         controller: _maxToolRoundsCtrl,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Max Tool Rounds', hintText: '50'),
+                        decoration: const InputDecoration(labelText: '最大工具轮次', hintText: '50'),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text('Token Limits', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                const Text('Token 限额', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -3118,7 +3994,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                         controller: _dailyTokenCtrl,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Daily Token Limit', hintText: 'Unlimited'),
+                        decoration: const InputDecoration(labelText: '每日 Token 限额', hintText: '不限'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -3127,7 +4003,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                         controller: _monthlyTokenCtrl,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Monthly Token Limit', hintText: 'Unlimited'),
+                        decoration: const InputDecoration(labelText: '每月 Token 限额', hintText: '不限'),
                       ),
                     ),
                   ],
@@ -3137,9 +4013,167 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   alignment: Alignment.centerRight,
                   child: ElevatedButton(
                     onPressed: _savingSettings ? null : _saveSettings,
-                    child: _savingSettings ? _miniSpinner() : const Text('Save Settings'),
+                    child: _savingSettings ? _miniSpinner() : const Text('保存设置'),
                   ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Autonomy Policy ──
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(icon: Icons.security, label: '自主权限策略'),
+                const SizedBox(height: 4),
+                const Text('控制 Agent 执行操作时的审批级别', style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                const SizedBox(height: 12),
+                ..._buildAutonomyPolicyRows(agent),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Heartbeat (Settings) ──
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.favorite_outline, color: AppColors.error, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('心跳', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                          SizedBox(height: 2),
+                          Text('定时巡检广场、执行工作，会消耗 Token', style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: agent['heartbeat_enabled'] == true,
+                      activeColor: AppColors.accentPrimary,
+                      onChanged: (v) async {
+                        await _api.updateAgent(widget.agentId, {'heartbeat_enabled': v});
+                        _fetchAgentSilent();
+                      },
+                    ),
+                  ],
+                ),
+                if (agent['heartbeat_enabled'] == true) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text('间隔', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 80,
+                        child: TextField(
+                          controller: TextEditingController(
+                            text: '${agent['heartbeat_interval_minutes'] ?? 120}',
+                          ),
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          ),
+                          onSubmitted: (val) async {
+                            final v = int.tryParse(val) ?? 120;
+                            final clamped = v < 1 ? 1 : v;
+                            await _api.updateAgent(widget.agentId, {'heartbeat_interval_minutes': clamped});
+                            _fetchAgentSilent();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('分钟', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text('活跃时段', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 140,
+                        child: TextField(
+                          controller: TextEditingController(
+                            text: agent['heartbeat_active_hours'] as String? ?? '09:00-18:00',
+                          ),
+                          style: const TextStyle(fontSize: 13),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            hintText: '09:00-18:00',
+                            hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+                          ),
+                          onSubmitted: (val) async {
+                            await _api.updateAgent(widget.agentId, {'heartbeat_active_hours': val.trim()});
+                            _fetchAgentSilent();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (agent['last_heartbeat_at'] != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '上次心跳: ${_formatDateTime(agent['last_heartbeat_at'] as String)}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Access Permissions ──
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(icon: Icons.lock_outline, label: '访问权限'),
+                const SizedBox(height: 12),
+                const Text('作用范围', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _radioOption('company', '公司', agent['scope_type'] as String? ?? 'company', (v) async {
+                      await _api.updateAgent(widget.agentId, {'scope_type': v});
+                      _fetchAgentSilent();
+                    }),
+                    const SizedBox(width: 16),
+                    _radioOption('user', '个人', agent['scope_type'] as String? ?? 'company', (v) async {
+                      await _api.updateAgent(widget.agentId, {'scope_type': v});
+                      _fetchAgentSilent();
+                    }),
+                  ],
+                ),
+                if ((agent['scope_type'] as String? ?? 'company') == 'company') ...[
+                  const SizedBox(height: 16),
+                  const Text('访问级别', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _radioOption('use', '使用', agent['access_level'] as String? ?? 'manage', (v) async {
+                        await _api.updateAgent(widget.agentId, {'access_level': v});
+                        _fetchAgentSilent();
+                      }),
+                      const SizedBox(width: 16),
+                      _radioOption('manage', '管理', agent['access_level'] as String? ?? 'manage', (v) async {
+                        await _api.updateAgent(widget.agentId, {'access_level': v});
+                        _fetchAgentSilent();
+                      }),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -3155,7 +4189,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     const Icon(Icons.wifi_tethering, color: AppColors.textSecondary, size: 18),
                     const SizedBox(width: 8),
                     const Expanded(
-                      child: Text('Channel Configuration', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                      child: Text('通道配置', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                     IconButton(icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18), onPressed: _fetchSettingsData),
                   ],
@@ -3188,8 +4222,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     TextField(
                       controller: _channelTokenCtrl,
                       style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                      obscureText: true,
-                      decoration: const InputDecoration(labelText: 'App ID', isDense: true),
+                      decoration: const InputDecoration(labelText: 'App ID', isDense: true, hintText: 'cli_xxx...'),
                     ),
                     const SizedBox(height: 8),
                     TextField(
@@ -3198,7 +4231,34 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       obscureText: true,
                       decoration: const InputDecoration(labelText: 'App Secret', isDense: true),
                     ),
-                  ] else ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _channelEncryptKeyCtrl,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'Encrypt Key (可选)', isDense: true),
+                    ),
+                  ] else if (_newChannelType == 'slack') ...[
+                    TextField(
+                      controller: _channelTokenCtrl,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'Bot Token', isDense: true, hintText: 'xoxb-...'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _channelSecretCtrl,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'Signing Secret', isDense: true),
+                    ),
+                  ] else if (_newChannelType == 'discord') ...[
+                    TextField(
+                      controller: _channelIdCtrl,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      decoration: const InputDecoration(labelText: 'Application ID', isDense: true),
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: _channelTokenCtrl,
                       style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
@@ -3207,9 +4267,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     ),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: _channelIdCtrl,
+                      controller: _channelPublicKeyCtrl,
                       style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                      decoration: const InputDecoration(labelText: 'Channel ID', isDense: true),
+                      decoration: const InputDecoration(labelText: 'Public Key', isDense: true),
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -3222,11 +4282,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     ],
                   ),
                 ] else ...[
-                  _settingRow('Type', _channelConfig?['type']?.toString() ?? '-'),
-                  _settingRow('Status', _channelConfig?['status']?.toString() ?? '-'),
+                  _settingRow('类型', _channelConfig?['type']?.toString() ?? '-'),
+                  _settingRow('状态', _channelConfig?['status']?.toString() ?? '-'),
                   _settingRow('Webhook URL', _channelConfig?['webhook_url']?.toString() ?? '-'),
                   if (_channelConfig?['bot_name'] != null)
-                    _settingRow('Bot Name', _channelConfig?['bot_name']?.toString() ?? '-'),
+                    _settingRow('机器人名称', _channelConfig?['bot_name']?.toString() ?? '-'),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -3267,12 +4327,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   children: [
                     Icon(Icons.warning, color: AppColors.error, size: 18),
                     SizedBox(width: 8),
-                    Text('Danger Zone', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text('危险操作', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Once you delete an agent, there is no going back. Please be certain.',
+                  'Agent 一旦删除将无法恢复，请谨慎操作。',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
@@ -3286,12 +4346,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 else
                   Row(
                     children: [
-                      const Text('Are you sure?', style: TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w500)),
+                      const Text('确定要删除吗？', style: TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w500)),
                       const SizedBox(width: 12),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
                         onPressed: _deleteAgent,
-                        child: const Text('Yes, Delete'),
+                        child: const Text('确认删除'),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton(
@@ -3424,6 +4484,77 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     );
   }
 
+  String _formatDateTime(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    return DateFormat('yyyy-MM-dd HH:mm').format(dt.toLocal());
+  }
+
+  List<Widget> _buildAutonomyPolicyRows(Map<String, dynamic> agent) {
+    final policy = (agent['autonomy_policy'] as Map<String, dynamic>?) ?? {};
+    const fields = [
+      {'key': 'read_files', 'label': '读取文件'},
+      {'key': 'write_workspace_files', 'label': '写入工作区文件'},
+      {'key': 'delete_files', 'label': '删除文件'},
+      {'key': 'send_feishu_message', 'label': '发送消息'},
+      {'key': 'web_search', 'label': '网络搜索'},
+      {'key': 'manage_tasks', 'label': '管理任务'},
+    ];
+    const levelLabels = {'L1': '自动', 'L2': '通知', 'L3': '审批'};
+    return fields.map((f) {
+      final key = f['key']!;
+      final label = f['label']!;
+      final current = (policy[key] as String?) ?? 'L1';
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Expanded(flex: 3, child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+            Expanded(
+              flex: 4,
+              child: DropdownButtonFormField<String>(
+                value: current,
+                isDense: true,
+                decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6)),
+                dropdownColor: AppColors.bgElevated,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+                items: levelLabels.entries.map((e) => DropdownMenuItem(value: e.key, child: Text('${e.key} ${e.value}'))).toList(),
+                onChanged: (v) async {
+                  if (v == null) return;
+                  final updated = Map<String, dynamic>.from(policy);
+                  updated[key] = v;
+                  await _api.updateAgent(widget.agentId, {'autonomy_policy': updated});
+                  _fetchAgentSilent();
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _radioOption(String value, String label, String groupValue, ValueChanged<String> onChanged) {
+    return InkWell(
+      onTap: () => onChanged(value),
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Radio<String>(
+            value: value,
+            groupValue: groupValue,
+            activeColor: AppColors.accentPrimary,
+            onChanged: (v) { if (v != null) onChanged(v); },
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
+          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+        ],
+      ),
+    );
+  }
+
   Widget _miniSpinner() {
     return const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white));
   }
@@ -3461,7 +4592,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  opt[0].toUpperCase() + opt.substring(1),
+                  _segmentLabel(opt),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,

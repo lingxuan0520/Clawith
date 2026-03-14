@@ -19,7 +19,6 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
   List<Map<String, dynamic>> _posts = [];
   Map<String, dynamic>? _stats;
   List<Map<String, dynamic>> _agents = [];
-  List<Map<String, dynamic>> _allActivities = [];
   bool _loading = true;
   final _postCtl = TextEditingController();
   String? _expandedPostId;
@@ -30,6 +29,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
   @override
   void initState() {
     super.initState();
+    _postCtl.addListener(() => setState(() {}));
     _loadData();
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!AppLifecycle.instance.isActive) return;
@@ -43,30 +43,11 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
       final stats = await ApiService.instance.getPlazaStats();
       final agents = (await ApiService.instance.listAgents()).cast<Map<String, dynamic>>();
 
-      // Load activity from all agents (for timeline)
-      final allActs = <Map<String, dynamic>>[];
-      await Future.wait(agents.map((a) async {
-        final id = a['id'] as String;
-        final name = a['name'] as String? ?? 'Agent';
-        try {
-          final acts = await ApiService.instance.listActivity(id, limit: 10);
-          for (final act in acts) {
-            allActs.add({...act as Map<String, dynamic>, 'agent_id': id, 'agent_name': name});
-          }
-        } catch (_) {}
-      }));
-      allActs.sort((a, b) {
-        final aTime = DateTime.tryParse(a['created_at'] as String? ?? '') ?? DateTime(2000);
-        final bTime = DateTime.tryParse(b['created_at'] as String? ?? '') ?? DateTime(2000);
-        return bTime.compareTo(aTime);
-      });
-
       if (mounted) {
         setState(() {
           _posts = posts;
           _stats = stats;
           _agents = agents;
-          _allActivities = allActs.take(30).toList();
           _loading = false;
         });
       }
@@ -145,6 +126,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
     final trendingTags = tagMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -159,12 +141,6 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Activity Timeline
-          if (_allActivities.isNotEmpty) ...[
-            _buildActivityTimeline(),
-            const SizedBox(height: 24),
-          ],
 
           // Stats
           if (_stats != null) _buildStats(),
@@ -198,106 +174,6 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
         ],
       ),
     );
-  }
-
-  Widget _buildActivityTimeline() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.borderSubtle),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-            child: Row(
-              children: [
-                const Icon(Icons.timeline, size: 16, color: AppColors.textSecondary),
-                const SizedBox(width: 6),
-                const Text('Agent 动态', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                const Spacer(),
-                Text('最近 ${_allActivities.length} 条', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-              ],
-            ),
-          ),
-          const Divider(height: 20),
-          ..._allActivities.take(8).map((act) {
-            final agentName = act['agent_name'] as String? ?? 'Agent';
-            final type = act['type'] as String? ?? '';
-            final summary = act['summary'] as String? ?? act['detail'] as String? ?? '';
-            final createdAt = act['created_at'] as String?;
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 8, height: 8,
-                    margin: const EdgeInsets.only(top: 5),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _activityColor(type),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(text: agentName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                              TextSpan(text: ' · ${_activityLabel(type)}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                            ],
-                          ),
-                        ),
-                        if (summary.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(summary, maxLines: 2, overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (createdAt != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Text(_timeAgo(createdAt), style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                    ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Color _activityColor(String type) {
-    switch (type) {
-      case 'start': case 'started': return AppColors.success;
-      case 'stop': case 'stopped': return AppColors.warning;
-      case 'tool_call': return AppColors.accentPrimary;
-      case 'error': return AppColors.error;
-      case 'task_complete': return AppColors.success;
-      default: return AppColors.textTertiary;
-    }
-  }
-
-  String _activityLabel(String type) {
-    switch (type) {
-      case 'start': case 'started': return '已启动';
-      case 'stop': case 'stopped': return '已停止';
-      case 'tool_call': return '工具调用';
-      case 'error': return '错误';
-      case 'chat': return '对话';
-      case 'task_complete': return '任务完成';
-      case 'heartbeat': return '心跳';
-      default: return type;
-    }
   }
 
   Widget _buildFeed(AuthState auth) {

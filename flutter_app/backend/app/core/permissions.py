@@ -27,11 +27,7 @@ async def check_agent_access(db: AsyncSession, user: User, agent_id: uuid.UUID) 
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    # Platform admins can access everything with manage
-    if user.role == "platform_admin":
-        return agent, "manage"
-
-    # Creator always has manage access
+    # Creator always has manage access (2C model: user only manages their own agents)
     if agent.creator_id == user.id:
         return agent, "manage"
 
@@ -53,7 +49,7 @@ async def check_agent_access(db: AsyncSession, user: User, agent_id: uuid.UUID) 
 
 def is_agent_creator(user: User, agent: Agent) -> bool:
     """Check if the user is the creator (admin) of the agent."""
-    return agent.creator_id == user.id or user.role == "platform_admin"
+    return agent.creator_id == user.id
 
 
 def is_agent_expired(agent: Agent) -> bool:

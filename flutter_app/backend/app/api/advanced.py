@@ -267,11 +267,11 @@ async def get_agent_metrics(
             "limit_month": agent.max_tokens_per_month,
         },
         "tasks": {
-            "total": total_tasks.scalar() or 0,
-            "done": done_tasks.scalar() or 0,
+            "total": (t := total_tasks.scalar() or 0),
+            "done": (d := done_tasks.scalar() or 0),
             "pending": pending_tasks.scalar() or 0,
             "completion_rate": round(
-                (done_tasks.scalar() or 0) / max(total_tasks.scalar() or 1, 1) * 100, 1
+                d / max(t, 1) * 100, 1
             ),
         },
         "approvals": {

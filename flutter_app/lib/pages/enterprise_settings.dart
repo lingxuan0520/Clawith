@@ -1824,10 +1824,10 @@ class _ToolsTabState extends State<_ToolsTab>
                   style: const TextStyle(
                       fontSize: 13, color: AppColors.textPrimary),
                   decoration:
-                      const InputDecoration(hintText: 'My MCP Server'),
+                      const InputDecoration(hintText: '我的 MCP 服务器'),
                 ),
                 const SizedBox(height: 10),
-                const Text('MCP Server URL',
+                const Text('MCP 服务器地址',
                     style: TextStyle(
                         fontSize: 12, color: AppColors.textSecondary)),
                 const SizedBox(height: 4),
@@ -1846,7 +1846,7 @@ class _ToolsTabState extends State<_ToolsTab>
                           ? null
                           : _testMcpConnection,
                       child: Text(
-                          _mcpTesting ? 'Testing...' : 'Test Connection'),
+                          _mcpTesting ? '测试中...' : '测试连接'),
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton(
@@ -1854,7 +1854,7 @@ class _ToolsTabState extends State<_ToolsTab>
                         _showAddMCP = false;
                         _mcpTestResult = null;
                       }),
-                      child: const Text('Cancel'),
+                      child: const Text('取消'),
                     ),
                   ],
                 ),
@@ -1878,7 +1878,7 @@ class _ToolsTabState extends State<_ToolsTab>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Connected! Found ${(_mcpTestResult!['tools'] as List?)?.length ?? 0} tools',
+                                '连接成功！发现 ${(_mcpTestResult!['tools'] as List?)?.length ?? 0} 个工具',
                                 style: const TextStyle(
                                     color: AppColors.success,
                                     fontWeight: FontWeight.w600,
@@ -1933,7 +1933,7 @@ class _ToolsTabState extends State<_ToolsTab>
                                           textStyle:
                                               const TextStyle(fontSize: 11),
                                         ),
-                                        child: const Text('Import'),
+                                        child: const Text('导入'),
                                       ),
                                     ],
                                   ),
@@ -1942,7 +1942,7 @@ class _ToolsTabState extends State<_ToolsTab>
                             ],
                           )
                         : Text(
-                            'Connection failed: ${_mcpTestResult!['error'] ?? 'Unknown error'}',
+                            '连接失败: ${_mcpTestResult!['error'] ?? '未知错误'}',
                             style: const TextStyle(
                                 color: AppColors.error, fontSize: 13),
                           ),
@@ -1959,7 +1959,7 @@ class _ToolsTabState extends State<_ToolsTab>
           const Center(
             child: Padding(
               padding: EdgeInsets.all(40),
-              child: Text('No tools available',
+              child: Text('暂无可用工具',
                   style:
                       TextStyle(color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -2014,7 +2014,7 @@ class _ToolsTabState extends State<_ToolsTab>
                       ),
                       const SizedBox(width: 6),
                       _buildBadge(
-                        isMcp ? 'MCP' : 'Built-in',
+                        isMcp ? 'MCP' : '内置',
                         isMcp
                             ? AppColors.accentPrimary
                             : AppColors.bgTertiary,
@@ -2024,7 +2024,7 @@ class _ToolsTabState extends State<_ToolsTab>
                       ),
                       if (isDefault) ...[
                         const SizedBox(width: 4),
-                        _buildBadge('Default', AppColors.success,
+                        _buildBadge('默认', AppColors.success,
                             textColor: Colors.white),
                       ],
                     ],
@@ -2051,7 +2051,7 @@ class _ToolsTabState extends State<_ToolsTab>
                     size: 16, color: AppColors.error),
                 onPressed: () =>
                     _deleteTool(tool['id'] as String, displayName),
-                tooltip: 'Delete',
+                tooltip: '删除',
                 visualDensity: VisualDensity.compact,
               ),
             const SizedBox(width: 4),
@@ -2152,15 +2152,15 @@ class _SkillsTabState extends State<_SkillsTab>
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Text('Skill Registry',
+        const Text('技能注册表',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary)),
         const SizedBox(height: 4),
         const Text(
-          'Manage global skills. Each skill is a folder with a SKILL.md file. '
-          "Skills selected during agent creation are copied to the agent's workspace.",
+          '管理全局技能。每个技能是一个包含 SKILL.md 文件的文件夹。'
+          "创建 Agent 时选择的技能会被复制到 Agent 的工作区。",
           style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
         ),
         const SizedBox(height: 16),
@@ -2174,7 +2174,7 @@ class _SkillsTabState extends State<_SkillsTab>
           const Center(
             child: Padding(
               padding: EdgeInsets.all(40),
-              child: Text('No skills defined',
+              child: Text('暂无技能',
                   style: TextStyle(
                       color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -2187,7 +2187,7 @@ class _SkillsTabState extends State<_SkillsTab>
         const SizedBox(height: 16),
 
         // Skill files browser
-        const Text('Skill Files',
+        const Text('技能文件',
             style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -2199,7 +2199,7 @@ class _SkillsTabState extends State<_SkillsTab>
           children: [
             InkWell(
               onTap: () => _loadFiles(''),
-              child: const Text('root',
+              child: const Text('根目录',
                   style: TextStyle(
                       fontSize: 12,
                       color: AppColors.accentText,
@@ -2237,14 +2237,14 @@ class _SkillsTabState extends State<_SkillsTab>
                 icon: const Icon(Icons.arrow_upward,
                     size: 16, color: AppColors.textSecondary),
                 onPressed: _navigateUp,
-                tooltip: 'Go up',
+                tooltip: '返回上级',
                 visualDensity: VisualDensity.compact,
               ),
             IconButton(
               icon: const Icon(Icons.refresh,
                   size: 16, color: AppColors.textSecondary),
               onPressed: () => _loadFiles(_currentPath),
-              tooltip: 'Refresh',
+              tooltip: '刷新',
               visualDensity: VisualDensity.compact,
             ),
           ],
@@ -2259,7 +2259,7 @@ class _SkillsTabState extends State<_SkillsTab>
           const Center(
             child: Padding(
               padding: EdgeInsets.all(24),
-              child: Text('Empty directory',
+              child: Text('空目录',
                   style: TextStyle(
                       color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -2440,7 +2440,7 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
       Future.delayed(const Duration(seconds: 2),
           () => mounted ? setState(() => _quotaSaved = false) : null);
     } catch (_) {
-      _showError('Failed to save quotas');
+      _showError('保存配额失败');
     }
     setState(() => _quotaSaving = false);
   }
@@ -2474,7 +2474,7 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
       setState(() => _editingUserId = null);
       _loadUsers();
     } catch (_) {
-      _showError('Failed to save user quota');
+      _showError('保存用户配额失败');
     }
   }
 
@@ -2491,14 +2491,14 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
       padding: const EdgeInsets.all(24),
       children: [
         // ── Default Quotas ──
-        const Text('Default User Quotas',
+        const Text('默认用户配额',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary)),
         const SizedBox(height: 4),
         const Text(
-          'These defaults apply to newly registered users. Existing users are not affected.',
+          '这些默认值适用于新注册用户，不影响现有用户。',
           style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
         ),
         const SizedBox(height: 12),
@@ -2508,7 +2508,7 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Conversation limits
-              const Text('Conversation Limits',
+              const Text('对话限制',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -2518,8 +2518,8 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
                 children: [
                   Expanded(
                     child: _buildQuotaField(
-                      'Message Limit',
-                      'Max messages per period',
+                      '消息上限',
+                      '每个周期最大消息数',
                       _defaultMessageLimit.toString(),
                       (v) => _defaultMessageLimit =
                           int.tryParse(v) ?? _defaultMessageLimit,
@@ -2530,7 +2530,7 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Message Period',
+                        const Text('消息周期',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -2556,16 +2556,16 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
                               items: const [
                                 DropdownMenuItem(
                                     value: 'permanent',
-                                    child: Text('Permanent')),
+                                    child: Text('永久')),
                                 DropdownMenuItem(
                                     value: 'daily',
-                                    child: Text('Daily')),
+                                    child: Text('每天')),
                                 DropdownMenuItem(
                                     value: 'weekly',
-                                    child: Text('Weekly')),
+                                    child: Text('每周')),
                                 DropdownMenuItem(
                                     value: 'monthly',
-                                    child: Text('Monthly')),
+                                    child: Text('每月')),
                               ],
                               onChanged: (v) => setState(
                                   () => _defaultMessagePeriod = v ?? 'permanent'),
@@ -2579,7 +2579,7 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
               ),
 
               const SizedBox(height: 20),
-              const Text('Agent Limits',
+              const Text('Agent 限制',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -2589,8 +2589,8 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
                 children: [
                   Expanded(
                     child: _buildQuotaField(
-                      'Max Agents',
-                      'Agents a user can create',
+                      '最大 Agent 数',
+                      '用户可创建的 Agent 数量',
                       _defaultMaxAgents.toString(),
                       (v) => _defaultMaxAgents =
                           int.tryParse(v) ?? _defaultMaxAgents,
@@ -2599,8 +2599,8 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildQuotaField(
-                      'Agent TTL (hours)',
-                      'Agent auto-expiry time',
+                      'Agent 存活时间（小时）',
+                      'Agent 自动过期时间',
                       _defaultAgentTtlHours.toString(),
                       (v) => _defaultAgentTtlHours =
                           int.tryParse(v) ?? _defaultAgentTtlHours,
@@ -2609,8 +2609,8 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildQuotaField(
-                      'Daily LLM Calls / Agent',
-                      'Max LLM calls per agent per day',
+                      '每日 LLM 调用 / Agent',
+                      '每个 Agent 每天最大 LLM 调用次数',
                       _defaultMaxLlmCallsPerDay.toString(),
                       (v) => _defaultMaxLlmCallsPerDay =
                           int.tryParse(v) ?? _defaultMaxLlmCallsPerDay,
@@ -2620,7 +2620,7 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
               ),
 
               const SizedBox(height: 20),
-              const Text('System',
+              const Text('系统',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -2629,8 +2629,8 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
               SizedBox(
                 width: 300,
                 child: _buildQuotaField(
-                  'Min Heartbeat Interval (min)',
-                  'Minimum heartbeat interval for all agents',
+                  '最小心跳间隔（分钟）',
+                  '所有 Agent 的最小心跳间隔',
                   _minHeartbeatIntervalMinutes.toString(),
                   (v) => _minHeartbeatIntervalMinutes =
                       int.tryParse(v) ?? _minHeartbeatIntervalMinutes,
@@ -2650,7 +2650,7 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
         const SizedBox(height: 32),
 
         // ── Users List ──
-        const Text('Users',
+        const Text('用户',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -2665,7 +2665,7 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
           const Center(
             child: Padding(
               padding: EdgeInsets.all(40),
-              child: Text('No users found',
+              child: Text('暂无用户',
                   style: TextStyle(
                       color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -2688,28 +2688,28 @@ class _QuotasUsersTabState extends ConsumerState<_QuotasUsersTab>
                     children: [
                       Expanded(
                           flex: 3,
-                          child: Text('User',
+                          child: Text('用户',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textTertiary))),
                       Expanded(
                           flex: 2,
-                          child: Text('Role',
+                          child: Text('角色',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textTertiary))),
                       Expanded(
                           flex: 2,
-                          child: Text('Msg Limit',
+                          child: Text('消息上限',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textTertiary))),
                       Expanded(
                           flex: 2,
-                          child: Text('Max Agents',
+                          child: Text('最大 Agent 数',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -2945,18 +2945,18 @@ class _KnowledgeBaseTabState extends State<_KnowledgeBaseTab>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
-        title: const Text('Delete File',
+        title: const Text('删除文件',
             style: TextStyle(color: AppColors.textPrimary)),
-        content: Text('Delete "$name"?',
+        content: Text('确定删除 "$name" 吗？',
             style: const TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+              child: const Text('取消')),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
               child:
-                  const Text('Delete', style: TextStyle(color: AppColors.error))),
+                  const Text('删除', style: TextStyle(color: AppColors.error))),
         ],
       ),
     );
@@ -2968,7 +2968,7 @@ class _KnowledgeBaseTabState extends State<_KnowledgeBaseTab>
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to delete file')));
+            const SnackBar(content: Text('删除文件失败')));
       }
     }
   }
@@ -2979,14 +2979,14 @@ class _KnowledgeBaseTabState extends State<_KnowledgeBaseTab>
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Text('Enterprise Knowledge Base',
+        const Text('企业知识库',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary)),
         const SizedBox(height: 4),
         const Text(
-          'Shared files accessible to all agents via enterprise_info/ directory.',
+          '所有 Agent 可通过 enterprise_info/ 目录访问的共享文件。',
           style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
         ),
         const SizedBox(height: 16),
@@ -2996,7 +2996,7 @@ class _KnowledgeBaseTabState extends State<_KnowledgeBaseTab>
           children: [
             InkWell(
               onTap: () => _loadFiles(''),
-              child: const Text('root',
+              child: const Text('根目录',
                   style: TextStyle(
                       fontSize: 12,
                       color: AppColors.accentText,
@@ -3034,14 +3034,14 @@ class _KnowledgeBaseTabState extends State<_KnowledgeBaseTab>
                 icon: const Icon(Icons.arrow_upward,
                     size: 16, color: AppColors.textSecondary),
                 onPressed: _navigateUp,
-                tooltip: 'Go up',
+                tooltip: '返回上级',
                 visualDensity: VisualDensity.compact,
               ),
             IconButton(
               icon: const Icon(Icons.refresh,
                   size: 16, color: AppColors.textSecondary),
               onPressed: () => _loadFiles(_currentPath),
-              tooltip: 'Refresh',
+              tooltip: '刷新',
               visualDensity: VisualDensity.compact,
             ),
           ],
@@ -3056,7 +3056,7 @@ class _KnowledgeBaseTabState extends State<_KnowledgeBaseTab>
           const Center(
             child: Padding(
               padding: EdgeInsets.all(40),
-              child: Text('No files',
+              child: Text('暂无文件',
                   style: TextStyle(
                       color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -3185,11 +3185,11 @@ Widget _buildSaveButton({
     children: [
       ElevatedButton(
         onPressed: enabled && !saving ? onSave : null,
-        child: Text(saving ? 'Saving...' : 'Save'),
+        child: Text(saving ? '保存中...' : '保存'),
       ),
       if (saved) ...[
         const SizedBox(width: 8),
-        const Text('Saved',
+        const Text('已保存',
             style:
                 TextStyle(color: AppColors.success, fontSize: 12)),
       ],

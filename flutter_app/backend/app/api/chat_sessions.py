@@ -20,10 +20,8 @@ router = APIRouter(prefix="/api/agents", tags=["chat-sessions"])
 
 
 def _is_admin_or_creator(user: User, agent: Agent) -> bool:
-    return (
-        user.role in ("platform_admin", "org_admin")
-        or str(agent.creator_id) == str(user.id)
-    )
+    """2C model: only the agent's creator has admin access."""
+    return str(agent.creator_id) == str(user.id)
 
 
 class SessionOut(BaseModel):

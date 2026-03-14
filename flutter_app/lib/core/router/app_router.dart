@@ -7,6 +7,8 @@ import '../../pages/login.dart';
 import '../../pages/layout_shell.dart';
 import '../../pages/dashboard.dart';
 import '../../pages/plaza.dart';
+import '../../pages/chat_list.dart';
+import '../../pages/profile_page.dart';
 import '../../pages/agent_create.dart';
 import '../../pages/agent_detail.dart';
 import '../../pages/chat.dart';
@@ -33,10 +35,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return isLoggedIn ? '/plaza' : '/login';
       }
 
-      final isLoginRoute = location == '/login';
       final isPublicRoute = location == '/login' || location == '/privacy';
       if (!isLoggedIn && !isPublicRoute) return '/login';
-      if (isLoggedIn && isLoginRoute) return '/plaza';
+      if (isLoggedIn && location == '/login') return '/plaza';
       return null;
     },
     routes: [
@@ -48,7 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (context, state) => const LoginPage(),
       ),
-      // Agent detail and chat have their own full AppBar — outside shell
+      // Full-screen routes outside tab shell
       GoRoute(
         path: '/agents/new',
         builder: (context, state) => const AgentCreatePage(),
@@ -63,34 +64,43 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) =>
             ChatPage(agentId: state.pathParameters['id']!),
       ),
-      // Virtual office — full screen game, no shell nav
-      GoRoute(
-        path: '/office',
-        builder: (context, state) => const OfficePage(),
-      ),
-      // Privacy policy — accessible from login and settings
       GoRoute(
         path: '/privacy',
         builder: (context, state) => const PrivacyPolicyPage(),
       ),
+      // Enterprise settings — pushed from profile, has own back button
+      GoRoute(
+        path: '/enterprise',
+        builder: (context, state) => const EnterpriseSettingsPage(),
+      ),
+      // Bottom tab shell
       ShellRoute(
         builder: (context, state, child) => LayoutShell(child: child),
         routes: [
-          GoRoute(
-            path: '/dashboard',
-            builder: (context, state) => const DashboardPage(),
-          ),
           GoRoute(
             path: '/plaza',
             builder: (context, state) => const PlazaPage(),
           ),
           GoRoute(
-            path: '/messages',
-            builder: (context, state) => const MessagesPage(),
+            path: '/chat-list',
+            builder: (context, state) => const ChatListPage(),
           ),
           GoRoute(
-            path: '/enterprise',
-            builder: (context, state) => const EnterpriseSettingsPage(),
+            path: '/office',
+            builder: (context, state) => const OfficePage(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfilePage(),
+          ),
+          // Keep dashboard accessible
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const DashboardPage(),
+          ),
+          GoRoute(
+            path: '/messages',
+            builder: (context, state) => const MessagesPage(),
           ),
           GoRoute(
             path: '/invitations',
