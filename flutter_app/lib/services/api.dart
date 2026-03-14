@@ -60,6 +60,15 @@ class ApiService {
     return r.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> updateTenant(String tenantId, Map<String, dynamic> data) async {
+    final r = await _dio.put('/tenants/$tenantId', data: data);
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteTenant(String tenantId) async {
+    await _dio.delete('/tenants/$tenantId');
+  }
+
   // ─── Agents ───────────────────────────────────────────
   Future<List<dynamic>> listAgents({String? tenantId}) async {
     final r = await _dio.get('/agents/', queryParameters: tenantId != null ? {'tenant_id': tenantId} : null);

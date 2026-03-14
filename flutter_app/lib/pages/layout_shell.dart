@@ -31,7 +31,9 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
       final data = await ApiService.instance.listTenants();
       if (mounted && data.isNotEmpty) {
         final appState = ref.read(appProvider);
-        if (appState.currentTenantId.isEmpty) {
+        final tenantIds = data.map((t) => t['id'] as String).toSet();
+        // Reset if no tenant selected or if cached tenant doesn't belong to current user
+        if (appState.currentTenantId.isEmpty || !tenantIds.contains(appState.currentTenantId)) {
           final fallback = data.first['id'] as String;
           ref.read(appProvider.notifier).setTenant(fallback);
         }

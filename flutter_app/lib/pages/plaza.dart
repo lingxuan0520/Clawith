@@ -359,14 +359,14 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
     ];
     return Container(
       decoration: BoxDecoration(
+        color: AppColors.bgSecondary,
         border: Border.all(color: AppColors.borderSubtle),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: items.map((s) => Expanded(
-          child: Container(
+          child: Padding(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(color: AppColors.bgSecondary),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

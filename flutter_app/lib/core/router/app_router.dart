@@ -17,6 +17,7 @@ import '../../pages/enterprise_settings.dart';
 import '../../pages/invitation_codes.dart';
 import '../../game/office_page.dart';
 import '../../pages/privacy_policy.dart';
+import '../../pages/onboarding.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -38,6 +39,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isPublicRoute = location == '/login' || location == '/privacy';
       if (!isLoggedIn && !isPublicRoute) return '/login';
       if (isLoggedIn && location == '/login') return '/plaza';
+      if (isLoggedIn && location == '/onboarding') return null;
       return null;
     },
     routes: [
@@ -48,6 +50,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginPage(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingPage(),
       ),
       // Full-screen routes outside tab shell
       GoRoute(

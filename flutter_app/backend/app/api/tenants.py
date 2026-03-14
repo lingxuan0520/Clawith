@@ -5,7 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
@@ -18,7 +18,6 @@ router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 class TenantCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    slug: str = Field(min_length=2, max_length=50, pattern=r"^[a-z0-9_-]+$")
     im_provider: str = "web_only"
 
 
@@ -26,6 +25,7 @@ class TenantOut(BaseModel):
     id: uuid.UUID
     name: str
     slug: str
+    owner_id: uuid.UUID | None = None
     im_provider: str
     is_active: bool
     created_at: datetime | None = None
@@ -44,9 +44,16 @@ async def list_tenants(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all tenants."""
-    result = await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))
-    return [TenantOut.model_validate(t) for t in result.scalars().all()]
+    """List tenants owned by the current user."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"[DEBUG] list_tenants called by user={current_user.id} username={current_user.username} owner_id filter={current_user.id}")
+    result = await db.execute(
+        select(Tenant).where(Tenant.owner_id == current_user.id).order_by(Tenant.created_at.desc())
+    )
+    tenants = result.scalars().all()
+    logger.warning(f"[DEBUG] list_tenants returning {len(tenants)} tenants: {[(t.id, t.name, t.owner_id) for t in tenants]}")
+    return [TenantOut.model_validate(t) for t in tenants]
 
 
 @router.post("/", response_model=TenantOut, status_code=status.HTTP_201_CREATED)
@@ -55,15 +62,18 @@ async def create_tenant(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new tenant/company (platform_admin only)."""
-    # Check slug uniqueness
-    existing = await db.execute(select(Tenant).where(Tenant.slug == data.slug))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Slug '{data.slug}' already exists")
+    """Create a new tenant/company owned by the current user."""
+    import time
+    slug = f"co-{current_user.id.hex[:8]}-{int(time.time())}"
 
-    tenant = Tenant(name=data.name, slug=data.slug, im_provider=data.im_provider)
+    tenant = Tenant(name=data.name, slug=slug, im_provider=data.im_provider, owner_id=current_user.id)
     db.add(tenant)
     await db.flush()
+
+    # Switch user to the new tenant
+    current_user.tenant_id = tenant.id
+    await db.flush()
+
     return TenantOut.model_validate(tenant)
 
 
@@ -73,8 +83,8 @@ async def get_tenant(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get tenant details."""
-    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    """Get tenant details (must be owner)."""
+    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == current_user.id))
     tenant = result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -88,8 +98,8 @@ async def update_tenant(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update tenant settings."""
-    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    """Update tenant settings (must be owner)."""
+    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == current_user.id))
     tenant = result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -100,33 +110,35 @@ async def update_tenant(
     return TenantOut.model_validate(tenant)
 
 
-@router.put("/{tenant_id}/assign-user/{user_id}")
-async def assign_user_to_tenant(
+@router.delete("/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_tenant(
     tenant_id: uuid.UUID,
-    user_id: uuid.UUID,
-    role: str = "member",
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Assign a user to a tenant with a specific role."""
-    # Verify tenant
-    t_result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
-    if not t_result.scalar_one_or_none():
+    """Delete a tenant (must be owner). If last tenant, user returns to onboarding."""
+    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == current_user.id))
+    tenant = result.scalar_one_or_none()
+    if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    # Verify user
-    u_result = await db.execute(select(User).where(User.id == user_id))
-    user = u_result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    # Find another tenant to switch to (may be None if this is the last one)
+    other = await db.execute(
+        select(Tenant).where(Tenant.owner_id == current_user.id, Tenant.id != tenant_id).limit(1)
+    )
+    other_tenant = other.scalar_one_or_none()
 
-    if role not in ("org_admin", "agent_admin", "member"):
-        raise HTTPException(status_code=400, detail="Invalid role")
+    # Move user to another tenant, or clear tenant_id if last one
+    if current_user.tenant_id == tenant_id:
+        current_user.tenant_id = other_tenant.id if other_tenant else None
 
-    user.tenant_id = tenant_id
-    user.role = role
-    await db.flush()
-    return {"status": "ok", "user_id": str(user_id), "tenant_id": str(tenant_id), "role": role}
+    # Delete agents under this tenant that belong to this user
+    from app.models.agent import Agent
+    await db.execute(sa_delete(Agent).where(Agent.tenant_id == tenant_id, Agent.creator_id == current_user.id))
+
+    # Delete the tenant
+    await db.delete(tenant)
+    await db.commit()
 
 
 class TenantSimple(BaseModel):

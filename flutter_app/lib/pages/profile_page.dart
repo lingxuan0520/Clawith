@@ -7,6 +7,7 @@ import '../stores/app_store.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
 import '../components/initial_avatar.dart';
+import '../components/tenant_switcher_sheet.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -127,24 +128,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         _sectionHeader('公司'),
         _menuItem(
           icon: Icons.business,
-          label: _currentTenantName,
-          trailing: _tenants.length > 1 ? '切换' : null,
-          onTap: () {
-            if (_tenants.length > 1) {
-              _showTenantSwitcher();
-            }
-          },
+          label: _tenants.isNotEmpty ? _currentTenantName : '创建你的第一家公司',
+          trailing: _tenants.isNotEmpty ? '管理' : null,
+          onTap: () => _showTenantSwitcher(),
         ),
-        _menuItem(
-          icon: Icons.settings,
-          label: '公司设置',
-          onTap: () => context.push('/enterprise'),
-        ),
-        _menuItem(
-          icon: Icons.add_business,
-          label: '新建公司',
-          onTap: () => _showCreateCompany(),
-        ),
+        if (_tenants.isNotEmpty)
+          _menuItem(
+            icon: Icons.settings,
+            label: '公司设置',
+            onTap: () => context.push('/enterprise'),
+          ),
         const SizedBox(height: 16),
 
         // Settings section
@@ -222,75 +215,87 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   void _showTenantSwitcher() {
-    final currentId = ref.read(appProvider).currentTenantId;
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.bgElevated,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('切换公司', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            ),
-            const Divider(height: 1),
-            ..._tenants.map((t) {
-              final id = t['id'] as String;
-              final name = t['name'] as String;
-              final isSelected = id == currentId;
-              return ListTile(
-                title: Text(name, style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected ? AppColors.accentPrimary : AppColors.textPrimary,
-                )),
-                trailing: isSelected ? const Icon(Icons.check, color: AppColors.accentPrimary, size: 18) : null,
-                onTap: () {
-                  ref.read(appProvider.notifier).setTenant(id);
-                  Navigator.pop(ctx);
-                },
-              );
-            }),
-            const SizedBox(height: 8),
-          ],
-        ),
+      builder: (ctx) => TenantSwitcherSheet(
+        tenants: _tenants,
+        currentTenantId: ref.read(appProvider).currentTenantId,
+        onSelect: (id) {
+          ref.read(appProvider.notifier).setTenant(id);
+          Navigator.pop(ctx);
+        },
+        onDelete: (id, name) {
+          Navigator.pop(ctx);
+          _confirmDeleteTenant(id, name);
+        },
+        onCreate: (name) async {
+          final result = await ApiService.instance.createTenant({'name': name});
+          final newId = result['id'] as String;
+          ref.read(appProvider.notifier).setTenant(newId);
+          final user = await ApiService.instance.getMe();
+          ref.read(authProvider.notifier).updateUser(user);
+          await _loadTenants();
+        },
       ),
     );
   }
 
-  void _showCreateCompany() {
-    final ctl = TextEditingController();
-    showDialog(
+  Future<void> _confirmDeleteTenant(String tenantId, String tenantName) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
-        title: const Text('新建公司'),
-        content: TextField(
-          controller: ctl,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '公司名称'),
+        title: const Text('删除公司'),
+        content: Text(
+          '确定要删除"$tenantName"吗？\n\n该公司下的所有 Agent 也会被一并删除，此操作不可撤回。',
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
           TextButton(
-            onPressed: () async {
-              if (ctl.text.trim().isEmpty) return;
-              final name = ctl.text.trim();
-              var slug = name.toLowerCase().replaceAll(RegExp(r'[\s]+'), '-').replaceAll(RegExp(r'[^a-z0-9_-]'), '');
-              if (slug.length < 2) slug = 'co-${DateTime.now().millisecondsSinceEpoch}';
-              try {
-                final result = await ApiService.instance.createTenant({'name': name, 'slug': slug, 'im_provider': 'web_only'});
-                final newId = result['id'] as String;
-                ref.read(appProvider.notifier).setTenant(newId);
-                await _loadTenants();
-                if (ctx.mounted) Navigator.pop(ctx);
-              } catch (_) {}
-            },
-            child: const Text('创建'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确认删除', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ApiService.instance.deleteTenant(tenantId);
+      await _loadTenants();
+      if (_tenants.isEmpty) {
+        // Last company deleted — refresh user info, stay on profile
+        final user = await ApiService.instance.getMe();
+        if (!mounted) return;
+        ref.read(authProvider.notifier).updateUser(user);
+        ref.read(appProvider.notifier).setTenant('');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"$tenantName" 已删除')),
+        );
+        return;
+      }
+      // If we deleted the current tenant, switch to first available
+      final appState = ref.read(appProvider);
+      final stillExists = _tenants.any((t) => t['id'] == appState.currentTenantId);
+      if (!stillExists) {
+        ref.read(appProvider.notifier).setTenant(_tenants.first['id'] as String);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"$tenantName" 已删除')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除失败: $e')),
+        );
+      }
+    }
   }
+
 }

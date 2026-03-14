@@ -92,7 +92,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final user = res['user'] as Map<String, dynamic>;
     final token = res['access_token'] as String;
     await ref.read(authProvider.notifier).setAuth(user, token);
-    if (mounted) context.go('/plaza');
+    if (!mounted) return;
+    // No tenant → new user → onboarding
+    if (user['tenant_id'] == null) {
+      context.go('/onboarding');
+      return;
+    }
+    context.go('/plaza');
   }
 
   @override

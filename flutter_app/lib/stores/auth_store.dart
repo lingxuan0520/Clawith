@@ -78,6 +78,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _clearAuth(SharedPreferences prefs) async {
     await prefs.remove('token');
+    await prefs.remove('current_tenant_id');
   }
 
   void updateUser(Map<String, dynamic> user) {

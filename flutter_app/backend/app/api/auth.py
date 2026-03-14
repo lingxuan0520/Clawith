@@ -359,21 +359,14 @@ async def firebase_login(data: FirebaseLoginRequest, db: AsyncSession = Depends(
     avatar_url = decoded.get("picture", "")
     provider = decoded.get("firebase", {}).get("sign_in_provider", "")
 
-    # Try to find existing user by firebase_uid
+    import logging
+    _logger = logging.getLogger(__name__)
+    _logger.warning(f"[FIREBASE] login: uid={firebase_uid} email={email} provider={provider} name={display_name}")
+
+    # Only match by firebase_uid — different providers = different accounts
     result = await db.execute(select(User).where(User.firebase_uid == firebase_uid))
     user = result.scalar_one_or_none()
-
-    if not user and email:
-        # Try matching by email (user may have registered with password before)
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalar_one_or_none()
-        if user:
-            # Link Firebase to existing account
-            user.firebase_uid = firebase_uid
-            if avatar_url and not user.avatar_url:
-                user.avatar_url = avatar_url
-            if display_name and user.display_name == user.username:
-                user.display_name = display_name
+    _logger.warning(f"[FIREBASE] find by uid: user={user.id if user else None}")
 
     # Update avatar/display_name/role for existing users on every login
     # 2C model: every user owns their own space → always platform_admin
@@ -395,34 +388,39 @@ async def firebase_login(data: FirebaseLoginRequest, db: AsyncSession = Depends(
     if not user:
         # Auto-register new user
         from sqlalchemy import func
-        from app.models.tenant import Tenant
+        import time
 
-        user_count = await db.execute(select(func.count()).select_from(User))
-        is_first_user = user_count.scalar() == 0
-
-        # Assign to default tenant
-        default = await db.execute(select(Tenant).where(Tenant.slug == "default"))
-        tenant = default.scalar_one_or_none()
+        # Provider tag for uniqueness (e.g. "apple", "google")
+        provider_tag = provider.replace(".com", "") if provider else "fb"
 
         username = email.split("@")[0] if email else f"fb_{firebase_uid[:12]}"
         # Ensure username uniqueness
         existing = await db.execute(select(User).where(User.username == username))
         if existing.scalar_one_or_none():
+            username = f"{username}_{provider_tag}"
+        # Double-check
+        existing2 = await db.execute(select(User).where(User.username == username))
+        if existing2.scalar_one_or_none():
             username = f"{username}_{firebase_uid[:6]}"
 
+        # Ensure email uniqueness — different provider gets tagged email
+        user_email = email or f"{firebase_uid}@firebase.local"
+        existing_email = await db.execute(select(User).where(User.email == user_email))
+        if existing_email.scalar_one_or_none():
+            # e.g. "19910520chen+apple@gmail.com"
+            local, domain = user_email.split("@", 1)
+            user_email = f"{local}+{provider_tag}@{domain}"
+        _logger.warning(f"[FIREBASE] creating new user: username={username} email={user_email} provider={provider}")
+
+        # Create user (no tenant yet — user creates company in onboarding)
         user = User(
             username=username,
-            email=email or f"{firebase_uid}@firebase.local",
+            email=user_email,
             password_hash=hash_password(uuid.uuid4().hex),  # random password (not used)
             display_name=display_name or username,
             avatar_url=avatar_url or None,
             role="platform_admin",  # every user owns their own space
-            tenant_id=tenant.id if tenant else None,
             firebase_uid=firebase_uid,
-            quota_message_limit=tenant.default_message_limit if tenant else 50,
-            quota_message_period=tenant.default_message_period if tenant else "permanent",
-            quota_max_agents=tenant.default_max_agents if tenant else 2,
-            quota_agent_ttl_hours=tenant.default_agent_ttl_hours if tenant else 48,
         )
         db.add(user)
         await db.flush()
@@ -434,15 +432,6 @@ async def firebase_login(data: FirebaseLoginRequest, db: AsyncSession = Depends(
             display_name=user.display_name, avatar_url=user.avatar_url,
         ))
         await db.flush()
-
-        # Seed defaults for first user
-        if is_first_user:
-            await db.commit()
-            try:
-                from app.services.agent_seeder import seed_default_agents
-                await seed_default_agents()
-            except Exception:
-                pass
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
