@@ -519,26 +519,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
   // ─── Actions ─────────────────────────────────────────────
 
-  Future<void> _startAgent() async {
-    try {
-      await _api.startAgent(widget.agentId);
-      await _fetchAgent();
-      _showSnack('智能体已启动');
-    } catch (e) {
-      _showSnack('启动失败: ${_errMsg(e)}');
-    }
-  }
-
-  Future<void> _stopAgent() async {
-    try {
-      await _api.stopAgent(widget.agentId);
-      await _fetchAgent();
-      _showSnack('智能体已停止');
-    } catch (e) {
-      _showSnack('停止失败: ${_errMsg(e)}');
-    }
-  }
-
   Future<void> _deleteAgent() async {
     final confirmed = await _showConfirmDialog(
       '删除智能体',
@@ -1401,85 +1381,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     descCtrl.dispose();
   }
 
-  void _showExpiryEditor() {
-    final agent = _agent;
-    if (agent == null) return;
-    final currentExpiry = agent['expires_at'] as String?;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('设置过期时间', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (currentExpiry != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text('当前过期: ${_fmtTs(currentExpiry)}',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-              ),
-            const Text('快速续期', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _expiryBtn(ctx, '+24h', const Duration(hours: 24)),
-                _expiryBtn(ctx, '+7d', const Duration(days: 7)),
-                _expiryBtn(ctx, '+30d', const Duration(days: 30)),
-                _expiryBtn(ctx, '+90d', const Duration(days: 90)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.all_inclusive, size: 16),
-              label: const Text('永不过期'),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                try {
-                  await _api.updateAgent(widget.agentId, {'expires_at': null});
-                  await _fetchAgentSilent();
-                  _showSnack('已设置为永不过期');
-                } catch (e) {
-                  _showSnack('设置失败: ${_errMsg(e)}');
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-        ],
-      ),
-    );
-  }
-
-  Widget _expiryBtn(BuildContext ctx, String label, Duration duration) {
-    return OutlinedButton(
-      onPressed: () async {
-        Navigator.pop(ctx);
-        final newExpiry = DateTime.now().add(duration).toUtc().toIso8601String();
-        try {
-          await _api.updateAgent(widget.agentId, {'expires_at': newExpiry});
-          await _fetchAgentSilent();
-          _showSnack('过期时间已更新');
-        } catch (e) {
-          _showSnack('设置失败: ${_errMsg(e)}');
-        }
-      },
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        side: const BorderSide(color: AppColors.accentPrimary),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 12)),
-    );
-  }
-
   // ─── Helpers ─────────────────────────────────────────────
+
 
   static const _segmentLabelMap = {
     'all': '全部',
@@ -1636,50 +1539,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
   }
 
-  String _statusLabel(String? status) {
-    switch (status) {
-      case 'running':
-        return '运行中';
-      case 'idle':
-        return '待机';
-      case 'stopped':
-        return '已停止';
-      case 'error':
-        return '错误';
-      default:
-        return status ?? '未知';
-    }
-  }
 
-  Color _statusColor(String? status) {
-    switch (status) {
-      case 'running':
-        return AppColors.statusRunning;
-      case 'idle':
-        return AppColors.statusIdle;
-      case 'stopped':
-        return AppColors.statusStopped;
-      case 'error':
-        return AppColors.statusError;
-      default:
-        return AppColors.textTertiary;
-    }
-  }
-
-  IconData _statusIcon(String? status) {
-    switch (status) {
-      case 'running':
-        return Icons.play_circle_filled;
-      case 'idle':
-        return Icons.pause_circle_filled;
-      case 'stopped':
-        return Icons.stop_circle;
-      case 'error':
-        return Icons.error;
-      default:
-        return Icons.help_outline;
-    }
-  }
 
   Color _priorityColor(String? p) {
     switch (p) {
@@ -1731,7 +1591,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
     final agent = _agent!;
     final name = agent['name'] as String? ?? '未命名 Agent';
-    final status = agent['status'] as String? ?? 'stopped';
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -1773,8 +1632,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               )
             : Row(
                 children: [
-                  Icon(_statusIcon(status), color: _statusColor(status), size: 20),
-                  const SizedBox(width: 8),
                   Flexible(
                     child: GestureDetector(
                       onTap: () {
@@ -1792,41 +1649,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _statusBadge(status),
-                  if (_expiryLabel(agent) != null) ...[
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: _showExpiryEditor,
-                      child: _expiryBadge(agent),
-                    ),
-                  ],
                 ],
               ),
-        actions: [
-          if (status == 'running' || status == 'idle')
-            IconButton(
-              icon: const Icon(Icons.stop, color: AppColors.warning),
-              tooltip: '停止智能体',
-              onPressed: _stopAgent,
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.play_arrow, color: AppColors.success),
-              tooltip: '启动智能体',
-              onPressed: _startAgent,
-            ),
-          IconButton(
-            icon: const Icon(Icons.timer_outlined, color: AppColors.textSecondary),
-            tooltip: '设置过期时间',
-            onPressed: _showExpiryEditor,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
-            tooltip: '刷新',
-            onPressed: _fetchAgent,
-          ),
-        ],
+        actions: const [],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -1858,74 +1683,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     );
   }
 
-  Widget _statusBadge(String status) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: _statusColor(status).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _statusColor(status).withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        _statusLabel(status),
-        style: TextStyle(
-          color: _statusColor(status),
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  String? _expiryLabel(Map<String, dynamic> agent) {
-    final expiresAt = agent['expires_at'] as String?;
-    if (expiresAt == null) return null;
-    try {
-      final dt = DateTime.parse(expiresAt);
-      final diff = dt.difference(DateTime.now());
-      if (diff.isNegative) return '已过期';
-      if (diff.inHours < 24) return '${diff.inHours}h';
-      if (diff.inDays < 30) return '${diff.inDays}d';
-      return '${(diff.inDays / 30).floor()}mo';
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Widget _expiryBadge(Map<String, dynamic> agent) {
-    final label = _expiryLabel(agent);
-    if (label == null) return const SizedBox.shrink();
-    final isExpired = label == '已过期';
-    final color = isExpired
-        ? AppColors.error
-        : label.endsWith('h')
-            ? AppColors.warning
-            : AppColors.success;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.timer, size: 11, color: color),
-          const SizedBox(width: 3),
-          Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-
   // ═══════════════════════════════════════════════════════════
   // TAB 0 : Overview
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildOverviewTab(Map<String, dynamic> agent) {
-    final status = agent['status'] as String? ?? 'stopped';
-    final model = agent['model'] as String? ?? '默认';
     final createdAt = agent['created_at'];
     final updatedAt = agent['updated_at'];
     final tokens = (_metrics?['tokens'] as Map<String, dynamic>?) ?? {};
@@ -1944,58 +1706,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Status & Controls ──
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(_statusIcon(status), color: _statusColor(status), size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            agent['name'] as String? ?? 'Agent',
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '模型: $model',
-                            style: const TextStyle(color: AppColors.textTertiary, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _statusBadge(status),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (status == 'running' || status == 'idle')
-                      _actionBtn(Icons.stop, '停止', AppColors.warning, _stopAgent)
-                    else
-                      _actionBtn(Icons.play_arrow, '启动', AppColors.success, _startAgent),
-                    _actionBtn(Icons.chat_bubble_outline, '聊天', AppColors.accentPrimary, () {
-                      context.push('/agents/${widget.agentId}/chat');
-                    }),
-                    _actionBtn(Icons.refresh, '刷新', AppColors.textSecondary, _fetchAgent),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
           // ── Role Description ──
           _card(
             child: Column(
@@ -2147,8 +1857,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 _infoRow('Agent ID', widget.agentId),
                 _infoRow('创建时间', _fmtTs(createdAt)),
                 _infoRow('更新时间', _fmtTs(updatedAt)),
-                _infoRow('模型', model),
-                _infoRow('状态', _statusLabel(status)),
               ],
             ),
           ),
@@ -2230,23 +1938,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       ),
     );
   }
-
-  Widget _actionBtn(IconData icon, String label, Color color, VoidCallback onPressed) {
-    return OutlinedButton.icon(
-      icon: Icon(icon, size: 16, color: color),
-      label: Text(label, style: TextStyle(color: color, fontSize: 12)),
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(color: color.withValues(alpha: 0.3)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      onPressed: onPressed,
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // TAB 1 : Chat
-  // ═══════════════════════════════════════════════════════════
 
   // ═══════════════════════════════════════════════════════════
   // TAB 1 : Tasks

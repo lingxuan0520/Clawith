@@ -575,7 +575,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           IconButton(
             icon: const Icon(Icons.info_outline, size: 20),
             tooltip: 'Agent 详情',
-            onPressed: () => context.push('/agents/${widget.agentId}'),
+            onPressed: () => context.pushReplacement('/agents/${widget.agentId}'),
           ),
           IconButton(
             icon: const Icon(Icons.forum_outlined, size: 20),
