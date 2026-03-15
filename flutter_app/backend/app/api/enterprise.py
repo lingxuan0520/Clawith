@@ -124,6 +124,55 @@ async def update_llm_model(
     return LLMModelOut.model_validate(model)
 
 
+# ─── LLM Model Test ───────────────────────────────────
+
+class LLMModelTestRequest(BaseModel):
+    provider: str
+    model: str
+    api_key: str
+    base_url: str | None = None
+
+
+@router.post("/llm-models/test")
+async def test_llm_model(
+    data: LLMModelTestRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Test an LLM model connection by sending a minimal chat request."""
+    import httpx
+    from app.services.llm_utils import get_provider_base_url
+
+    base_url = get_provider_base_url(data.provider, data.base_url)
+    if not base_url:
+        raise HTTPException(status_code=400, detail="无法确定 API 地址，请填写自定义 Base URL")
+
+    url = f"{base_url.rstrip('/')}/chat/completions"
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {data.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": data.model,
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 5,
+                },
+            )
+        if resp.status_code == 200:
+            return {"success": True, "message": "连接成功"}
+        else:
+            body = resp.text[:300]
+            return {"success": False, "message": f"HTTP {resp.status_code}: {body}"}
+    except httpx.TimeoutException:
+        return {"success": False, "message": "连接超时（15秒）"}
+    except Exception as e:
+        return {"success": False, "message": f"连接失败: {str(e)[:200]}"}
+
+
 # ─── Enterprise Info ────────────────────────────────────
 
 @router.get("/info", response_model=list[EnterpriseInfoOut])

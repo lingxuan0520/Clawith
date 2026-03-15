@@ -41,6 +41,9 @@ async def execute_task(task_id: uuid.UUID, agent_id: uuid.UUID) -> None:
             return
 
         task.status = "doing"
+        # Clear old logs from previous attempts
+        from sqlalchemy import delete as sql_delete
+        await db.execute(sql_delete(TaskLog).where(TaskLog.task_id == task_id))
         db.add(TaskLog(task_id=task_id, content="🤖 开始执行任务..."))
         await db.commit()
         task_title = task.title
@@ -118,7 +121,7 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
     ]
 
     # Step 4: Call LLM with tool loop
-    from app.services.llm_utils import get_provider_base_url, get_tool_params
+    from app.services.llm_utils import get_provider_base_url, get_tool_params, get_max_tokens
     base_url = get_provider_base_url(model.provider, model.base_url)
 
     if not base_url:
@@ -147,7 +150,7 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
                 "model": model.model,
                 "messages": messages,
                 "temperature": 0.7,
-                "max_tokens": 40960,
+                "max_tokens": get_max_tokens(model.provider, model.model),
                 "tools": tools_for_llm if tools_for_llm else None,
                 **get_tool_params(model.provider),
             }
@@ -236,6 +239,14 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
         await _log_error(task_id, f"执行出错: {error_msg[:150]}")
         if task_type == 'supervision':
             await _restore_supervision_status(task_id)
+        else:
+            # Restore todo task to pending so it can be retried
+            async with async_session() as db:
+                result = await db.execute(select(Task).where(Task.id == task_id))
+                task = result.scalar_one_or_none()
+                if task and task.status == "doing":
+                    task.status = "pending"
+                    await db.commit()
         return
 
     # Step 5: Save result and update status

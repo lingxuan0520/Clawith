@@ -11,6 +11,7 @@ PROVIDER_URLS: dict[str, str | None] = {
     "openai": "https://api.openai.com/v1",
     "anthropic": "https://api.anthropic.com/v1",
     "deepseek": "https://api.deepseek.com/v1",
+    "kimi": "https://api.kimi.com/coding/v1",
     "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "zhipu": "https://open.bigmodel.cn/api/paas/v4",
     "minimax": "https://api.minimaxi.com/v1",
@@ -19,7 +20,7 @@ PROVIDER_URLS: dict[str, str | None] = {
 }
 
 # Providers that support OpenAI-compatible tool_choice and parallel_tool_calls
-_TOOL_CHOICE_PROVIDERS = {"openai", "qwen", "deepseek", "zhipu", "minimax", "openrouter", "custom"}
+_TOOL_CHOICE_PROVIDERS = {"openai", "qwen", "deepseek", "kimi", "zhipu", "minimax", "openrouter", "custom"}
 
 
 def get_provider_base_url(provider: str, custom_base_url: str | None = None) -> str | None:

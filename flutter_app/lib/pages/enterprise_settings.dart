@@ -797,11 +797,13 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
   final _apiKeyCtl = TextEditingController();
   final _baseUrlCtl = TextEditingController();
   bool _supportsVision = false;
+  bool _testing = false;
 
   static const _providers = [
     ('anthropic', 'Anthropic'),
     ('openai', 'OpenAI'),
     ('deepseek', 'DeepSeek'),
+    ('kimi', 'Kimi (月之暗面)'),
     ('minimax', 'MiniMax'),
     ('qwen', 'Qwen (DashScope)'),
     ('zhipu', 'Zhipu'),
@@ -942,6 +944,41 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
     }
   }
 
+  Future<void> _testModel() async {
+    final apiKey = _apiKeyCtl.text.trim();
+    if (apiKey.isEmpty && _editingModelId != null) {
+      _showError('测试需要重新输入 API Key');
+      return;
+    }
+    if (_modelCtl.text.trim().isEmpty || apiKey.isEmpty) {
+      _showError('请先填写模型名称和 API Key');
+      return;
+    }
+
+    setState(() => _testing = true);
+    try {
+      final resp = await _dio.post('/enterprise/llm-models/test', data: {
+        'provider': _provider,
+        'model': _modelCtl.text.trim(),
+        'api_key': apiKey,
+        'base_url': _baseUrlCtl.text.trim().isEmpty ? null : _baseUrlCtl.text.trim(),
+      });
+      if (!mounted) return;
+      final success = resp.data['success'] == true;
+      final message = resp.data['message'] as String? ?? '';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(message),
+        backgroundColor: success ? AppColors.success : AppColors.error,
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      _showError('测试请求失败');
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
+  }
+
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -1013,6 +1050,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                                 value: _provider,
                                 isExpanded: true,
                                 dropdownColor: AppColors.bgElevated,
+                                borderRadius: BorderRadius.circular(12),
                                 style: const TextStyle(
                                     fontSize: 13,
                                     color: AppColors.textPrimary),
@@ -1042,6 +1080,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                           const SizedBox(height: 4),
                           TextField(
                             controller: _modelCtl,
+                            onChanged: (_) => setState(() {}),
                             style: const TextStyle(
                                 fontSize: 13,
                                 color: AppColors.textPrimary),
@@ -1116,6 +1155,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                     const SizedBox(height: 4),
                     TextField(
                       controller: _apiKeyCtl,
+                      onChanged: (_) => setState(() {}),
                       obscureText: true,
                       style: const TextStyle(
                           fontSize: 13, color: AppColors.textPrimary),
@@ -1167,11 +1207,20 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     OutlinedButton(
-                      onPressed: () => setState(() {
+                      onPressed: _testing ? null : () => setState(() {
                         _showForm = false;
                         _editingModelId = null;
                       }),
                       child: const Text('取消'),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: _testing || _modelCtl.text.isEmpty || _apiKeyCtl.text.isEmpty
+                          ? null
+                          : _testModel,
+                      child: _testing
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary))
+                          : const Text('测试'),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
@@ -1202,7 +1251,7 @@ class _LlmModelsTabState extends State<_LlmModelsTab>
             ),
           )
         else
-          ..._models.map(_buildModelCard),
+          ..._models.where((m) => m['id'] != _editingModelId).map(_buildModelCard),
       ],
     );
   }

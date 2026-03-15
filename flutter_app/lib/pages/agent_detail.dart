@@ -41,15 +41,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   // ── Tasks ────────────────────────────────────────────────
   List<dynamic> _tasks = [];
   bool _loadingTasks = false;
-  bool _showCreateTask = false;
-  final _taskTitleCtrl = TextEditingController();
-  final _taskDescCtrl = TextEditingController();
-  String _taskPriority = 'medium';
-  bool _creatingTask = false;
-  String _taskFilter = 'all';
-  String? _selectedTaskId;
-  List<dynamic> _taskLogs = [];
-
+  String _taskFilter = 'pending';
   // ── Schedules ────────────────────────────────────────────
   List<dynamic> _schedules = [];
 
@@ -135,12 +127,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   final _channelEncryptKeyCtrl = TextEditingController();
   final _channelPublicKeyCtrl = TextEditingController();
 
-  // ── Schedule creation ────────────────────────────────────
-  bool _showCreateSchedule = false;
-  final _scheduleNameCtrl = TextEditingController();
-  final _scheduleCronCtrl = TextEditingController();
-  String _scheduleFrequency = 'daily';
-  bool _creatingSchedule = false;
 
   static const _tabLabels = [
     '状态',
@@ -175,9 +161,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _taskPollTimer?.cancel();
     _tabController.dispose();
-    _taskTitleCtrl.dispose();
-    _taskDescCtrl.dispose();
     _soulController.dispose();
     _modelCtrl.dispose();
     _fallbackModelCtrl.dispose();
@@ -193,8 +178,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     _channelSecretCtrl.dispose();
     _channelEncryptKeyCtrl.dispose();
     _channelPublicKeyCtrl.dispose();
-    _scheduleNameCtrl.dispose();
-    _scheduleCronCtrl.dispose();
     super.dispose();
   }
 
@@ -288,10 +271,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   Future<void> _fetchTasks() async {
     setState(() => _loadingTasks = true);
     try {
-      final tasks = await _api.listTasks(
-        widget.agentId,
-        status: _taskFilter == 'all' ? null : _taskFilter,
-      );
+      final tasks = await _api.listTasks(widget.agentId);
       if (!mounted) return;
       setState(() {
         _tasks = tasks;
@@ -308,13 +288,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       final s = await _api.listSchedules(widget.agentId);
       if (mounted) setState(() => _schedules = s);
-    } catch (_) {}
-  }
-
-  Future<void> _fetchTaskLogs(String taskId) async {
-    try {
-      final logs = await _api.getTaskLogs(widget.agentId, taskId);
-      if (mounted) setState(() => _taskLogs = logs);
     } catch (_) {}
   }
 
@@ -530,36 +503,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
   }
 
-  Future<void> _createTask() async {
-    final title = _taskTitleCtrl.text.trim();
-    if (title.isEmpty) {
-      _showSnack('请输入任务标题');
-      return;
-    }
-    setState(() => _creatingTask = true);
-    try {
-      await _api.createTask(widget.agentId, {
-        'title': title,
-        'description': _taskDescCtrl.text.trim(),
-        'priority': _taskPriority,
-        'type': 'todo',
-      });
-      _taskTitleCtrl.clear();
-      _taskDescCtrl.clear();
-      if (!mounted) return;
-      setState(() {
-        _creatingTask = false;
-        _showCreateTask = false;
-        _taskPriority = 'medium';
-      });
-      _showSnack('任务已创建');
-      _fetchTasks();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _creatingTask = false);
-      _showSnack('创建任务失败: ${_errMsg(e)}');
-    }
-  }
 
   Future<void> _saveSoulMd() async {
     setState(() => _savingSoul = true);
@@ -824,11 +767,25 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
   }
 
+  Timer? _taskPollTimer;
+
   Future<void> _triggerTask(String taskId) async {
     try {
       await _api.triggerTask(widget.agentId, taskId);
-      _showSnack('任务已触发');
+      _showSnack('任务已触发，执行中...');
+      setState(() => _taskFilter = 'doing');
       _fetchTasks();
+      // Poll every 3s until task leaves 'doing'
+      _taskPollTimer?.cancel();
+      _taskPollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+        if (!mounted) { timer.cancel(); return; }
+        await _fetchTasks();
+        final stillDoing = _tasks.any((t) => (t as Map)['id'] == taskId && (t['status'] == 'doing' || t['status'] == 'running'));
+        if (!stillDoing) {
+          timer.cancel();
+          if (mounted) setState(() => _taskFilter = 'done');
+        }
+      });
     } catch (e) {
       _showSnack('触发任务失败: ${_errMsg(e)}');
     }
@@ -844,38 +801,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
   }
 
-  Future<void> _createSchedule() async {
-    final name = _scheduleNameCtrl.text.trim();
-    if (name.isEmpty) {
-      _showSnack('请输入计划名称');
-      return;
-    }
-    setState(() => _creatingSchedule = true);
-    try {
-      final data = <String, dynamic>{
-        'name': name,
-        'frequency': _scheduleFrequency,
-      };
-      if (_scheduleCronCtrl.text.trim().isNotEmpty) {
-        data['cron'] = _scheduleCronCtrl.text.trim();
-      }
-      await _api.createSchedule(widget.agentId, data);
-      _scheduleNameCtrl.clear();
-      _scheduleCronCtrl.clear();
-      if (!mounted) return;
-      setState(() {
-        _creatingSchedule = false;
-        _showCreateSchedule = false;
-        _scheduleFrequency = 'daily';
-      });
-      _showSnack('计划已创建');
-      _fetchSchedules();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _creatingSchedule = false);
-      _showSnack('创建计划失败: ${_errMsg(e)}');
-    }
-  }
 
   Future<void> _createChannel() async {
     try {
@@ -1215,6 +1140,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   value: relType,
                   decoration: const InputDecoration(labelText: '关系类型', isDense: true),
                   dropdownColor: AppColors.bgElevated,
+                  borderRadius: BorderRadius.circular(12),
                   style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                   items: const [
                     DropdownMenuItem(value: 'direct_leader', child: Text('直属上级')),
@@ -1292,6 +1218,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   value: selectedAgentId,
                   decoration: const InputDecoration(labelText: '选择 Agent', isDense: true),
                   dropdownColor: AppColors.bgElevated,
+                  borderRadius: BorderRadius.circular(12),
                   style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                   isExpanded: true,
                   items: otherAgents.map((a) {
@@ -1308,6 +1235,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   value: relType,
                   decoration: const InputDecoration(labelText: '关系类型', isDense: true),
                   dropdownColor: AppColors.bgElevated,
+                  borderRadius: BorderRadius.circular(12),
                   style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                   items: const [
                     DropdownMenuItem(value: 'peer', child: Text('同级')),
@@ -1378,24 +1306,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     return _segmentLabelMap[key] ?? (key[0].toUpperCase() + key.substring(1));
   }
 
-  String _taskStatusLabel(String status) {
-    switch (status) {
-      case 'completed':
-      case 'done':
-        return '已完成';
-      case 'running':
-      case 'in_progress':
-        return '进行中';
-      case 'failed':
-      case 'error':
-        return '失败';
-      case 'pending':
-        return '待处理';
-      default:
-        return status;
-    }
-  }
-
   void _showSnack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1407,10 +1317,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     if (e is DioException) {
       final data = e.response?.data;
       if (data is Map) {
-        final detail = data['detail'] as String?;
-        if (detail != null && detail.isNotEmpty) return detail;
-        final msg = data['message'] as String?;
-        if (msg != null && msg.isNotEmpty) return msg;
+        final detail = data['detail'];
+        if (detail is String && detail.isNotEmpty) return detail;
+        if (detail is List && detail.isNotEmpty) return detail.map((d) => d is Map ? (d['msg'] ?? d.toString()) : d.toString()).join('; ');
+        final msg = data['message'];
+        if (msg is String && msg.isNotEmpty) return msg;
       }
       final sc = e.response?.statusCode;
       return sc != null ? 'HTTP $sc' : '网络错误';
@@ -1515,20 +1426,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
 
-
-  Color _priorityColor(String? p) {
-    switch (p) {
-      case 'high':
-      case 'urgent':
-        return AppColors.error;
-      case 'medium':
-        return AppColors.warning;
-      case 'low':
-        return AppColors.success;
-      default:
-        return AppColors.textTertiary;
-    }
-  }
 
   // ─── Build ───────────────────────────────────────────────
 
@@ -1664,7 +1561,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
   Widget _buildOverviewTab(Map<String, dynamic> agent) {
     final createdAt = agent['created_at'];
-    final updatedAt = agent['updated_at'];
+    final lastActiveAt = agent['last_active_at'];
+    final creatorName = agent['creator_username'] as String? ?? '';
     final tokens = (_metrics?['tokens'] as Map<String, dynamic>?) ?? {};
     final tasks = (_metrics?['tasks'] as Map<String, dynamic>?) ?? {};
     final activity = (_metrics?['activity'] as Map<String, dynamic>?) ?? {};
@@ -1675,6 +1573,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     final tasksCompleted = (tasks['done'] ?? 0) as num;
     final tasksTotal = (tasks['total'] ?? 0) as num;
     final actionsLast24h = (activity['actions_last_24h'] ?? 0) as num;
+    final llmCallsToday = (agent['llm_calls_today'] ?? 0) as num;
+    final maxLlmCalls = (agent['max_llm_calls_per_day'] ?? 100) as num;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -1693,6 +1593,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 if (dailyLimit > 0)
                   _tokenBar('每日 Token', dailyTokens.toDouble(), dailyLimit.toDouble()),
                 if (dailyLimit > 0) const SizedBox(height: 12),
+                _tokenBar('今日 LLM 调用', llmCallsToday.toDouble(), maxLlmCalls.toDouble()),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(child: _metricTile('总任务', tasksTotal.toString(), Icons.assignment)),
@@ -1754,7 +1656,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 const SizedBox(height: 12),
                 _infoRow('Agent ID', widget.agentId),
                 _infoRow('创建时间', _fmtTs(createdAt)),
-                _infoRow('更新时间', _fmtTs(updatedAt)),
+                if (creatorName.isNotEmpty)
+                  _infoRow('创建者', '@$creatorName'),
+                _infoRow('最后活动', _fmtTs(lastActiveAt)),
               ],
             ),
           ),
@@ -1842,406 +1746,565 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildTasksTab() {
+    // Categorize tasks into columns
+    final todoTasks = _tasks.where((t) {
+      final m = t as Map<String, dynamic>;
+      return m['status'] == 'pending' || m['status'] == 'todo';
+    }).toList();
+    final doingTasks = _tasks.where((t) {
+      final m = t as Map<String, dynamic>;
+      return m['status'] == 'doing' || m['status'] == 'running';
+    }).toList();
+    final doneTasks = _tasks.where((t) {
+      final m = t as Map<String, dynamic>;
+      return m['status'] == 'done' || m['status'] == 'completed';
+    }).toList();
+
+    final columns = {
+      'pending': ('待办', todoTasks.length + _schedules.length),
+      'doing': ('进行中', doingTasks.length),
+      'done': ('已完成', doneTasks.length),
+    };
+
+    List<dynamic> currentTasks;
+    switch (_taskFilter) {
+      case 'doing': currentTasks = doingTasks; break;
+      case 'done': currentTasks = doneTasks; break;
+      default: currentTasks = todoTasks;
+    }
+
     return Column(
       children: [
-        // Header
+        // Top bar: tabs + buttons
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
           child: Row(
             children: [
-              const Icon(Icons.task_alt, color: AppColors.textSecondary, size: 18),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text('任务', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-              _segmentedControl(
-                options: const ['all', 'pending', 'running', 'completed', 'failed'],
-                selected: _taskFilter,
-                onChanged: (v) {
-                  setState(() => _taskFilter = v);
-                  _fetchTasks();
-                },
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('新建任务'),
-                onPressed: () => setState(() => _showCreateTask = !_showCreateTask),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  textStyle: const TextStyle(fontSize: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: columns.entries.map((e) {
+                      final key = e.key;
+                      final label = e.value.$1;
+                      final count = e.value.$2;
+                      final selected = _taskFilter == key;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: ChoiceChip(
+                          label: Text('$label $count', style: TextStyle(fontSize: 11, color: selected ? Colors.white : AppColors.textSecondary)),
+                          selected: selected,
+                          onSelected: (_) => setState(() => _taskFilter = key),
+                          selectedColor: AppColors.accentPrimary,
+                          backgroundColor: AppColors.bgTertiary,
+                          side: BorderSide.none,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18),
-                onPressed: _fetchTasks,
+                icon: const Icon(Icons.add, size: 20, color: AppColors.accentPrimary),
+                onPressed: _showCreateTaskSheet,
               ),
             ],
           ),
         ),
 
-        // Create Form
-        if (_showCreateTask)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('创建任务', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _taskTitleCtrl,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                    decoration: const InputDecoration(labelText: '标题', hintText: '输入任务标题...'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _taskDescCtrl,
-                    maxLines: 3,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                    decoration: const InputDecoration(labelText: '描述', hintText: '描述任务内容...'),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _taskPriority,
-                    decoration: const InputDecoration(labelText: '优先级'),
-                    dropdownColor: AppColors.bgElevated,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                    items: const [
-                      DropdownMenuItem(value: 'low', child: Text('低')),
-                      DropdownMenuItem(value: 'medium', child: Text('中')),
-                      DropdownMenuItem(value: 'high', child: Text('高')),
-                      DropdownMenuItem(value: 'urgent', child: Text('紧急')),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setState(() => _taskPriority = v);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => setState(() => _showCreateTask = false),
-                        child: const Text('取消'),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: _creatingTask ? null : _createTask,
-                        child: _creatingTask ? _miniSpinner() : const Text('创建'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
         const SizedBox(height: 8),
 
-        // Schedules section
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.schedule, color: AppColors.textSecondary, size: 16),
-                  const SizedBox(width: 6),
-                  const Expanded(
-                    child: Text('计划任务', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.add, size: 14),
-                    label: const Text('新建', style: TextStyle(fontSize: 11)),
-                    onPressed: () => setState(() => _showCreateSchedule = !_showCreateSchedule),
-                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
-                  ),
-                ],
-              ),
-              if (_showCreateSchedule) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgSecondary,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.borderSubtle),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('创建计划', style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _scheduleNameCtrl,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
-                        decoration: const InputDecoration(labelText: '名称', hintText: '计划名称', isDense: true),
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: _scheduleFrequency,
-                        decoration: const InputDecoration(labelText: '频率', isDense: true),
-                        dropdownColor: AppColors.bgElevated,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
-                        items: const [
-                          DropdownMenuItem(value: 'minutely', child: Text('每分钟')),
-                          DropdownMenuItem(value: 'hourly', child: Text('每小时')),
-                          DropdownMenuItem(value: 'daily', child: Text('每天')),
-                          DropdownMenuItem(value: 'weekly', child: Text('每周')),
-                          DropdownMenuItem(value: 'monthly', child: Text('每月')),
-                          DropdownMenuItem(value: 'custom', child: Text('自定义 Cron')),
-                        ],
-                        onChanged: (v) { if (v != null) setState(() => _scheduleFrequency = v); },
-                      ),
-                      if (_scheduleFrequency == 'custom') ...[
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _scheduleCronCtrl,
-                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontFamily: 'monospace'),
-                          decoration: const InputDecoration(labelText: 'Cron 表达式', hintText: '* * * * *', isDense: true),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(onPressed: () => setState(() => _showCreateSchedule = false), child: const Text('取消')),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: _creatingSchedule ? null : _createSchedule,
-                            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), textStyle: const TextStyle(fontSize: 12)),
-                            child: _creatingSchedule ? _miniSpinner() : const Text('创建'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              if (_schedules.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                ..._schedules.map((s) {
-                  final sched = s as Map<String, dynamic>;
-                  final name = sched['name'] as String? ?? sched['cron'] as String? ?? '计划';
-                  final id = sched['id']?.toString() ?? '';
-                  final enabled = sched['enabled'] == true || sched['is_active'] == true;
-                  final nextFire = sched['next_fire_time'] ?? sched['next_run_at'];
-                  final fireCount = sched['fire_count'] ?? sched['run_count'] ?? 0;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgTertiary,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColors.borderSubtle),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.schedule, size: 14, color: enabled ? AppColors.accentPrimary : AppColors.textTertiary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w500)),
-                              if (nextFire != null)
-                                Text('下次: ${_fmtRelative(nextFire)}', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
-                              if (fireCount > 0)
-                                Text('已执行 $fireCount 次', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.play_circle_outline, size: 16, color: AppColors.accentPrimary),
-                          tooltip: '立即触发',
-                          onPressed: () => _triggerSchedule(id),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                          tooltip: '删除',
-                          onPressed: () => _deleteSchedule(id),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Task List
+        // Content list
         Expanded(
           child: _loadingTasks
               ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
-              : _tasks.isEmpty
-                  ? _emptyState('暂无任务', '创建一个任务开始吧。')
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: _tasks.length,
-                      itemBuilder: (ctx, i) {
-                        final task = _tasks[i] as Map<String, dynamic>;
-                        return _buildTaskItem(task);
-                      },
-                    ),
+              : _buildTaskColumnContent(_taskFilter, currentTasks),
         ),
       ],
     );
   }
 
-  Widget _buildTaskItem(Map<String, dynamic> task) {
+  Widget _buildTaskColumnContent(String column, List<dynamic> tasks) {
+    final showSchedules = column == 'pending';
+    final hasContent = tasks.isNotEmpty || (showSchedules && _schedules.isNotEmpty);
+
+    if (!hasContent) {
+      return _emptyState(
+        column == 'pending' ? '暂无待办' : column == 'doing' ? '暂无进行中' : '暂无已完成',
+        column == 'pending' ? '创建任务或计划开始吧' : '',
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      children: [
+        // Schedules sub-section in pending tab
+        if (showSchedules) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6, top: 4),
+            child: Text('SCHEDULED', style: TextStyle(color: AppColors.textTertiary, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+          ),
+          if (_schedules.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text('暂无计划', style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+            ),
+          ..._schedules.map((s) => _buildScheduleCard(s as Map<String, dynamic>)),
+          if (tasks.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6, top: 8),
+              child: Text('TASKS', style: TextStyle(color: AppColors.textTertiary, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+            ),
+        ],
+        // Task cards
+        ...tasks.map((t) => _buildTaskCard(t as Map<String, dynamic>)),
+      ],
+    );
+  }
+
+  Widget _buildScheduleCard(Map<String, dynamic> sched) {
+    final name = sched['name'] as String? ?? '计划';
+    final id = sched['id']?.toString() ?? '';
+    final enabled = sched['is_enabled'] == true || sched['enabled'] == true;
+    final instruction = sched['instruction'] as String? ?? '';
+    final cronExpr = sched['cron_expr'] as String? ?? sched['cron'] as String? ?? '';
+    final nextFire = sched['next_run_at'] ?? sched['next_fire_time'];
+    final runCount = sched['run_count'] ?? sched['fire_count'] ?? 0;
+    final creator = sched['creator_username'] as String? ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.bgSecondary,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(enabled ? Icons.schedule : Icons.pause_circle_outline, size: 15, color: enabled ? AppColors.accentPrimary : AppColors.textTertiary),
+              const SizedBox(width: 6),
+              Expanded(child: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+              if (creator.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(8)),
+                  child: Text('@$creator', style: TextStyle(color: AppColors.accentPrimary, fontSize: 9)),
+                ),
+            ],
+          ),
+          if (instruction.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(instruction, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+          ],
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              if (cronExpr.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(4)),
+                  child: Text(cronExpr, style: const TextStyle(color: AppColors.textTertiary, fontSize: 10, fontFamily: 'monospace')),
+                ),
+              if (cronExpr.isNotEmpty) const SizedBox(width: 8),
+              if (nextFire != null)
+                Text('下次: ${_fmtRelative(nextFire)}', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+              if (runCount > 0) ...[
+                const SizedBox(width: 8),
+                Text('已执行 $runCount 次', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+              ],
+              const Spacer(),
+              InkWell(
+                onTap: () => _triggerSchedule(id),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: const Icon(Icons.play_circle_outline, size: 18, color: AppColors.accentPrimary),
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () => _deleteSchedule(id),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskCard(Map<String, dynamic> task) {
     final title = task['title'] as String? ?? '无标题';
     final desc = task['description'] as String? ?? '';
     final status = task['status'] as String? ?? 'pending';
-    final priority = task['priority'] as String? ?? 'medium';
-    final createdAt = task['created_at'];
+    final creator = task['creator_username'] as String? ?? '';
     final taskId = task['id']?.toString() ?? '';
-    final isExpanded = _selectedTaskId == taskId;
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (_selectedTaskId == taskId) {
-            _selectedTaskId = null;
-            _taskLogs = [];
-          } else {
-            _selectedTaskId = taskId;
-            _fetchTaskLogs(taskId);
-          }
-        });
-      },
+      onTap: () => _showTaskDetail(taskId, title, desc, status),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.bgSecondary,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isExpanded ? AppColors.accentPrimary.withValues(alpha: 0.4) : AppColors.borderSubtle,
-          ),
+          border: Border.all(color: AppColors.borderSubtle),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(color: _priorityColor(priority), shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
-                ),
-                _taskStatusChip(status),
+                Expanded(child: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                if (status == 'doing' || status == 'running')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(color: AppColors.warning.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                    child: const Text('进行中', style: TextStyle(color: AppColors.warning, fontSize: 9)),
+                  ),
+                if (status == 'done' || status == 'completed')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                    child: const Text('已完成', style: TextStyle(color: AppColors.success, fontSize: 9)),
+                  ),
               ],
             ),
             if (desc.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
             ],
-            const SizedBox(height: 6),
+            if (creator.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('@$creator', style: TextStyle(color: AppColors.accentPrimary, fontSize: 10)),
+            ],
+            const SizedBox(height: 4),
             Row(
               children: [
-                Text(
-                  '优先级: ${priority[0].toUpperCase()}${priority.substring(1)}',
-                  style: TextStyle(color: _priorityColor(priority), fontSize: 11),
-                ),
                 const Spacer(),
                 if (status == 'pending')
-                  GestureDetector(
+                  InkWell(
                     onTap: () => _triggerTask(taskId),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         color: AppColors.accentPrimary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.accentPrimary.withValues(alpha: 0.3)),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.play_arrow, size: 11, color: AppColors.accentPrimary),
-                          SizedBox(width: 3),
-                          Text('触发', style: TextStyle(color: AppColors.accentPrimary, fontSize: 10, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
+                      child: const Text('触发', style: TextStyle(color: AppColors.accentPrimary, fontSize: 10, fontWeight: FontWeight.w500)),
                     ),
                   ),
-                Text(_fmtTs(createdAt), style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
               ],
             ),
-            // Expanded task logs
-            if (isExpanded && _taskLogs.isNotEmpty) ...[
-              const Divider(height: 16, color: AppColors.borderSubtle),
-              const Text('任务日志', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              ..._taskLogs.take(10).map((l) {
-                final log = l as Map<String, dynamic>;
-                final logMsg = log['message'] as String? ?? log['content'] as String? ?? '';
-                final logTs = log['timestamp'] ?? log['created_at'];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.chevron_right, size: 12, color: AppColors.textTertiary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(logMsg, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                      ),
-                      Text(_fmtRelative(logTs), style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
-                    ],
-                  ),
-                );
-              }),
-            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _taskStatusChip(String status) {
-    Color bg;
-    Color fg;
-    switch (status) {
-      case 'completed':
-      case 'done':
-        bg = AppColors.success.withValues(alpha: 0.15);
-        fg = AppColors.success;
-        break;
-      case 'running':
-      case 'in_progress':
-        bg = AppColors.accentPrimary.withValues(alpha: 0.15);
-        fg = AppColors.accentPrimary;
-        break;
-      case 'failed':
-      case 'error':
-        bg = AppColors.error.withValues(alpha: 0.15);
-        fg = AppColors.error;
-        break;
-      default:
-        bg = AppColors.textTertiary.withValues(alpha: 0.15);
-        fg = AppColors.textTertiary;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Text(_taskStatusLabel(status), style: TextStyle(color: fg, fontSize: 10, fontWeight: FontWeight.w500)),
+  void _showTaskDetail(String taskId, String title, String desc, String status) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgElevated,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => _TaskDetailSheet(
+        agentId: widget.agentId,
+        taskId: taskId,
+        title: title,
+        desc: desc,
+        status: status,
+        onTrigger: () { Navigator.pop(ctx); _triggerTask(taskId); },
+      ),
     );
   }
+
+  /// Unified create task/schedule bottom sheet
+  void _showCreateTaskSheet() {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    final intervalCtrl = TextEditingController(text: '1');
+    bool isRepeat = false; // false=一次性, true=重复
+    String freq = 'day'; // month, week, day, hour, minute
+    TimeOfDay execTime = const TimeOfDay(hour: 9, minute: 0);
+    bool hasDeadline = false;
+    DateTime? deadline;
+    bool creating = false;
+
+    const units = [
+      ('month', '月'),
+      ('week', '周'),
+      ('day', '天'),
+      ('hour', '小时'),
+      ('minute', '分钟'),
+    ];
+    bool showExecTime(String f) => f == 'month' || f == 'week' || f == 'day';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgElevated,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheetState) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('新建任务', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: InputDecoration(hintText: '任务标题', filled: true, fillColor: AppColors.bgTertiary, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                    onChanged: (_) => setSheetState(() {}),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(hintText: '任务描述（可选）', filled: true, fillColor: AppColors.bgTertiary, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                  ),
+                  const SizedBox(height: 14),
+                  // Execution mode toggle
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setSheetState(() => isRepeat = false),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: !isRepeat ? AppColors.accentPrimary : AppColors.bgTertiary,
+                              borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
+                              border: Border.all(color: !isRepeat ? AppColors.accentPrimary : AppColors.borderSubtle),
+                            ),
+                            child: Center(child: Text('一次性执行', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: !isRepeat ? Colors.white : AppColors.textSecondary))),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setSheetState(() => isRepeat = true),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isRepeat ? AppColors.accentPrimary : AppColors.bgTertiary,
+                              borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
+                              border: Border.all(color: isRepeat ? AppColors.accentPrimary : AppColors.borderSubtle),
+                            ),
+                            child: Center(child: Text('重复执行', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: isRepeat ? Colors.white : AppColors.textSecondary))),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Repeat settings
+                  if (isRepeat) ...[
+                    const SizedBox(height: 14),
+                    const Text('重复频率', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text('每', style: TextStyle(fontSize: 14)),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 56,
+                          child: TextField(
+                            controller: intervalCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                              filled: true,
+                              fillColor: AppColors.bgTertiary,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.borderSubtle)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.accentPrimary)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: units.map((u) {
+                                final sel = freq == u.$1;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: GestureDetector(
+                                    onTap: () => setSheetState(() => freq = u.$1),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: sel ? AppColors.accentPrimary : AppColors.bgTertiary,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: sel ? AppColors.accentPrimary : AppColors.borderSubtle),
+                                      ),
+                                      child: Text(u.$2, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (showExecTime(freq)) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text('执行时间：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                          GestureDetector(
+                            onTap: () async {
+                              final t = await showTimePicker(context: ctx, initialTime: execTime);
+                              if (t != null) setSheetState(() => execTime = t);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.borderSubtle)),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text("${execTime.hour.toString().padLeft(2, '0')}:${execTime.minute.toString().padLeft(2, '0')}", style: const TextStyle(fontSize: 14)),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.schedule, size: 16, color: AppColors.textTertiary),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Text('截止时间：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        ChoiceChip(
+                          label: const Text('永不截止', style: TextStyle(fontSize: 12)),
+                          selected: !hasDeadline,
+                          onSelected: (_) => setSheetState(() => hasDeadline = false),
+                          selectedColor: AppColors.accentPrimary,
+                          side: BorderSide.none,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        const SizedBox(width: 6),
+                        ChoiceChip(
+                          label: const Text('设置截止', style: TextStyle(fontSize: 12)),
+                          selected: hasDeadline,
+                          onSelected: (_) => setSheetState(() {
+                            hasDeadline = true;
+                            deadline ??= DateTime.now().add(const Duration(days: 30));
+                          }),
+                          selectedColor: AppColors.accentPrimary,
+                          side: BorderSide.none,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                    if (hasDeadline) ...[
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () async {
+                          final d = await showDatePicker(context: ctx, initialDate: deadline ?? DateTime.now().add(const Duration(days: 30)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                          if (d != null) setSheetState(() => deadline = d);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.borderSubtle)),
+                          child: Text(
+                            deadline != null ? "${deadline!.year}-${deadline!.month.toString().padLeft(2, '0')}-${deadline!.day.toString().padLeft(2, '0')}" : '选择日期',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: titleCtrl.text.trim().isEmpty || creating ? null : () async {
+                        setSheetState(() => creating = true);
+                        try {
+                          if (isRepeat) {
+                            // Create schedule
+                            final n = int.tryParse(intervalCtrl.text.trim()) ?? 1;
+                            final h = execTime.hour;
+                            final m = execTime.minute;
+                            String cronExpr;
+                            switch (freq) {
+                              case 'minute':
+                                cronExpr = n == 1 ? '* * * * *' : '*/$n * * * *';
+                              case 'hour':
+                                cronExpr = n == 1 ? '0 * * * *' : '0 */$n * * *';
+                              case 'day':
+                                cronExpr = n == 1 ? '$m $h * * *' : '$m $h */$n * *';
+                              case 'week':
+                                cronExpr = '$m $h * * 1';
+                              case 'month':
+                                cronExpr = n == 1 ? '$m $h 1 * *' : '$m $h 1 */$n *';
+                              default:
+                                cronExpr = '$m $h * * *';
+                            }
+                            final data = <String, dynamic>{
+                              'name': titleCtrl.text.trim(),
+                              'instruction': descCtrl.text.trim(),
+                              'cron_expr': cronExpr,
+                            };
+                            if (hasDeadline && deadline != null) {
+                              data['due_date'] = deadline!.toIso8601String();
+                            }
+                            await _api.createSchedule(widget.agentId, data);
+                            if (!mounted) return;
+                            Navigator.pop(ctx);
+                            _showSnack('计划已创建');
+                            _fetchSchedules();
+                          } else {
+                            // Create one-time task
+                            await _api.createTask(widget.agentId, {
+                              'title': titleCtrl.text.trim(),
+                              'description': descCtrl.text.trim(),
+                            });
+                            if (!mounted) return;
+                            Navigator.pop(ctx);
+                            _showSnack('任务已创建');
+                            _fetchTasks();
+                          }
+                        } catch (e) {
+                          if (!mounted) return;
+                          setSheetState(() => creating = false);
+                          _showSnack('创建失败: ${_errMsg(e)}');
+                        }
+                      },
+                      child: creating
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('创建'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
 
   // ═══════════════════════════════════════════════════════════
   // TAB 3 : Pulse
@@ -3811,6 +3874,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     value: _newChannelType,
                     decoration: const InputDecoration(labelText: '通道类型', isDense: true),
                     dropdownColor: AppColors.bgElevated,
+                  borderRadius: BorderRadius.circular(12),
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                     items: const [
                       DropdownMenuItem(value: 'feishu', child: Text('飞书')),
@@ -3983,6 +4047,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         isExpanded: true,
         decoration: InputDecoration(labelText: label),
         dropdownColor: AppColors.bgElevated,
+        borderRadius: BorderRadius.circular(12),
         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
         hint: Text('未选择', style: const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
         items: [
@@ -4119,6 +4184,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 isDense: true,
                 decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6)),
                 dropdownColor: AppColors.bgElevated,
+                  borderRadius: BorderRadius.circular(12),
                 style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
                 items: levelLabels.entries.map((e) => DropdownMenuItem(value: e.key, child: Text('${e.key} ${e.value}'))).toList(),
                 onChanged: (v) async {
@@ -4224,6 +4290,226 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 8),
         Text(label, style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
       ],
+    );
+  }
+}
+
+/// Dialog to view a workspace file's content
+class _FileViewerDialog extends StatefulWidget {
+  final String agentId;
+  final String path;
+  const _FileViewerDialog({required this.agentId, required this.path});
+
+  @override
+  State<_FileViewerDialog> createState() => _FileViewerDialogState();
+}
+
+class _FileViewerDialogState extends State<_FileViewerDialog> {
+  String? _content;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await ApiService.instance.readFile(widget.agentId, widget.path);
+      if (!mounted) return;
+      setState(() { _content = data['content'] as String? ?? ''; _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _error = '读取失败: $e'; _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.bgElevated,
+      insetPadding: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Title bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+              child: Row(
+                children: [
+                  const Icon(Icons.description_outlined, size: 16, color: AppColors.accentPrimary),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(widget.path, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+                  IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
+            ),
+            const Divider(color: AppColors.borderSubtle),
+            // Content
+            Flexible(
+              child: _loading
+                  ? const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(color: AppColors.accentPrimary)))
+                  : _error != null
+                      ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, style: const TextStyle(color: AppColors.error))))
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: SelectableText(_content ?? '', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet showing full task execution result
+class _TaskDetailSheet extends StatefulWidget {
+  final String agentId;
+  final String taskId;
+  final String title;
+  final String desc;
+  final String status;
+  final VoidCallback onTrigger;
+  const _TaskDetailSheet({required this.agentId, required this.taskId, required this.title, required this.desc, required this.status, required this.onTrigger});
+
+  @override
+  State<_TaskDetailSheet> createState() => _TaskDetailSheetState();
+}
+
+class _TaskDetailSheetState extends State<_TaskDetailSheet> {
+  List<dynamic> _logs = [];
+  bool _loading = true;
+
+  static final _filePathRegex = RegExp(r'(?:workspace|skills|knowledge_base)/[\w./_-]+\.[\w]+');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogs();
+  }
+
+  Future<void> _loadLogs() async {
+    try {
+      final logs = await ApiService.instance.getTaskLogs(widget.agentId, widget.taskId);
+      if (!mounted) return;
+      setState(() { _logs = logs; _loading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxH = MediaQuery.of(context).size.height * 0.8;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxH),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Center(child: Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 8, bottom: 12), decoration: BoxDecoration(color: AppColors.textTertiary.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)))),
+            // Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(child: Text(widget.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+                  if (widget.status == 'pending')
+                    TextButton(onPressed: widget.onTrigger, child: const Text('触发执行', style: TextStyle(color: AppColors.accentPrimary))),
+                ],
+              ),
+            ),
+            if (widget.desc.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Align(alignment: Alignment.centerLeft, child: Text(widget.desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
+              ),
+            const Divider(height: 20, color: AppColors.borderSubtle),
+            // Logs / Result
+            Flexible(
+              child: _loading
+                  ? const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(color: AppColors.accentPrimary)))
+                  : _logs.isEmpty
+                      ? const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('暂无执行记录', style: TextStyle(color: AppColors.textTertiary))))
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          itemCount: _logs.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (ctx, i) {
+                            final log = _logs[i] as Map<String, dynamic>;
+                            final content = log['message'] as String? ?? log['content'] as String? ?? '';
+                            final isResult = content.startsWith('✅');
+                            if (isResult) {
+                              return _buildResultContent(content);
+                            }
+                            return Text(content, style: const TextStyle(color: AppColors.textTertiary, fontSize: 12));
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultContent(String content) {
+    final matches = _filePathRegex.allMatches(content).toList();
+    if (matches.isEmpty) {
+      return SelectableText(content, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6));
+    }
+    final widgets = <Widget>[];
+    int cursor = 0;
+    for (final m in matches) {
+      if (m.start > cursor) {
+        widgets.add(SelectableText(content.substring(cursor, m.start), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)));
+      }
+      final path = m.group(0)!;
+      widgets.add(
+        GestureDetector(
+          onTap: () => _openFile(path),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.accentPrimary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.accentPrimary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.description_outlined, size: 14, color: AppColors.accentPrimary),
+                const SizedBox(width: 4),
+                Flexible(child: Text(path, style: const TextStyle(color: AppColors.accentPrimary, fontSize: 12))),
+                const SizedBox(width: 4),
+                const Icon(Icons.open_in_new, size: 12, color: AppColors.accentPrimary),
+              ],
+            ),
+          ),
+        ),
+      );
+      cursor = m.end;
+    }
+    if (cursor < content.length) {
+      widgets.add(SelectableText(content.substring(cursor), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)));
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+  }
+
+  void _openFile(String path) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _FileViewerDialog(agentId: widget.agentId, path: path),
     );
   }
 }

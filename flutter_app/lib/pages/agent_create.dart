@@ -601,6 +601,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
               const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
       decoration: const InputDecoration(),
       dropdownColor: AppColors.bgElevated,
+      borderRadius: BorderRadius.circular(12),
       style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
       isExpanded: true,
       items: items,
