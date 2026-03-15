@@ -147,7 +147,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
   static const _tabLabels = [
     '状态',
-    '聊天',
     '任务',
     '动态',
     '思维',
@@ -205,14 +204,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
   void _onTabChanged() {
     if (!_tabController.indexIsChanging) return;
-    final idx = _tabController.index;
-    // Chat tab -> navigate to separate chat page
-    if (idx == 1) {
-      _tabController.animateTo(0);
-      context.push('/agents/${widget.agentId}/chat');
-      return;
-    }
-    _loadTabData(idx);
+    _loadTabData(_tabController.index);
   }
 
   void _loadTabData(int idx) {
@@ -220,32 +212,32 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       case 0:
         _fetchOverviewData();
         break;
-      case 2:
+      case 1:
         _fetchTasks();
         _fetchSchedules();
         break;
-      case 3:
+      case 2:
         _fetchPulseData();
         break;
-      case 4:
+      case 3:
         _fetchMindData();
         break;
-      case 5:
+      case 4:
         _fetchToolsData();
         break;
-      case 6:
+      case 5:
         _fetchSkillsData();
         break;
-      case 7:
+      case 6:
         _fetchRelationshipsData();
         break;
-      case 8:
+      case 7:
         _fetchWorkspaceFiles();
         break;
-      case 9:
+      case 8:
         _fetchActivity();
         break;
-      case 10:
+      case 9:
         _fetchSettingsData();
         break;
     }
@@ -1852,7 +1844,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         controller: _tabController,
         children: [
           _buildOverviewTab(agent),
-          _buildChatTab(),
           _buildTasksTab(),
           _buildPulseTab(),
           _buildMindTab(),
@@ -2257,35 +2248,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   // TAB 1 : Chat
   // ═══════════════════════════════════════════════════════════
 
-  Widget _buildChatTab() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.chat_bubble_outline, size: 64, color: AppColors.textTertiary),
-          const SizedBox(height: 16),
-          const Text(
-            '开始与此智能体聊天',
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '打开聊天界面与此 Agent 互动。',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.open_in_new, size: 18),
-            label: const Text('打开聊天'),
-            onPressed: () => context.push('/agents/${widget.agentId}/chat'),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ═══════════════════════════════════════════════════════════
-  // TAB 2 : Tasks
+  // TAB 1 : Tasks
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildTasksTab() {

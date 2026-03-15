@@ -70,6 +70,30 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Top bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+          child: Row(
+            children: [
+              const Text('聊天', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.person_add_alt_1, size: 22),
+                color: AppColors.textSecondary,
+                tooltip: '招募新员工',
+                onPressed: () => context.push('/agents/new'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: _buildBody()),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
     if (_loading) {
       return const Center(
         child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary),
