@@ -241,10 +241,17 @@ async def rename_session(
 async def get_session_messages(
     agent_id: uuid.UUID,
     session_id: uuid.UUID,
+    limit: int = 50,
+    before: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get chat messages for a specific session."""
+    """Get chat messages for a specific session (paginated, newest last).
+
+    - limit: max messages to return (default 50, max 200)
+    - before: ISO timestamp cursor — return messages older than this
+    """
+    limit = min(limit, 200)
     # Allow looking up sessions where agent_id OR peer_agent_id matches
     result = await db.execute(
         select(ChatSession).where(
@@ -262,14 +269,23 @@ async def get_session_messages(
     if str(session.user_id) != str(current_user.id) and not _is_admin_or_creator(current_user, agent):
         raise HTTPException(status_code=403, detail="Not authorized to view this session")
 
-    # Query messages by conversation_id only (agent-to-agent uses session_agent_id)
-    msgs_result = await db.execute(
+    # Query messages by conversation_id, paginated (return newest N, ordered asc)
+    from datetime import datetime as dt
+    query = (
         select(ChatMessage)
         .where(ChatMessage.conversation_id == str(session_id))
-        .order_by(ChatMessage.created_at.asc())
-        .limit(500)
     )
-    messages = msgs_result.scalars().all()
+    if before:
+        try:
+            before_dt = dt.fromisoformat(before)
+            query = query.where(ChatMessage.created_at < before_dt)
+        except ValueError:
+            pass
+    # Get the last `limit` messages: order desc to pick newest, then reverse
+    query = query.order_by(ChatMessage.created_at.desc()).limit(limit)
+    msgs_result = await db.execute(query)
+    messages = list(reversed(msgs_result.scalars().all()))
+    has_more = len(messages) == limit
 
     # Resolve sender names for agent sessions
     sender_cache: dict = {}
@@ -286,7 +302,7 @@ async def get_session_messages(
 
         if m.role == "tool_call":
             import json
-            entry: dict = {"role": m.role, "content": m.content}
+            entry: dict = {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat() if m.created_at else None}
             try:
                 data = json.loads(m.content)
                 entry["content"] = ""
@@ -309,12 +325,12 @@ async def get_session_messages(
                     part["sender_name"] = sender_name
                 out.append(part)
         else:
-            entry = {"role": m.role, "content": m.content}
+            entry = {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat() if m.created_at else None}
             if sender_name:
                 entry["sender_name"] = sender_name
             out.append(entry)
 
-    return out
+    return {"messages": out, "has_more": has_more}
 
 
 import re

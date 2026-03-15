@@ -43,6 +43,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final List<Map<String, dynamic>> _sessions = [];
   Map<String, dynamic>? _activeSession;
   bool _sessionsLoading = false;
+  bool _hasMoreMessages = false;
+  bool _loadingMore = false;
+  String? _oldestMessageTs;
 
   // Vision model support
   bool _supportsVision = false;
@@ -68,11 +71,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   void _onScroll() {
     if (!_scrollCtrl.hasClients) return;
-    final maxExtent = _scrollCtrl.position.maxScrollExtent;
+    // reverse: true → offset 0 = bottom, larger = scrolled up
     final current = _scrollCtrl.offset;
-    final isNearBottom = (maxExtent - current) < 150;
+    final isNearBottom = current < 150;
     if (_showScrollToBottom == isNearBottom) {
       setState(() => _showScrollToBottom = !isNearBottom);
+    }
+    // Load older messages when near top
+    final maxExtent = _scrollCtrl.position.maxScrollExtent;
+    if (maxExtent - current < 200 && _hasMoreMessages && !_loadingMore) {
+      _loadMoreMessages();
     }
   }
 
@@ -142,13 +150,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       _activeSession = sess;
       _isReadOnly = false;
       _agentExpired = false;
+      _hasMoreMessages = false;
+      _oldestMessageTs = null;
     });
 
     try {
-      final msgs = await ApiService.instance.getSessionMessages(
+      final data = await ApiService.instance.getSessionMessages(
         widget.agentId, sess['id'] as String,
       );
       if (!mounted) return;
+      final msgs = data['messages'] as List<dynamic>;
+      _hasMoreMessages = data['has_more'] as bool? ?? false;
+      if (msgs.isNotEmpty) {
+        _oldestMessageTs = (msgs.first as Map<String, dynamic>)['created_at'] as String?;
+      }
 
       final auth = ref.read(authProvider);
       final isAgentSession =
@@ -181,6 +196,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if (isOwnSession) _reconnectWs();
     }
     _scrollToBottom(force: true);
+  }
+
+  Future<void> _loadMoreMessages() async {
+    if (_loadingMore || !_hasMoreMessages || _activeSession == null || _oldestMessageTs == null) return;
+    setState(() => _loadingMore = true);
+    try {
+      final data = await ApiService.instance.getSessionMessages(
+        widget.agentId, _activeSession!['id'] as String,
+        before: _oldestMessageTs,
+      );
+      if (!mounted) return;
+      final msgs = data['messages'] as List<dynamic>;
+      _hasMoreMessages = data['has_more'] as bool? ?? false;
+      if (msgs.isNotEmpty) {
+        _oldestMessageTs = (msgs.first as Map<String, dynamic>)['created_at'] as String?;
+        final older = msgs.map((m) => _parseHistoryMessage(m as Map<String, dynamic>)).toList();
+        setState(() {
+          _messages.insertAll(0, older);
+        });
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loadingMore = false);
   }
 
   ChatMessage _parseHistoryMessage(Map<String, dynamic> m) {
@@ -361,15 +398,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _scrollToBottom({bool force = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollCtrl.hasClients) return;
-      final maxExtent = _scrollCtrl.position.maxScrollExtent;
+      // reverse: true → offset 0 = bottom
       final current = _scrollCtrl.offset;
-      final isNearBottom = (maxExtent - current) < 150;
+      final isNearBottom = current < 150;
       if (force || isNearBottom) {
-        _scrollCtrl.animateTo(
-          maxExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
+        if (force) {
+          _scrollCtrl.jumpTo(0);
+        } else {
+          _scrollCtrl.animateTo(
+            0,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
       }
     });
   }
@@ -663,13 +704,27 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             children: [
               ListView.builder(
                 controller: _scrollCtrl,
+                reverse: true,
                 padding: const EdgeInsets.all(16),
-                itemCount: _messages.length + (_waitingForResponse ? 1 : 0),
+                itemCount: _messages.length + (_waitingForResponse ? 1 : 0) + (_loadingMore ? 1 : 0),
                 itemBuilder: (context, i) {
-                  if (i == _messages.length && _waitingForResponse) {
+                  // reverse: true → index 0 = bottom, so reverse the mapping
+                  final extra = (_waitingForResponse ? 1 : 0) + (_loadingMore ? 1 : 0);
+                  final total = _messages.length + extra;
+                  final ri = total - 1 - i;
+                  // Loading more indicator (top of list = highest ri)
+                  if (_loadingMore && ri == 0) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary)),
+                    );
+                  }
+                  final msgIdx = ri - (_loadingMore ? 1 : 0);
+                  if (msgIdx == _messages.length && _waitingForResponse) {
                     return _buildTypingIndicator();
                   }
-                  return _buildMessage(_messages[i]);
+                  if (msgIdx < 0 || msgIdx >= _messages.length) return const SizedBox.shrink();
+                  return _buildMessage(_messages[msgIdx]);
                 },
               ),
               if (_showScrollToBottom)

@@ -36,9 +36,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   Timer? _pollTimer;
 
   // ── Overview ─────────────────────────────────────────────
-  final _roleController = TextEditingController();
-  bool _editingRole = false;
-  bool _savingRole = false;
   List<dynamic> _recentActivity = [];
 
   // ── Tasks ────────────────────────────────────────────────
@@ -179,7 +176,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   void dispose() {
     _pollTimer?.cancel();
     _tabController.dispose();
-    _roleController.dispose();
     _taskTitleCtrl.dispose();
     _taskDescCtrl.dispose();
     _soulController.dispose();
@@ -256,7 +252,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       setState(() {
         _agent = agent;
         _loading = false;
-        _roleController.text = agent['role_description'] as String? ?? '';
       });
       _fetchOverviewData();
     } catch (e) {
@@ -532,26 +527,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _showSnack('智能体已删除');
     } catch (e) {
       _showSnack('删除失败: ${_errMsg(e)}');
-    }
-  }
-
-  Future<void> _saveRoleDescription() async {
-    setState(() => _savingRole = true);
-    try {
-      await _api.updateAgent(widget.agentId, {
-        'role_description': _roleController.text,
-      });
-      await _fetchAgentSilent();
-      if (!mounted) return;
-      setState(() {
-        _editingRole = false;
-        _savingRole = false;
-      });
-      _showSnack('角色描述已保存');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _savingRole = false);
-      _showSnack('保存失败: ${_errMsg(e)}');
     }
   }
 
@@ -1706,83 +1681,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Role Description ──
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.description, color: AppColors.textSecondary, size: 18),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        '角色描述',
-                        style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    if (!_editingRole)
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: AppColors.accentPrimary, size: 18),
-                        onPressed: () => setState(() => _editingRole = true),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (_editingRole) ...[
-                  TextField(
-                    controller: _roleController,
-                    maxLines: 5,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                    decoration: const InputDecoration(
-                      hintText: '描述这个 Agent 的职责...',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          _roleController.text = agent['role_description'] as String? ?? '';
-                          setState(() => _editingRole = false);
-                        },
-                        child: const Text('取消'),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: _savingRole ? null : _saveRoleDescription,
-                        child: _savingRole
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text('保存'),
-                      ),
-                    ],
-                  ),
-                ] else
-                  Text(
-                    (agent['role_description'] as String?)?.isNotEmpty == true
-                        ? agent['role_description'] as String
-                        : '暂无角色描述，点击编辑按钮添加。',
-                    style: TextStyle(
-                      color: (agent['role_description'] as String?)?.isNotEmpty == true
-                          ? AppColors.textSecondary
-                          : AppColors.textTertiary,
-                      fontSize: 13,
-                      fontStyle: (agent['role_description'] as String?)?.isNotEmpty == true
-                          ? FontStyle.normal
-                          : FontStyle.italic,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
           // ── Metrics ──
           _card(
             child: Column(

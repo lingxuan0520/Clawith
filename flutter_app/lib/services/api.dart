@@ -205,9 +205,14 @@ class ApiService {
     return r.data as Map<String, dynamic>;
   }
 
-  Future<List<dynamic>> getSessionMessages(String agentId, String sessionId) async {
-    final r = await _dio.get('/agents/$agentId/sessions/$sessionId/messages');
-    return r.data as List<dynamic>;
+  Future<Map<String, dynamic>> getSessionMessages(
+    String agentId, String sessionId, {int limit = 50, String? before}
+  ) async {
+    final params = <String, dynamic>{'limit': limit};
+    if (before != null) params['before'] = before;
+    final r = await _dio.get('/agents/$agentId/sessions/$sessionId/messages',
+        queryParameters: params);
+    return r.data as Map<String, dynamic>;
   }
 
   // ─── Chat ─────────────────────────────────────────────
