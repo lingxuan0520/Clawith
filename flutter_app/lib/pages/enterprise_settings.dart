@@ -25,7 +25,7 @@ class _EnterpriseSettingsPageState
     '公司信息',
     '模型池',
     '工具',
-    '技能',
+    'Skills',
     '知识库',
     // '配额管理',  // 2B feature — hidden for 2C
     // '组织架构',  // 2B feature — hidden for 2C
@@ -138,18 +138,6 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
   bool _introSaving = false;
   bool _introSaved = false;
 
-  // Notification bar
-  bool _notifEnabled = false;
-  final _notifTextCtl = TextEditingController();
-  bool _notifSaving = false;
-  bool _notifSaved = false;
-
-  // Platform settings
-  final _publicUrlCtl = TextEditingController();
-  final _maxRoundsCtl = TextEditingController(text: '5');
-  bool _platSaving = false;
-  bool _platSaved = false;
-
   @override
   void initState() {
     super.initState();
@@ -176,34 +164,6 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
       final data = d.data as Map<String, dynamic>;
       if (data['value'] is Map && data['value']['content'] != null) {
         _introCtl.text = data['value']['content'] as String;
-      }
-    } catch (_) {}
-
-    // Load notification bar
-    try {
-      final d =
-          await _dio.get('/enterprise/system-settings/notification_bar');
-      final data = d.data as Map<String, dynamic>;
-      if (data['value'] is Map) {
-        _notifEnabled = data['value']['enabled'] == true;
-        _notifTextCtl.text = (data['value']['text'] ?? '') as String;
-      }
-    } catch (_) {}
-
-    // Load platform settings
-    try {
-      final d = await _dio.get('/enterprise/system-settings/platform');
-      final data = d.data as Map<String, dynamic>;
-      if (data['value'] is Map && data['value']['public_base_url'] != null) {
-        _publicUrlCtl.text = data['value']['public_base_url'] as String;
-      }
-    } catch (_) {}
-    try {
-      final d =
-          await _dio.get('/enterprise/system-settings/agent_conversation');
-      final data = d.data as Map<String, dynamic>;
-      if (data['value'] is Map && data['value']['max_rounds'] != null) {
-        _maxRoundsCtl.text = data['value']['max_rounds'].toString();
       }
     } catch (_) {}
 
@@ -242,39 +202,6 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
     setState(() => _introSaving = false);
   }
 
-  Future<void> _saveNotificationBar() async {
-    setState(() => _notifSaving = true);
-    try {
-      await _dio.put('/enterprise/system-settings/notification_bar', data: {
-        'value': {'enabled': _notifEnabled, 'text': _notifTextCtl.text}
-      });
-      setState(() => _notifSaved = true);
-      Future.delayed(
-          const Duration(seconds: 2), () => mounted ? setState(() => _notifSaved = false) : null);
-    } catch (_) {
-      _showError('保存通知栏失败');
-    }
-    setState(() => _notifSaving = false);
-  }
-
-  Future<void> _savePlatformSettings() async {
-    setState(() => _platSaving = true);
-    try {
-      await _dio.put('/enterprise/system-settings/platform', data: {
-        'value': {'public_base_url': _publicUrlCtl.text}
-      });
-      await _dio.put('/enterprise/system-settings/agent_conversation', data: {
-        'value': {'max_rounds': int.tryParse(_maxRoundsCtl.text) ?? 5}
-      });
-      setState(() => _platSaved = true);
-      Future.delayed(
-          const Duration(seconds: 2), () => mounted ? setState(() => _platSaved = false) : null);
-    } catch (_) {
-      _showError('保存平台配置失败');
-    }
-    setState(() => _platSaving = false);
-  }
-
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -287,80 +214,6 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        // ── Notification Bar Config ──
-        _buildSectionHeader('通知栏',
-            subtitle:
-                '在页面顶部显示通知栏，所有用户可见。'),
-        const SizedBox(height: 8),
-        _SectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: Checkbox(
-                      value: _notifEnabled,
-                      onChanged: (v) =>
-                          setState(() => _notifEnabled = v ?? false),
-                      activeColor: AppColors.accentPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text('启用通知栏',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _notifTextCtl,
-                style:
-                    const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: '通知内容',
-                  hintText: '例如：v2.1 发布，包含新功能！',
-                ),
-              ),
-              if (_notifEnabled && _notifTextCtl.text.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Text('预览:',
-                    style:
-                        TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                const SizedBox(height: 4),
-                Container(
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.accentPrimary,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    _notifTextCtl.text,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              _buildSaveRow(
-                saving: _notifSaving,
-                saved: _notifSaved,
-                onSave: _saveNotificationBar,
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
         // ── Company Name ──
         _buildSectionHeader('公司名称'),
         const SizedBox(height: 8),
@@ -434,89 +287,6 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
             ],
           ),
         ),
-
-        const SizedBox(height: 24),
-
-        // ── Platform Configuration ──
-        _buildSectionHeader('平台配置'),
-        const SizedBox(height: 8),
-        _SectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('公开访问地址',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _publicUrlCtl,
-                          style: const TextStyle(
-                              fontSize: 13, color: AppColors.textPrimary),
-                          decoration: const InputDecoration(
-                            hintText: 'https://your-server.com',
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text('用于外部访问的公开地址',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textTertiary)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('最大对话轮数',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _maxRoundsCtl,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(
-                              fontSize: 13, color: AppColors.textPrimary),
-                          decoration: const InputDecoration(
-                            hintText: '5',
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                            'Agent 之间最大来回对话轮数',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textTertiary)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildSaveRow(
-                saving: _platSaving,
-                saved: _platSaved,
-                onSave: _savePlatformSettings,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        // ── Theme Color Picker ──
-        _SectionCard(
-          child: _ThemeColorPicker(),
-        ),
       ],
     );
   }
@@ -525,148 +295,7 @@ class _CompanyInfoTabState extends ConsumerState<_CompanyInfoTab>
   void dispose() {
     _nameCtl.dispose();
     _introCtl.dispose();
-    _notifTextCtl.dispose();
-    _publicUrlCtl.dispose();
-    _maxRoundsCtl.dispose();
     super.dispose();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  THEME COLOR PICKER
-// ═══════════════════════════════════════════════════════════════
-class _ThemeColorPicker extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_ThemeColorPicker> createState() => _ThemeColorPickerState();
-}
-
-class _ThemeColorPickerState extends ConsumerState<_ThemeColorPicker> {
-  final _hexCtl = TextEditingController();
-
-  static const _presets = [
-    {'name': 'Blue', 'hex': '#5A96FF'},
-    {'name': 'Purple', 'hex': '#9C7CF4'},
-    {'name': 'Green', 'hex': '#22C55E'},
-    {'name': 'Teal', 'hex': '#14B8A6'},
-    {'name': 'Orange', 'hex': '#F97316'},
-    {'name': 'Pink', 'hex': '#EC4899'},
-    {'name': 'Red', 'hex': '#EF4444'},
-    {'name': 'Yellow', 'hex': '#EAB308'},
-  ];
-
-  void _apply(String hex) {
-    ref.read(appProvider.notifier).setAccentColor(hex);
-  }
-
-  void _reset() {
-    ref.read(appProvider.notifier).setAccentColor(null);
-    _hexCtl.clear();
-  }
-
-  void _applyCustom() {
-    final hex = _hexCtl.text.trim();
-    final valid = RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex);
-    if (!valid) return;
-    _apply(hex);
-  }
-
-  @override
-  void dispose() {
-    _hexCtl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentColor = ref.watch(appProvider).accentColor;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('主题强调色',
-            style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _presets.map((p) {
-            final hex = p['hex']!;
-            final isSelected = currentColor == hex;
-            final color = Color(int.parse('FF${hex.replaceFirst('#', '')}', radix: 16));
-            return GestureDetector(
-              onTap: () => _apply(hex),
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: isSelected ? AppColors.textPrimary : Colors.transparent,
-                    width: 2,
-                  ),
-                  boxShadow: isSelected
-                      ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4, spreadRadius: 1)]
-                      : null,
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            SizedBox(
-              width: 120,
-              child: TextField(
-                controller: _hexCtl,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontFamily: 'monospace',
-                    color: AppColors.textPrimary),
-                decoration: const InputDecoration(
-                  hintText: '#hex',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  isDense: true,
-                ),
-                onSubmitted: (_) => _applyCustom(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton(
-              onPressed: _applyCustom,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                textStyle: const TextStyle(fontSize: 12),
-              ),
-              child: const Text('应用'),
-            ),
-            if (currentColor != null) ...[
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: _reset,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textTertiary,
-                  textStyle: const TextStyle(fontSize: 12),
-                ),
-                child: const Text('重置'),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: Color(int.parse(
-                      'FF${currentColor.replaceFirst('#', '')}', radix: 16)),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: AppColors.borderDefault),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
   }
 }
 
@@ -2123,9 +1752,7 @@ class _SkillsTabState extends State<_SkillsTab>
       _currentPath = path;
     });
     try {
-      final r = await _dio.get('/skills/browse/files',
-          queryParameters: {'path': path});
-      final data = r.data as List<dynamic>;
+      final data = await ApiService.instance.listSkillFiles(path: path);
       _files = data.cast<Map<String, dynamic>>();
     } catch (_) {
       _files = [];
@@ -2146,13 +1773,26 @@ class _SkillsTabState extends State<_SkillsTab>
     _loadFiles(parts.join('/'));
   }
 
+  void _viewFile(String name) {
+    final filePath = _currentPath.isEmpty ? name : '$_currentPath/$name';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _SkillFileViewer(filePath: filePath),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Text('技能注册表',
+        const Text('Skills 注册表',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -2271,10 +1911,10 @@ class _SkillsTabState extends State<_SkillsTab>
               children: _files.asMap().entries.map((entry) {
                 final f = entry.value;
                 final isLast = entry.key == _files.length - 1;
-                final isDir = f['type'] == 'directory';
+                final isDir = f['is_dir'] == true || f['type'] == 'directory';
                 final name = (f['name'] ?? '') as String;
                 return InkWell(
-                  onTap: isDir ? () => _navigateToFolder(name) : null,
+                  onTap: isDir ? () => _navigateToFolder(name) : () => _viewFile(name),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 10),
@@ -2362,6 +2002,98 @@ class _SkillsTabState extends State<_SkillsTab>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Skill File Viewer (bottom sheet) ─────────────────────────
+class _SkillFileViewer extends StatefulWidget {
+  final String filePath;
+  const _SkillFileViewer({required this.filePath});
+  @override
+  State<_SkillFileViewer> createState() => _SkillFileViewerState();
+}
+
+class _SkillFileViewerState extends State<_SkillFileViewer> {
+  String _content = '';
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await ApiService.instance.readSkillFile(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _content = (data['content'] ?? '') as String;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = '$e';
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fileName = widget.filePath.split('/').last;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      maxChildSize: 0.95,
+      minChildSize: 0.3,
+      expand: false,
+      builder: (ctx, scrollController) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.description_outlined, size: 18, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(fileName,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                : _error != null
+                    ? Center(child: Text('加载失败: $_error',
+                        style: const TextStyle(color: AppColors.error, fontSize: 13)))
+                    : SingleChildScrollView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(16),
+                        child: SelectableText(
+                          _content,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontFamily: 'monospace',
+                            color: AppColors.textPrimary,
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+          ),
+        ],
       ),
     );
   }
@@ -3068,7 +2800,7 @@ class _KnowledgeBaseTabState extends State<_KnowledgeBaseTab>
               children: _files.asMap().entries.map((entry) {
                 final f = entry.value;
                 final isLast = entry.key == _files.length - 1;
-                final isDir = f['type'] == 'directory';
+                final isDir = f['is_dir'] == true || f['type'] == 'directory';
                 final name = (f['name'] ?? '') as String;
                 return InkWell(
                   onTap: isDir ? () => _navigateToFolder(name) : null,

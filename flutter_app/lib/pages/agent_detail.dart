@@ -2118,8 +2118,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   const SizedBox(height: 12),
                   ..._recentActivity.take(5).map((a) {
                     final act = a as Map<String, dynamic>;
-                    final msg = act['message'] as String? ?? act['content'] as String? ?? '';
-                    final ts = act['timestamp'] ?? act['created_at'];
+                    final msg = act['summary'] as String? ?? act['message'] as String? ?? '';
+                    final ts = act['created_at'] ?? act['timestamp'];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
@@ -3795,14 +3795,18 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     if (_logFilter == 'all') return _activities;
     return _activities.where((a) {
       final act = a as Map<String, dynamic>;
-      final type = act['type'] as String? ?? act['event'] as String? ?? '';
+      final type = act['action_type'] as String? ?? act['type'] as String? ?? '';
       switch (_logFilter) {
         case 'error':
           return type == 'error' || type == 'task_failed';
         case 'user':
-          return type == 'chat' || type == 'message' || type == 'task_complete' || type == 'task_completed';
+          return type == 'chat_reply' || type == 'chat' || type == 'message'
+              || type == 'web_msg_sent' || type == 'agent_msg_sent' || type == 'feishu_msg_sent'
+              || type == 'task_created' || type == 'task_updated' || type == 'task_complete' || type == 'task_completed';
         case 'system':
-          return type == 'start' || type == 'started' || type == 'stop' || type == 'stopped' || type == 'tool_call';
+          return type == 'heartbeat' || type == 'schedule_run' || type == 'tool_call'
+              || type == 'file_written' || type == 'plaza_post'
+              || type == 'start' || type == 'started' || type == 'stop' || type == 'stopped';
         default:
           return true;
       }
@@ -3810,16 +3814,19 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   Widget _buildActivityItem(Map<String, dynamic> act) {
-    final type = act['type'] as String? ?? act['event'] as String? ?? 'event';
-    final message = act['message'] as String? ?? act['content'] as String? ?? '';
-    final timestamp = act['timestamp'] ?? act['created_at'];
-    final details = act['details'] as String? ?? '';
+    final type = act['action_type'] as String? ?? act['type'] as String? ?? 'event';
+    final message = act['summary'] as String? ?? act['message'] as String? ?? '';
+    final timestamp = act['created_at'] ?? act['timestamp'];
+    final detailRaw = act['detail'] ?? act['details'];
+    final details = detailRaw is String ? detailRaw : (detailRaw != null ? detailRaw.toString() : '');
     final actId = act['id']?.toString() ?? '';
     final isExpanded = _expandedLogId == actId;
 
     IconData icon;
     Color iconColor;
     switch (type) {
+      case 'task_created':
+      case 'task_updated':
       case 'task_complete':
       case 'task_completed':
         icon = Icons.check_circle;
@@ -3830,9 +3837,29 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         icon = Icons.error;
         iconColor = AppColors.error;
         break;
+      case 'chat_reply':
+      case 'web_msg_sent':
+      case 'agent_msg_sent':
+      case 'feishu_msg_sent':
       case 'chat':
       case 'message':
         icon = Icons.chat_bubble;
+        iconColor = AppColors.accentPrimary;
+        break;
+      case 'heartbeat':
+        icon = Icons.favorite;
+        iconColor = AppColors.warning;
+        break;
+      case 'schedule_run':
+        icon = Icons.schedule;
+        iconColor = AppColors.textSecondary;
+        break;
+      case 'file_written':
+        icon = Icons.insert_drive_file;
+        iconColor = AppColors.accentPrimary;
+        break;
+      case 'plaza_post':
+        icon = Icons.forum;
         iconColor = AppColors.accentPrimary;
         break;
       case 'start':
@@ -3880,7 +3907,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                         decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                        child: Text(type, style: TextStyle(color: iconColor, fontSize: 10, fontWeight: FontWeight.w600)),
+                        child: Text(_activityTypeLabel(type), style: TextStyle(color: iconColor, fontSize: 10, fontWeight: FontWeight.w600)),
                       ),
                       const Spacer(),
                       Text(_fmtTs(timestamp), style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
@@ -3914,6 +3941,28 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         ),
       ),
     );
+  }
+
+  String _activityTypeLabel(String type) {
+    switch (type) {
+      case 'chat_reply': return '聊天回复';
+      case 'web_msg_sent': return '网页消息';
+      case 'agent_msg_sent': return 'Agent 消息';
+      case 'feishu_msg_sent': return '飞书消息';
+      case 'tool_call': return '工具调用';
+      case 'task_created': return '任务创建';
+      case 'task_updated': return '任务更新';
+      case 'task_complete': case 'task_completed': return '任务完成';
+      case 'task_failed': return '任务失败';
+      case 'error': return '错误';
+      case 'heartbeat': return '心跳';
+      case 'schedule_run': return '定时任务';
+      case 'file_written': return '文件写入';
+      case 'plaza_post': return '广场动态';
+      case 'start': case 'started': return '启动';
+      case 'stop': case 'stopped': return '停止';
+      default: return type;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════

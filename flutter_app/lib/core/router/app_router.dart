@@ -79,39 +79,53 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/enterprise',
         builder: (context, state) => const EnterpriseSettingsPage(),
       ),
-      // Bottom tab shell
-      ShellRoute(
-        builder: (context, state, child) => LayoutShell(child: child),
-        routes: [
-          GoRoute(
-            path: '/plaza',
-            builder: (context, state) => const PlazaPage(),
-          ),
-          GoRoute(
-            path: '/chat-list',
-            builder: (context, state) => const ChatListPage(),
-          ),
-          GoRoute(
-            path: '/office',
-            builder: (context, state) => const OfficePage(),
-          ),
-          GoRoute(
-            path: '/profile',
-            builder: (context, state) => const ProfilePage(),
-          ),
-          // Keep dashboard accessible
-          GoRoute(
-            path: '/dashboard',
-            builder: (context, state) => const DashboardPage(),
-          ),
-          GoRoute(
-            path: '/messages',
-            builder: (context, state) => const MessagesPage(),
-          ),
-          GoRoute(
-            path: '/invitations',
-            builder: (context, state) => const InvitationCodesPage(),
-          ),
+      // Bottom tab shell — StatefulShellRoute keeps tab pages alive
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            LayoutShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/plaza',
+              pageBuilder: (context, state) => const NoTransitionPage(child: PlazaPage()),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/chat-list',
+              pageBuilder: (context, state) => const NoTransitionPage(child: ChatListPage()),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/office',
+              pageBuilder: (context, state) => const NoTransitionPage(child: OfficePage()),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/profile',
+              pageBuilder: (context, state) => const NoTransitionPage(child: ProfilePage()),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/dashboard',
+              pageBuilder: (context, state) => const NoTransitionPage(child: DashboardPage()),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/messages',
+              pageBuilder: (context, state) => const NoTransitionPage(child: MessagesPage()),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/invitations',
+              pageBuilder: (context, state) => const NoTransitionPage(child: InvitationCodesPage()),
+            ),
+          ]),
         ],
       ),
     ],

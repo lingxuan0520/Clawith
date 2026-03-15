@@ -41,10 +41,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   // Session state
   final List<Map<String, dynamic>> _sessions = [];
-  final List<Map<String, dynamic>> _allSessions = [];
   Map<String, dynamic>? _activeSession;
-  String _chatScope = 'mine';
-  String _allUserFilter = '';
   bool _sessionsLoading = false;
 
   // Vision model support
@@ -124,19 +121,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     } catch (_) {
       if (mounted) setState(() => _sessionsLoading = false);
     }
-  }
-
-  Future<void> _loadAllSessions() async {
-    try {
-      final data = await ApiService.instance.listSessions(widget.agentId, scope: 'all');
-      if (mounted) {
-        setState(() {
-          _allSessions
-            ..clear()
-            ..addAll(data.cast<Map<String, dynamic>>());
-        });
-      }
-    } catch (_) {}
   }
 
   Future<void> _createSession() async {
@@ -876,15 +860,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildSessionsPanel() {
-    final displaySessions = _chatScope == 'mine'
-        ? _sessions
-        : (_allUserFilter.isEmpty
-            ? _allSessions
-            : _allSessions
-                .where((s) =>
-                    (s['username'] ?? s['user_id']) == _allUserFilter)
-                .toList());
-
     return SafeArea(
       child: Column(
         children: [
@@ -903,58 +878,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ],
             ),
           ),
-          // Scope tabs
+          // New session button
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                _buildScopeTab('我的会话', 'mine'),
-                const SizedBox(width: 4),
-                _buildScopeTab('所有用户', 'all'),
-              ],
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _createSession,
+                icon: const Icon(Icons.add, size: 14),
+                label: const Text('新建会话', style: TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  side: const BorderSide(color: AppColors.borderSubtle),
+                  foregroundColor: AppColors.textSecondary,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          // New session button (mine only)
-          if (_chatScope == 'mine')
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _createSession,
-                  icon: const Icon(Icons.add, size: 14),
-                  label: const Text('新建会话', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    side: const BorderSide(color: AppColors.borderSubtle),
-                    foregroundColor: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          // User filter (all sessions)
-          if (_chatScope == 'all')
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: DropdownButtonFormField<String>(
-                initialValue: _allUserFilter,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  border: OutlineInputBorder(),
-                ),
-                style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
-                dropdownColor: AppColors.bgElevated,
-                items: [
-                  const DropdownMenuItem(value: '', child: Text('所有用户')),
-                  ...{for (final s in _allSessions) s['username'] ?? s['user_id']}
-                      .where((u) => u != null)
-                      .map((u) => DropdownMenuItem(value: u as String, child: Text(u))),
-                ],
-                onChanged: (v) => setState(() => _allUserFilter = v ?? ''),
-              ),
-            ),
           const Divider(height: 1, color: AppColors.borderSubtle),
           // Session list
           Expanded(
@@ -962,53 +902,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ? const Center(
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary),
                   )
-                : displaySessions.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.all(20),
+                : _sessions.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(20),
                         child: Text(
-                          _chatScope == 'mine' ? '暂无会话\n点击「新建会话」开始' : '暂无会话',
+                          '暂无会话\n点击「新建会话」开始',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, height: 1.6),
+                          style: TextStyle(fontSize: 12, color: AppColors.textTertiary, height: 1.6),
                         ),
                       )
                     : ListView.builder(
-                        itemCount: displaySessions.length,
-                        itemBuilder: (ctx, i) => _buildSessionItem(displaySessions[i]),
+                        itemCount: _sessions.length,
+                        itemBuilder: (ctx, i) => _buildSessionItem(_sessions[i]),
                       ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildScopeTab(String label, String scope) {
-    final isActive = _chatScope == scope;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() => _chatScope = scope);
-          if (scope == 'all') _loadAllSessions();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: isActive ? AppColors.accentPrimary : Colors.transparent,
-                width: 2,
-              ),
-            ),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-              color: isActive ? AppColors.textPrimary : AppColors.textTertiary,
-            ),
-          ),
-        ),
       ),
     );
   }

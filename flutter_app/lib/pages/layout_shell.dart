@@ -8,8 +8,8 @@ import '../core/theme/app_theme.dart';
 import '../core/app_lifecycle.dart';
 
 class LayoutShell extends ConsumerStatefulWidget {
-  final Widget child;
-  const LayoutShell({super.key, required this.child});
+  final StatefulNavigationShell navigationShell;
+  const LayoutShell({super.key, required this.navigationShell});
   @override
   ConsumerState<LayoutShell> createState() => _LayoutShellState();
 }
@@ -32,7 +32,6 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
       if (mounted && data.isNotEmpty) {
         final appState = ref.read(appProvider);
         final tenantIds = data.map((t) => t['id'] as String).toSet();
-        // Reset if no tenant selected or if cached tenant doesn't belong to current user
         if (appState.currentTenantId.isEmpty || !tenantIds.contains(appState.currentTenantId)) {
           final fallback = data.first['id'] as String;
           ref.read(appProvider.notifier).setTenant(fallback);
@@ -41,40 +40,25 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     } catch (_) {}
   }
 
-  int _currentIndex(String location) {
-    if (location.startsWith('/chat-list')) return 1;
-    if (location.startsWith('/office')) return 2;
-    if (location.startsWith('/profile')) return 3;
-    return 0; // /plaza or default
+  // Map branch index to the 4 main tabs (0-3)
+  int get _tabIndex {
+    final idx = widget.navigationShell.currentIndex;
+    return idx < 4 ? idx : 0;
   }
-
-  static const _tabs = [
-    '/plaza',
-    '/chat-list',
-    '/office',
-    '/profile',
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final currentLocation = GoRouterState.of(context).matchedLocation;
-    final currentIdx = _currentIndex(currentLocation);
-
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
-      body: SafeArea(child: widget.child),
+      body: SafeArea(child: widget.navigationShell),
       bottomNavigationBar: Theme(
         data: Theme.of(context).copyWith(
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
         ),
         child: BottomNavigationBar(
-          currentIndex: currentIdx,
-          onTap: (i) {
-            if (i != currentIdx) {
-              context.go(_tabs[i]);
-            }
-          },
+          currentIndex: _tabIndex,
+          onTap: (i) => widget.navigationShell.goBranch(i, initialLocation: i == widget.navigationShell.currentIndex),
           type: BottomNavigationBarType.fixed,
           backgroundColor: AppColors.bgSecondary,
           selectedItemColor: AppColors.accentPrimary,

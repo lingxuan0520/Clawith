@@ -6,13 +6,11 @@ import 'package:go_router/go_router.dart';
 import '../core/theme/app_theme.dart';
 import '../services/api.dart';
 
-/// 4-step agent creation wizard, ported from React AgentCreate.tsx.
+/// 2-step agent creation wizard.
 ///
 /// Steps:
 ///   0 - Basic Info & Model
 ///   1 - Personality & Boundaries
-///   2 - Skills
-///   3 - Permissions
 class AgentCreatePage extends ConsumerStatefulWidget {
   const AgentCreatePage({super.key});
 
@@ -30,7 +28,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   // ── External data loaded from API ─────────────────────────
   List<dynamic> _llmModels = [];
   List<dynamic> _templates = [];
-  List<dynamic> _skills = [];
 
   // ── Form state (mirrors the React form fields) ────────────
   final Map<String, dynamic> _form = {
@@ -40,12 +37,9 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     'boundaries': '',
     'primary_model_id': '',
     'fallback_model_id': '',
-    'permission_scope_type': 'self',
-    'permission_access_level': 'read',
     'template_id': '',
     'max_tokens_per_day': 100000,
     'max_tokens_per_month': 3000000,
-    'skill_ids': <String>[],
   };
 
   // ── Text editing controllers (for fields that need them) ──
@@ -59,8 +53,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   static const _stepLabels = [
     '基本信息',
     '性格设定',
-    '技能',
-    '权限',
   ];
 
   // ── Lifecycle ─────────────────────────────────────────────
@@ -87,13 +79,11 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
       final results = await Future.wait([
         ApiService.instance.listLlmModels(),
         ApiService.instance.getTemplates(),
-        ApiService.instance.listSkills(),
       ]);
       if (!mounted) return;
       setState(() {
         _llmModels = results[0];
         _templates = results[1];
-        _skills = results[2];
         _loadingResources = false;
       });
     } catch (e) {
@@ -132,8 +122,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         }
         return true;
       case 1:
-      case 2:
-      case 3:
         return true;
       default:
         return true;
@@ -181,21 +169,14 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
       _addIfNotEmpty(data, 'boundaries', _form['boundaries']);
       _addIfNotEmpty(data, 'fallback_model_id', _form['fallback_model_id']);
       _addIfNotEmpty(data, 'template_id', _form['template_id']);
-      data['permission_scope_type'] = _form['permission_scope_type'];
-      data['permission_access_level'] = _form['permission_access_level'];
       data['max_tokens_per_day'] = _form['max_tokens_per_day'];
       data['max_tokens_per_month'] = _form['max_tokens_per_month'];
-
-      final skillIds = _form['skill_ids'] as List<String>;
-      if (skillIds.isNotEmpty) {
-        data['skill_ids'] = skillIds;
-      }
 
       final result = await ApiService.instance.createAgent(data);
       if (!mounted) return;
 
       final newId = result['id'] as String;
-      context.push('/agents/$newId');
+      context.push('/agents/$newId/chat');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -420,10 +401,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         return _buildStepBasicInfo();
       case 1:
         return _buildStepPersonality();
-      case 2:
-        return _buildStepSkills();
-      case 3:
-        return _buildStepPermissions();
       default:
         return const SizedBox.shrink();
     }
@@ -605,142 +582,6 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
           decoration: const InputDecoration(
             hintText: '列出 Agent 必须避免的话题或行为...',
           ),
-        ),
-      ],
-    );
-  }
-
-  // ────────────────────────────────────────────────────────────
-  //  STEP 2 — Skills
-  // ────────────────────────────────────────────────────────────
-  Widget _buildStepSkills() {
-    final selectedIds = _form['skill_ids'] as List<String>;
-
-    return _StepCard(
-      title: '技能',
-      subtitle: '选择这个 Agent 应具备的技能。',
-      children: [
-        if (_skills.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Text(
-              '暂无可用技能',
-              style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
-            ),
-          )
-        else
-          ..._skills.map((skill) {
-            final skillId = skill['id']?.toString() ?? '';
-            final skillName = skill['name']?.toString() ?? skillId;
-            final skillDesc = skill['description']?.toString() ?? '';
-            final isSelected = selectedIds.contains(skillId);
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: isSelected
-                    ? AppColors.accentSubtle
-                    : AppColors.bgTertiary,
-                borderRadius: BorderRadius.circular(8),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    setState(() {
-                      if (isSelected) {
-                        selectedIds.remove(skillId);
-                      } else {
-                        selectedIds.add(skillId);
-                      }
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isSelected
-                              ? Icons.check_box
-                              : Icons.check_box_outline_blank,
-                          color: isSelected
-                              ? AppColors.accentPrimary
-                              : AppColors.textTertiary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                skillName,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              if (skillDesc.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  skillDesc,
-                                  style: const TextStyle(
-                                    color: AppColors.textTertiary,
-                                    fontSize: 12,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-      ],
-    );
-  }
-
-  // ────────────────────────────────────────────────────────────
-  //  STEP 3 — Permissions
-  // ────────────────────────────────────────────────────────────
-  Widget _buildStepPermissions() {
-    return _StepCard(
-      title: '权限设置',
-      subtitle: '配置 Agent 的可见范围和访问权限。',
-      children: [
-        // Scope — 2C: only "self" is meaningful
-        _FieldLabel('可见范围'),
-        const SizedBox(height: 6),
-        _buildDropdown<String>(
-          value: _form['permission_scope_type'] as String,
-          hint: '选择范围',
-          items: const [
-            DropdownMenuItem(value: 'self', child: Text('仅自己')),
-          ],
-          onChanged: (v) =>
-              setState(() => _form['permission_scope_type'] = v ?? 'self'),
-        ),
-        const SizedBox(height: 20),
-
-        // Access level
-        _FieldLabel('访问级别'),
-        const SizedBox(height: 6),
-        _buildDropdown<String>(
-          value: _form['permission_access_level'] as String,
-          hint: '选择访问级别',
-          items: const [
-            DropdownMenuItem(value: 'read', child: Text('只读')),
-            DropdownMenuItem(value: 'write', child: Text('读写')),
-            DropdownMenuItem(value: 'admin', child: Text('管理员')),
-          ],
-          onChanged: (v) =>
-              setState(() => _form['permission_access_level'] = v ?? 'read'),
         ),
       ],
     );
