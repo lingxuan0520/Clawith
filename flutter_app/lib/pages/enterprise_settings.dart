@@ -26,7 +26,7 @@ class _EnterpriseSettingsPageState
     '模型池',
     '工具',
     'Skills',
-    '知识库',
+    // '知识库',     // 2C 不需要
     // '配额管理',  // 2B feature — hidden for 2C
     // '组织架构',  // 2B feature — hidden for 2C
   ];
@@ -77,7 +77,7 @@ class _EnterpriseSettingsPageState
           _LlmModelsTab(),
           _ToolsTab(),
           _SkillsTab(),
-          _KnowledgeBaseTab(),
+          // _KnowledgeBaseTab(),  // 2C 不需要
           // _QuotasUsersTab(),  // 2B feature — hidden for 2C
           // _OrgTab(),          // 2B feature — hidden for 2C
         ],

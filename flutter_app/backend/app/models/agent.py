@@ -38,20 +38,20 @@ class Agent(Base):
     primary_model_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("llm_models.id"))
     fallback_model_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("llm_models.id"))
 
-    # Autonomy policy (L1/L2/L3)
+    # Autonomy policy (2C: all L1 auto-execute by default)
     autonomy_policy: Mapped[dict] = mapped_column(
         JSON,
         default={
             "read_files": "L1",
-            "write_workspace_files": "L2",
-            "send_feishu_message": "L2",
-            "send_external_message": "L3",
-            "modify_soul": "L3",
-            "access_business_system_read": "L2",
-            "access_business_system_write": "L3",
-            "delete_files": "L3",
-            "create_calendar_event": "L2",
-            "financial_operations": "L3",
+            "write_workspace_files": "L1",
+            "send_feishu_message": "L1",
+            "send_external_message": "L1",
+            "modify_soul": "L1",
+            "access_business_system_read": "L1",
+            "access_business_system_write": "L1",
+            "delete_files": "L1",
+            "create_calendar_event": "L1",
+            "financial_operations": "L1",
         },
     )
 
@@ -69,7 +69,7 @@ class Agent(Base):
 
     # Daily LLM call limit
     llm_calls_today: Mapped[int] = mapped_column(Integer, default=0)
-    max_llm_calls_per_day: Mapped[int] = mapped_column(Integer, default=100)
+    max_llm_calls_per_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     llm_calls_reset_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Template

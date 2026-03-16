@@ -105,19 +105,7 @@ async def create_agent(
     except QuotaExceeded as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
 
-    # Calculate expiry time
-    from datetime import datetime, timedelta, timezone as tz
-    expires_at = datetime.now(tz.utc) + timedelta(hours=current_user.quota_agent_ttl_hours or 48)
-
-    # Get default LLM calls limit from tenant
-    max_llm_calls = 100
-    if current_user.tenant_id:
-        from app.models.tenant import Tenant
-        tenant_result = await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
-        tenant = tenant_result.scalar_one_or_none()
-        if tenant:
-            max_llm_calls = tenant.default_max_llm_calls_per_day or 100
-
+    # 2C app: agents never expire, no default LLM call limit
     agent = Agent(
         name=data.name,
         role_description=data.role_description,
@@ -131,8 +119,8 @@ async def create_agent(
         max_tokens_per_month=data.max_tokens_per_month,
         template_id=data.template_id,
         status="creating",
-        expires_at=expires_at,
-        max_llm_calls_per_day=max_llm_calls,
+        expires_at=None,
+        max_llm_calls_per_day=None,
     )
     if data.autonomy_policy:
         agent.autonomy_policy = data.autonomy_policy

@@ -38,8 +38,8 @@ DEFAULT_TEMPLATES = [
         "default_autonomy_policy": {
             "read_files": "L1",
             "write_workspace_files": "L1",
-            "send_feishu_message": "L2",
-            "delete_files": "L2",
+            "send_feishu_message": "L1",
+            "delete_files": "L1",
             "web_search": "L1",
             "manage_tasks": "L1",
         },
@@ -75,8 +75,8 @@ DEFAULT_TEMPLATES = [
         "default_autonomy_policy": {
             "read_files": "L1",
             "write_workspace_files": "L1",
-            "send_feishu_message": "L2",
-            "delete_files": "L2",
+            "send_feishu_message": "L1",
+            "delete_files": "L1",
             "web_search": "L1",
         },
     },
@@ -111,8 +111,8 @@ DEFAULT_TEMPLATES = [
         "default_autonomy_policy": {
             "read_files": "L1",
             "write_workspace_files": "L1",
-            "send_feishu_message": "L2",
-            "delete_files": "L2",
+            "send_feishu_message": "L1",
+            "delete_files": "L1",
             "web_search": "L1",
         },
     },
@@ -148,8 +148,8 @@ DEFAULT_TEMPLATES = [
         "default_autonomy_policy": {
             "read_files": "L1",
             "write_workspace_files": "L1",
-            "send_feishu_message": "L2",
-            "delete_files": "L2",
+            "send_feishu_message": "L1",
+            "delete_files": "L1",
             "web_search": "L1",
         },
     },

@@ -170,7 +170,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> importSkill(String agentId, String skillId) async {
     final r = await _dio.post('/agents/$agentId/files/import-skill',
-        queryParameters: {'skill_id': skillId});
+        data: {'skill_id': skillId});
     return r.data as Map<String, dynamic>;
   }
 
@@ -255,7 +255,8 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> updateChannel(String agentId, Map<String, dynamic> data) async {
-    final r = await _dio.put('/agents/$agentId/channel', data: data);
+    // Backend uses POST with upsert logic (no PUT endpoint)
+    final r = await _dio.post('/agents/$agentId/channel', data: data);
     return r.data as Map<String, dynamic>;
   }
 
@@ -304,7 +305,7 @@ class ApiService {
       'file': MultipartFile.fromBytes(bytes, filename: fileName),
     });
     final r = await _dio.post('/enterprise/knowledge-base/upload',
-        queryParameters: path.isNotEmpty ? {'path': path} : null, data: formData);
+        queryParameters: path.isNotEmpty ? {'sub_path': path} : null, data: formData);
     return r.data as Map<String, dynamic>;
   }
 
@@ -432,7 +433,7 @@ class ApiService {
   }
 
   Future<void> updateRelationships(String agentId, List<dynamic> data) async {
-    await _dio.put('/agents/$agentId/relationships/', data: data);
+    await _dio.put('/agents/$agentId/relationships/', data: {'relationships': data});
   }
 
   Future<void> deleteRelationship(String agentId, String relId) async {
@@ -440,7 +441,7 @@ class ApiService {
   }
 
   Future<void> updateAgentRelationships(String agentId, List<dynamic> data) async {
-    await _dio.put('/agents/$agentId/relationships/agents', data: data);
+    await _dio.put('/agents/$agentId/relationships/agents', data: {'relationships': data});
   }
 
   Future<void> deleteAgentRelationship(String agentId, String relId) async {
@@ -485,7 +486,7 @@ class ApiService {
   }
 
   Future<List<dynamic>> listAgentTools(String agentId) async {
-    final r = await _dio.get('/tools/agents/$agentId/tools');
+    final r = await _dio.get('/tools/agents/$agentId');
     return r.data as List<dynamic>;
   }
 
@@ -495,12 +496,12 @@ class ApiService {
   }
 
   Future<void> toggleAgentTool(String agentId, String toolId, bool enabled) async {
-    await _dio.put('/tools/agents/$agentId/tools/$toolId', data: {'enabled': enabled});
+    await _dio.put('/tools/agents/$agentId', data: [{'tool_id': toolId, 'enabled': enabled}]);
   }
 
   Future<Map<String, dynamic>> updateToolConfig(
       String agentId, String toolId, Map<String, dynamic> config) async {
-    final r = await _dio.put('/tools/agents/$agentId/tool-config/$toolId', data: config);
+    final r = await _dio.put('/tools/agents/$agentId/tool-config/$toolId', data: {'config': config});
     return r.data as Map<String, dynamic>;
   }
 

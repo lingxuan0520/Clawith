@@ -131,7 +131,7 @@ async def check_agent_llm_quota(agent_id: uuid.UUID) -> None:
             agent.llm_calls_reset_at = now
             await db.commit()
 
-        if agent.llm_calls_today >= agent.max_llm_calls_per_day:
+        if agent.max_llm_calls_per_day and agent.llm_calls_today >= agent.max_llm_calls_per_day:
             raise QuotaExceeded(
                 f"Agent '{agent.name}' has reached daily LLM call limit "
                 f"({agent.llm_calls_today}/{agent.max_llm_calls_per_day}).",

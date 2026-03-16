@@ -45,14 +45,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   // ── Schedules ────────────────────────────────────────────
   List<dynamic> _schedules = [];
 
-  // ── Pulse ────────────────────────────────────────────────
-  String? _agendaContent;
-  List<dynamic> _triggers = [];
-  String? _monologueContent;
-  String? _taskHistoryContent;
-  bool _loadingPulse = false;
-  String _pulseSection = 'agenda';
-
+  // ── Mind ─────────────────────────────────────────────────
   // ── Mind ─────────────────────────────────────────────────
   String? _soulContent;
   bool _editingSoul = false;
@@ -61,6 +54,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   List<dynamic> _memoryFiles = [];
   bool _loadingMind = false;
   String? _heartbeatContent;
+  bool _soulExpanded = false;
+  bool _heartbeatExpanded = false;
+  bool _memoryExpanded = false;
 
   // ── Tools ────────────────────────────────────────────────
   List<dynamic> _platformTools = [];
@@ -72,6 +68,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   bool _loadingSkills = false;
   String? _viewingSkillContent;
   String? _viewingSkillName;
+  String? _skillSubFolder;        // non-null = viewing files inside a skill folder
+  List<dynamic> _skillSubFiles = []; // files inside the sub folder
 
   // ── Workspace ────────────────────────────────────────────
   List<dynamic> _workspaceFiles = [];
@@ -98,6 +96,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
   // ── Tool config ────────────────────────────────────────────
   String? _expandedToolId;
+  int _toolSection = 0; // 0=platform, 1=agent-installed
   final _toolConfigControllers = <String, TextEditingController>{};
 
   // ── Header inline edit ─────────────────────────────────────
@@ -131,11 +130,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   static const _tabLabels = [
     '状态',
     '任务',
-    '动态',
     '思维',
     '工具',
     '技能',
-    '关系',
     '工作区',
     '活动',
     '设置',
@@ -196,27 +193,21 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _fetchSchedules();
         break;
       case 2:
-        _fetchPulseData();
-        break;
-      case 3:
         _fetchMindData();
         break;
-      case 4:
+      case 3:
         _fetchToolsData();
         break;
-      case 5:
+      case 4:
         _fetchSkillsData();
         break;
-      case 6:
-        _fetchRelationshipsData();
-        break;
-      case 7:
+      case 5:
         _fetchWorkspaceFiles();
         break;
-      case 8:
+      case 6:
         _fetchActivity();
         break;
-      case 9:
+      case 7:
         _fetchSettingsData();
         break;
     }
@@ -291,36 +282,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (_) {}
   }
 
-  Future<void> _fetchPulseData() async {
-    setState(() => _loadingPulse = true);
-    try {
-      final results = await Future.wait([
-        _api.listTriggers(widget.agentId).catchError((_) => <dynamic>[]),
-        _api.readFile(widget.agentId, 'agenda.md').catchError((_) => <String, dynamic>{}),
-        _api.readFile(widget.agentId, 'monologue.md').catchError((_) => <String, dynamic>{}),
-        _api.readFile(widget.agentId, 'task_history.md').catchError((_) => <String, dynamic>{}),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _triggers = results[0] as List<dynamic>;
-        _agendaContent = (results[1] as Map<String, dynamic>)['content'] as String?;
-        _monologueContent = (results[2] as Map<String, dynamic>)['content'] as String?;
-        _taskHistoryContent = (results[3] as Map<String, dynamic>)['content'] as String?;
-        _loadingPulse = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loadingPulse = false);
-    }
-  }
-
   Future<void> _fetchMindData() async {
     setState(() => _loadingMind = true);
     try {
       final results = await Future.wait([
         _api.readFile(widget.agentId, 'soul.md').catchError((_) => <String, dynamic>{}),
         _api.listFiles(widget.agentId, path: 'memory').catchError((_) => <dynamic>[]),
-        _api.readFile(widget.agentId, 'heartbeat.md').catchError((_) => <String, dynamic>{}),
+        _api.readFile(widget.agentId, 'HEARTBEAT.md').catchError((_) => <String, dynamic>{}),
       ]);
       if (!mounted) return;
       setState(() {
@@ -339,14 +307,27 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   Future<void> _fetchToolsData() async {
     setState(() => _loadingTools = true);
     try {
-      final results = await Future.wait([
-        _api.listTools().catchError((_) => <dynamic>[]),
-        _api.listAgentTools(widget.agentId).catchError((_) => <dynamic>[]),
-      ]);
+      List<dynamic> tools;
+      try {
+        tools = await _api.listAgentToolsWithConfig(widget.agentId);
+      } catch (_) {
+        // Fallback to basic endpoint
+        tools = await _api.listAgentTools(widget.agentId).catchError((_) => <dynamic>[]);
+      }
       if (!mounted) return;
+      final platform = <dynamic>[];
+      final installed = <dynamic>[];
+      for (final t in tools) {
+        final m = t as Map<String, dynamic>;
+        if (m['source'] == 'user_installed') {
+          installed.add(m);
+        } else {
+          platform.add(m);
+        }
+      }
       setState(() {
-        _platformTools = results[0];
-        _agentTools = results[1];
+        _platformTools = platform;
+        _agentTools = installed;
         _loadingTools = false;
       });
     } catch (e) {
@@ -523,17 +504,32 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   Future<void> _toggleTool(String toolId, bool enabled) async {
+    // Optimistic update
+    setState(() {
+      for (final list in [_platformTools, _agentTools]) {
+        for (int i = 0; i < list.length; i++) {
+          final m = list[i] as Map<String, dynamic>;
+          if (m['id']?.toString() == toolId) {
+            list[i] = {...m, 'enabled': enabled};
+            break;
+          }
+        }
+      }
+    });
     try {
       await _api.toggleAgentTool(widget.agentId, toolId, enabled);
-      _fetchToolsData();
     } catch (e) {
+      // Revert on failure
+      _fetchToolsData();
+      if (!mounted) return;
       _showSnack('工具开关失败: ${_errMsg(e)}');
     }
   }
 
-  Widget _buildToolConfigFields(String toolId, Map<String, dynamic> schema) {
+  Widget _buildToolConfigFields(String toolId, Map<String, dynamic> schema, {Map<String, dynamic>? agentConfig, Map<String, dynamic>? globalConfig}) {
     final fields = (schema['fields'] as List?) ?? [];
     if (fields.isEmpty) return const SizedBox.shrink();
+    final merged = <String, dynamic>{...(globalConfig ?? {}), ...(agentConfig ?? {})};
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -545,7 +541,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           final label = field['label'] as String? ?? key;
           final isPassword = field['type'] == 'password';
           final ctrlKey = '${toolId}_$key';
-          _toolConfigControllers[ctrlKey] ??= TextEditingController(text: field['value']?.toString() ?? '');
+          final savedValue = merged[key]?.toString() ?? field['default']?.toString() ?? '';
+          _toolConfigControllers[ctrlKey] ??= TextEditingController(text: savedValue);
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: TextField(
@@ -640,15 +637,65 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
   Future<void> _openSkillFile(Map<String, dynamic> file) async {
     final name = file['name'] as String? ?? '';
-    try {
-      final res = await _api.readFile(widget.agentId, 'skills/$name');
-      if (!mounted) return;
-      setState(() {
-        _viewingSkillContent = res['content'] as String?;
-        _viewingSkillName = name;
-      });
-    } catch (e) {
-      _showSnack('读取技能文件失败: ${_errMsg(e)}');
+    final isDir = file['is_dir'] == true;
+    if (isDir) {
+      // Navigate into the folder — list its contents
+      try {
+        final subFiles = await _api.listFiles(widget.agentId, path: 'skills/$name');
+        if (!mounted) return;
+        setState(() {
+          _skillSubFolder = name;
+          _skillSubFiles = subFiles;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        _showSnack('打开技能文件夹失败: ${_errMsg(e)}');
+      }
+    } else {
+      // Flat .md file — read and show content directly
+      try {
+        final res = await _api.readFile(widget.agentId, 'skills/$name');
+        if (!mounted) return;
+        setState(() {
+          _viewingSkillContent = res['content'] as String?;
+          _viewingSkillName = name;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        _showSnack('读取技能文件失败: ${_errMsg(e)}');
+      }
+    }
+  }
+
+  Future<void> _openSkillSubFile(Map<String, dynamic> file) async {
+    final name = file['name'] as String? ?? '';
+    final isDir = file['is_dir'] == true;
+    final path = 'skills/$_skillSubFolder/$name';
+    if (isDir) {
+      // Navigate deeper into sub-folder
+      try {
+        final subFiles = await _api.listFiles(widget.agentId, path: path);
+        if (!mounted) return;
+        setState(() {
+          _skillSubFolder = '$_skillSubFolder/$name';
+          _skillSubFiles = subFiles;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        _showSnack('打开文件夹失败: ${_errMsg(e)}');
+      }
+    } else {
+      try {
+        final res = await _api.readFile(widget.agentId, path);
+        if (!mounted) return;
+        setState(() {
+          _viewingSkillContent = res['content'] as String?;
+          _viewingSkillName = '$_skillSubFolder/$name';
+        });
+      } catch (e) {
+        if (!mounted) return;
+        _showSnack('读取文件失败: ${_errMsg(e)}');
+      }
     }
   }
 
@@ -661,6 +708,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       await _api.deleteFile(widget.agentId, 'skills/$name');
       _showSnack('技能已删除');
+      setState(() {
+        _skillSubFolder = null;
+        _skillSubFiles = [];
+        _viewingSkillContent = null;
+        _viewingSkillName = null;
+      });
       _fetchSkillsData();
     } catch (e) {
       _showSnack('删除技能失败: ${_errMsg(e)}');
@@ -680,21 +733,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _fetchWorkspaceFiles(_currentPath);
     } catch (e) {
       _showSnack('删除文件失败: ${_errMsg(e)}');
-    }
-  }
-
-  Future<void> _deleteTrigger(String triggerId) async {
-    final confirmed = await _showConfirmDialog(
-      '删除触发器',
-      '确认删除此触发器吗？',
-    );
-    if (confirmed != true) return;
-    try {
-      await _api.deleteTrigger(widget.agentId, triggerId);
-      _showSnack('触发器已删除');
-      _fetchPulseData();
-    } catch (e) {
-      _showSnack('删除触发器失败: ${_errMsg(e)}');
     }
   }
 
@@ -755,15 +793,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       if (!mounted) return;
       setState(() => _savingName = false);
       _showSnack('更新名称失败: ${_errMsg(e)}');
-    }
-  }
-
-  Future<void> _toggleTrigger(String triggerId, bool enabled) async {
-    try {
-      await _api.updateTrigger(widget.agentId, triggerId, {'enabled': enabled});
-      _fetchPulseData();
-    } catch (e) {
-      _showSnack('更新触发器失败: ${_errMsg(e)}');
     }
   }
 
@@ -1293,10 +1322,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     'running': '进行中',
     'completed': '已完成',
     'failed': '失败',
-    'agenda': '日程',
-    'triggers': '触发器',
-    'monologue': '独白',
-    'history': '历史',
     'user': '用户',
     'system': '系统',
     'error': '错误',
@@ -1542,11 +1567,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         children: [
           _buildOverviewTab(agent),
           _buildTasksTab(),
-          _buildPulseTab(),
           _buildMindTab(),
           _buildToolsTab(),
           _buildSkillsTab(),
-          _buildRelationshipsTab(),
           _buildWorkspaceTab(),
           _buildActivityTab(),
           _buildSettingsTab(agent),
@@ -2031,21 +2054,18 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     final intervalCtrl = TextEditingController(text: '1');
-    bool isRepeat = false; // false=一次性, true=重复
-    String freq = 'day'; // month, week, day, hour, minute
-    TimeOfDay execTime = const TimeOfDay(hour: 9, minute: 0);
+    bool isRepeat = false;
+    String freq = 'day';
+    int execHour = 9;
+    int execMinute = 0;
+    int dayOfMonth = 1; // 1-31
+    int dayOfWeek = 1; // 1=周一 ... 7=周日
     bool hasDeadline = false;
     DateTime? deadline;
     bool creating = false;
 
-    const units = [
-      ('month', '月'),
-      ('week', '周'),
-      ('day', '天'),
-      ('hour', '小时'),
-      ('minute', '分钟'),
-    ];
-    bool showExecTime(String f) => f == 'month' || f == 'week' || f == 'day';
+    bool needsTime(String f) => f == 'month' || f == 'week' || f == 'day';
+    const weekLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
     showModalBottomSheet(
       context: context,
@@ -2109,87 +2129,196 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       ),
                     ],
                   ),
-                  // Repeat settings
+                  // Repeat settings — two-level: frequency type → sub-settings
                   if (isRepeat) ...[
                     const SizedBox(height: 14),
-                    const Text('重复频率', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Text('每', style: TextStyle(fontSize: 14)),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 56,
-                          child: TextField(
-                            controller: intervalCtrl,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                              filled: true,
-                              fillColor: AppColors.bgTertiary,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.borderSubtle)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.accentPrimary)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: units.map((u) {
-                                final sel = freq == u.$1;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: GestureDetector(
-                                    onTap: () => setSheetState(() => freq = u.$1),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: sel ? AppColors.accentPrimary : AppColors.bgTertiary,
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: sel ? AppColors.accentPrimary : AppColors.borderSubtle),
-                                      ),
-                                      child: Text(u.$2, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (showExecTime(freq)) ...[
-                      const SizedBox(height: 12),
-                      Row(
+                    // Level 1: Frequency type dropdown
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(10)),
+                      child: Row(
                         children: [
-                          const Text('执行时间：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                          GestureDetector(
-                            onTap: () async {
-                              final t = await showTimePicker(context: ctx, initialTime: execTime);
-                              if (t != null) setSheetState(() => execTime = t);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.borderSubtle)),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text("${execTime.hour.toString().padLeft(2, '0')}:${execTime.minute.toString().padLeft(2, '0')}", style: const TextStyle(fontSize: 14)),
-                                  const SizedBox(width: 6),
-                                  const Icon(Icons.schedule, size: 16, color: AppColors.textTertiary),
+                          const Icon(Icons.repeat, size: 16, color: AppColors.textTertiary),
+                          const SizedBox(width: 8),
+                          const Text('重复频率', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: AppColors.bgSecondary, borderRadius: BorderRadius.circular(8)),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: freq,
+                                isDense: true,
+                                style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                                dropdownColor: AppColors.bgElevated,
+                                items: const [
+                                  DropdownMenuItem(value: 'day', child: Text('每天')),
+                                  DropdownMenuItem(value: 'week', child: Text('每周')),
+                                  DropdownMenuItem(value: 'month', child: Text('每月')),
+                                  DropdownMenuItem(value: 'hour', child: Text('每小时')),
+                                  DropdownMenuItem(value: 'minute', child: Text('每分钟')),
                                 ],
+                                onChanged: (v) { if (v != null) setSheetState(() => freq = v); },
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Level 2: Sub-settings based on frequency type
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgTertiary,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.borderSubtle.withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Interval row: "每 [N] 天/周/月/小时/分钟"
+                          Row(
+                            children: [
+                              const Text('每', style: TextStyle(fontSize: 14)),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 48,
+                                height: 34,
+                                child: TextField(
+                                  controller: intervalCtrl,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+                                    filled: true,
+                                    fillColor: AppColors.bgSecondary,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                {'day': '天', 'week': '周', 'month': '个月', 'hour': '小时', 'minute': '分钟'}[freq] ?? '天',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                          // Day-of-month picker — for monthly
+                          if (freq == 'month') ...[
+                            const SizedBox(height: 12),
+                            const Divider(height: 1, color: AppColors.borderSubtle),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today_outlined, size: 15, color: AppColors.textTertiary),
+                                const SizedBox(width: 6),
+                                const Text('几号执行', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                const Spacer(),
+                                Container(
+                                  height: 34,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(color: AppColors.bgSecondary, borderRadius: BorderRadius.circular(8)),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      value: dayOfMonth,
+                                      isDense: true,
+                                      style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                                      dropdownColor: AppColors.bgElevated,
+                                      items: List.generate(31, (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}号'))),
+                                      onChanged: (v) { if (v != null) setSheetState(() => dayOfMonth = v); },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          // Day-of-week picker — for weekly
+                          if (freq == 'week') ...[
+                            const SizedBox(height: 12),
+                            const Divider(height: 1, color: AppColors.borderSubtle),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.view_week_outlined, size: 15, color: AppColors.textTertiary),
+                                const SizedBox(width: 6),
+                                const Text('周几执行', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                const Spacer(),
+                                ...List.generate(7, (i) {
+                                  final d = i + 1; // 1=周一 ... 7=周日
+                                  final sel = dayOfWeek == d;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(left: 4),
+                                    child: GestureDetector(
+                                      onTap: () => setSheetState(() => dayOfWeek = d),
+                                      child: Container(
+                                        width: 30,
+                                        height: 30,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: sel ? AppColors.accentPrimary : AppColors.bgSecondary,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(weekLabels[i], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ],
+                          // Time picker row — only for day/week/month
+                          if (needsTime(freq)) ...[
+                            const SizedBox(height: 12),
+                            const Divider(height: 1, color: AppColors.borderSubtle),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.schedule_outlined, size: 15, color: AppColors.textTertiary),
+                                const SizedBox(width: 6),
+                                const Text('几点执行', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                const Spacer(),
+                                // Hour
+                                Container(
+                                  height: 34,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(color: AppColors.bgSecondary, borderRadius: BorderRadius.circular(8)),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      value: execHour,
+                                      isDense: true,
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                      dropdownColor: AppColors.bgElevated,
+                                      items: List.generate(24, (i) => DropdownMenuItem(value: i, child: Text(i.toString().padLeft(2, '0')))),
+                                      onChanged: (v) { if (v != null) setSheetState(() => execHour = v); },
+                                    ),
+                                  ),
+                                ),
+                                const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Text(':', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+                                // Minute
+                                Container(
+                                  height: 34,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(color: AppColors.bgSecondary, borderRadius: BorderRadius.circular(8)),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      value: execMinute,
+                                      isDense: true,
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                      dropdownColor: AppColors.bgElevated,
+                                      items: List.generate(12, (i) => i * 5).map((m) => DropdownMenuItem(value: m, child: Text(m.toString().padLeft(2, '0')))).toList(),
+                                      onChanged: (v) { if (v != null) setSheetState(() => execMinute = v); },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -2244,8 +2373,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                           if (isRepeat) {
                             // Create schedule
                             final n = int.tryParse(intervalCtrl.text.trim()) ?? 1;
-                            final h = execTime.hour;
-                            final m = execTime.minute;
+                            final h = execHour;
+                            final m = execMinute;
                             String cronExpr;
                             switch (freq) {
                               case 'minute':
@@ -2255,9 +2384,10 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                               case 'day':
                                 cronExpr = n == 1 ? '$m $h * * *' : '$m $h */$n * *';
                               case 'week':
-                                cronExpr = '$m $h * * 1';
+                                final cronDow = dayOfWeek % 7; // 1=Mon..6=Sat, 7→0=Sun
+                                cronExpr = '$m $h * * $cronDow';
                               case 'month':
-                                cronExpr = n == 1 ? '$m $h 1 * *' : '$m $h 1 */$n *';
+                                cronExpr = n == 1 ? '$m $h $dayOfMonth * *' : '$m $h $dayOfMonth */$n *';
                               default:
                                 cronExpr = '$m $h * * *';
                             }
@@ -2307,199 +2437,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
 
   // ═══════════════════════════════════════════════════════════
-  // TAB 3 : Pulse
-  // ═══════════════════════════════════════════════════════════
-
-  Widget _buildPulseTab() {
-    if (_loadingPulse) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
-    }
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: _segmentedControl(
-                  options: const ['agenda', 'triggers', 'monologue', 'history'],
-                  selected: _pulseSection,
-                  onChanged: (v) => setState(() => _pulseSection = v),
-                  fullWidth: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18),
-                onPressed: _fetchPulseData,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Expanded(child: _buildPulseSection()),
-      ],
-    );
-  }
-
-  Widget _buildPulseSection() {
-    switch (_pulseSection) {
-      case 'agenda':
-        return _buildPulseContent(
-          icon: Icons.calendar_today,
-          iconColor: AppColors.accentPrimary,
-          title: '日程',
-          content: _agendaContent,
-          emptyMsg: '未找到日程文件。',
-        );
-      case 'triggers':
-        return _buildTriggersSection();
-      case 'monologue':
-        return _buildPulseContent(
-          icon: Icons.psychology,
-          iconColor: AppColors.accentPrimary,
-          title: '内心独白',
-          content: _monologueContent,
-          emptyMsg: '暂无内心独白内容。',
-        );
-      case 'history':
-        return _buildPulseContent(
-          icon: Icons.history,
-          iconColor: AppColors.warning,
-          title: '任务历史',
-          content: _taskHistoryContent,
-          emptyMsg: '暂无任务历史。',
-        );
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  Widget _buildPulseContent({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    String? content,
-    required String emptyMsg,
-  }) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: _card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: iconColor, size: 18),
-                const SizedBox(width: 8),
-                Text(title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.bgTertiary,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SelectableText(
-                content?.isNotEmpty == true ? content! : emptyMsg,
-                style: TextStyle(
-                  color: content?.isNotEmpty == true ? AppColors.textSecondary : AppColors.textTertiary,
-                  fontSize: 13,
-                  fontFamily: 'monospace',
-                  fontStyle: content?.isNotEmpty == true ? FontStyle.normal : FontStyle.italic,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTriggersSection() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: _card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.bolt, color: AppColors.warning, size: 18),
-                SizedBox(width: 8),
-                Text('触发器', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_triggers.isEmpty)
-              const Text(
-                '暂无触发器配置。',
-                style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic),
-              )
-            else
-              ..._triggers.map((t) {
-                final trigger = t as Map<String, dynamic>;
-                final id = trigger['id']?.toString() ?? '';
-                final type = trigger['type'] as String? ?? 'unknown';
-                final description = trigger['description'] as String? ?? '';
-                final enabled = trigger['enabled'] == true;
-                final cron = trigger['cron'] as String? ?? '';
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgTertiary,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.borderSubtle),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        enabled ? Icons.check_circle : Icons.cancel,
-                        color: enabled ? AppColors.success : AppColors.textTertiary,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              type,
-                              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
-                            ),
-                            if (description.isNotEmpty)
-                              Text(description, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                            if (cron.isNotEmpty)
-                              Text('cron: $cron', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10, fontFamily: 'monospace')),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: enabled,
-                        onChanged: (v) => _toggleTrigger(id, v),
-                        activeColor: AppColors.accentPrimary,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
-                        onPressed: () => _deleteTrigger(id),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // TAB 4 : Mind
+  // TAB 2 : Mind
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildMindTab() {
@@ -2511,87 +2449,146 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Soul.md
+          // Soul.md — collapsible
           _card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.auto_awesome, color: AppColors.accentPrimary, size: 18),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text('soul.md', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                    ),
-                    if (!_editingSoul)
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: AppColors.accentPrimary, size: 18),
-                        onPressed: () => setState(() => _editingSoul = true),
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18),
-                      onPressed: _fetchMindData,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (_editingSoul) ...[
-                  TextField(
-                    controller: _soulController,
-                    maxLines: 15,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
-                    decoration: const InputDecoration(
-                      hintText: '定义 Agent 的性格和核心行为...',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                InkWell(
+                  onTap: () => setState(() => _soulExpanded = !_soulExpanded),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
                     children: [
-                      TextButton(
-                        onPressed: () {
-                          _soulController.text = _soulContent ?? '';
-                          setState(() => _editingSoul = false);
-                        },
-                        child: const Text('取消'),
-                      ),
+                      const Icon(Icons.auto_awesome, color: AppColors.accentPrimary, size: 18),
                       const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: _savingSoul ? null : _saveSoulMd,
-                        child: _savingSoul ? _miniSpinner() : const Text('保存'),
+                      const Expanded(
+                        child: Text('soul.md', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                      ),
+                      Text(
+                        _soulContent?.isNotEmpty == true ? '${_soulContent!.length} 字' : '空',
+                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _soulExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: AppColors.textTertiary, size: 20,
                       ),
                     ],
                   ),
-                ] else
-                  _codeBlock(_soulContent, '未找到 soul.md 文件，点击编辑按钮创建。'),
+                ),
+                if (_soulExpanded) ...[
+                  const SizedBox(height: 8),
+                  if (_editingSoul) ...[
+                    TextField(
+                      controller: _soulController,
+                      maxLines: 15,
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
+                      decoration: const InputDecoration(
+                        hintText: '定义 Agent 的性格和核心行为...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            _soulController.text = _soulContent ?? '';
+                            setState(() => _editingSoul = false);
+                          },
+                          child: const Text('取消'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _savingSoul ? null : _saveSoulMd,
+                          child: _savingSoul ? _miniSpinner() : const Text('保存'),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    _codeBlock(_soulContent, '暂无内容，点击编辑按钮创建。'),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: const Text('编辑'),
+                        onPressed: () => setState(() => _editingSoul = true),
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Heartbeat (file only — settings controls are in Settings tab)
+          // HEARTBEAT.md — collapsible
           _card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(icon: Icons.favorite_outline, label: '心跳指令'),
-                const SizedBox(height: 12),
-                const Text('heartbeat.md', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                const SizedBox(height: 4),
-                _codeBlock(_heartbeatContent, '未找到 heartbeat.md 文件。'),
+                InkWell(
+                  onTap: () => setState(() => _heartbeatExpanded = !_heartbeatExpanded),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.favorite_outline, color: AppColors.error, size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text('HEARTBEAT.md', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                      ),
+                      Text(
+                        _heartbeatContent?.isNotEmpty == true ? '${_heartbeatContent!.length} 字' : '空',
+                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _heartbeatExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: AppColors.textTertiary, size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_heartbeatExpanded) ...[
+                  const SizedBox(height: 8),
+                  _codeBlock(_heartbeatContent, '暂无内容'),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Memory Files
+          // Memory Files — collapsible
           _card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(icon: Icons.memory, label: '记忆文件'),
-                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => setState(() => _memoryExpanded = !_memoryExpanded),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.memory, color: AppColors.warning, size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text('记忆文件', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                      ),
+                      Text(
+                        '${_memoryFiles.length} 个文件',
+                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _memoryExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: AppColors.textTertiary, size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_memoryExpanded) ...[
+                  const SizedBox(height: 12),
                 if (_memoryFiles.isEmpty)
                   const Text(
                     '暂无记忆文件。',
@@ -2627,6 +2624,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       ),
                     );
                   }),
+                ], // end _memoryExpanded
               ],
             ),
           ),
@@ -2639,153 +2637,209 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   // TAB 5 : Tools
   // ═══════════════════════════════════════════════════════════
 
+  static const _categoryLabels = {
+    'file': '文件操作',
+    'task': '任务管理',
+    'communication': '通讯',
+    'search': '搜索',
+    'code': '代码',
+    'discovery': '发现',
+    'trigger': '触发器',
+    'plaza': '广场',
+    'custom': '自定义',
+    'general': '通用',
+  };
+
   Widget _buildToolsTab() {
     if (_loadingTools) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
     }
 
-    final agentToolMap = <String, bool>{};
-    for (final at in _agentTools) {
-      final m = at as Map<String, dynamic>;
-      final id = m['tool_id']?.toString() ?? m['id']?.toString() ?? '';
-      agentToolMap[id] = m['enabled'] == true;
-    }
+    return Column(
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Row(
+            children: [
+              const Icon(Icons.build, color: AppColors.textSecondary, size: 18),
+              const SizedBox(width: 8),
+              const Text('工具', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+        // Tab bar: platform vs agent-installed
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              _toolSectionBtn(0, '平台工具', _platformTools.length),
+              const SizedBox(width: 8),
+              _toolSectionBtn(1, 'Agent 安装', _agentTools.length),
+            ],
+          ),
+        ),
+        // Content
+        Expanded(
+          child: _toolSection == 0
+              ? _buildPlatformToolsList()
+              : _buildAgentInstalledToolsList(),
+        ),
+      ],
+    );
+  }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+  Widget _toolSectionBtn(int index, String label, int count) {
+    final active = _toolSection == index;
+    return GestureDetector(
+      onTap: () => setState(() => _toolSection = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? AppColors.accentPrimary : AppColors.bgSecondary,
+          borderRadius: BorderRadius.circular(16),
+          border: active ? null : Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Text(
+          '$label ($count)',
+          style: TextStyle(
+            color: active ? Colors.white : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlatformToolsList() {
+    if (_platformTools.isEmpty) {
+      return _emptyState('暂无平台工具', '');
+    }
+    // Group by category
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final t in _platformTools) {
+      final m = t as Map<String, dynamic>;
+      final cat = (m['category'] as String?) ?? 'general';
+      grouped.putIfAbsent(cat, () => []).add(m);
+    }
+    final categories = grouped.keys.toList();
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: categories.length,
+      itemBuilder: (context, i) {
+        final cat = categories[i];
+        final tools = grouped[cat]!;
+        final catLabel = _categoryLabels[cat] ?? cat.toUpperCase();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 6),
+              child: Text(catLabel, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+            ),
+            ...tools.map(_buildToolCard),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAgentInstalledToolsList() {
+    if (_agentTools.isEmpty) {
+      return _emptyState('暂无安装的工具', 'Agent 可通过 import_mcp_server 工具自行安装。');
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _agentTools.length,
+      itemBuilder: (context, i) => _buildToolCard(_agentTools[i] as Map<String, dynamic>),
+    );
+  }
+
+  Widget _buildToolCard(Map<String, dynamic> tool) {
+    final id = tool['id']?.toString() ?? '';
+    final name = tool['name'] as String? ?? '未知';
+    final displayName = tool['display_name'] as String? ?? name;
+    final description = tool['description'] as String? ?? '';
+    final category = tool['category'] as String? ?? '';
+    final enabled = tool['enabled'] == true;
+    final toolType = tool['type'] as String? ?? '';
+    final configSchema = tool['config_schema'] as Map<String, dynamic>?;
+    final hasConfig = configSchema != null && (configSchema['fields'] as List?)?.isNotEmpty == true;
+    final isExpanded = _expandedToolId == id;
+    final mcpServer = tool['mcp_server_name'] as String? ?? '';
+    final agentConfig = (tool['agent_config'] as Map<String, dynamic>?) ?? {};
+    final globalConfig = (tool['global_config'] as Map<String, dynamic>?) ?? {};
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.bgSecondary,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.build, color: AppColors.textSecondary, size: 18),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text('工具', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-              IconButton(icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18), onPressed: _fetchToolsData),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Platform Tools
-          if (_platformTools.isNotEmpty) ...[
-            const Text('平台工具', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            ..._platformTools.map((t) {
-              final tool = t as Map<String, dynamic>;
-              final id = tool['id']?.toString() ?? '';
-              final name = tool['name'] as String? ?? '未知';
-              final description = tool['description'] as String? ?? '';
-              final category = tool['category'] as String? ?? '';
-              final enabled = agentToolMap[id] ?? false;
-              final configSchema = tool['config_schema'] as Map<String, dynamic>?;
-              final hasConfig = configSchema != null && (configSchema['fields'] as List?)?.isNotEmpty == true;
-              final isExpanded = _expandedToolId == id;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.bgSecondary,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.borderSubtle),
-                ),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
-                                  ),
-                                  if (category.isNotEmpty) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.bgTertiary,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(category, style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              if (description.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(description, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                ),
-                            ],
-                          ),
+                        Flexible(
+                          child: Text(displayName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
                         ),
-                        if (hasConfig)
-                          IconButton(
-                            icon: Icon(isExpanded ? Icons.expand_less : Icons.settings, color: AppColors.textSecondary, size: 18),
-                            onPressed: () => setState(() => _expandedToolId = isExpanded ? null : id),
+                        if (toolType == 'mcp') ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(color: const Color(0xFF7C3AED).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                            child: const Text('MCP', style: TextStyle(color: Color(0xFF7C3AED), fontSize: 9, fontWeight: FontWeight.w600)),
                           ),
-                        Switch(
-                          value: enabled,
-                          onChanged: (v) => _toggleTool(id, v),
-                          activeColor: AppColors.accentPrimary,
-                        ),
+                        ],
+                        if (category.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(4)),
+                            child: Text(category, style: const TextStyle(color: AppColors.textTertiary, fontSize: 9)),
+                          ),
+                        ],
                       ],
                     ),
-                    if (isExpanded && hasConfig) ...[
-                      const Divider(height: 16),
-                      _buildToolConfigFields(id, configSchema),
-                    ],
+                    if (description.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          mcpServer.isNotEmpty ? '$description · $mcpServer' : description,
+                          style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                   ],
                 ),
-              );
-            }),
-          ],
-
-          if (_platformTools.isEmpty && _agentTools.isEmpty)
-            _emptyState('暂无工具', '未找到平台工具或 Agent 安装的工具。'),
-
-          // Agent-installed Tools
-          if (_agentTools.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text('Agent 安装的工具', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            ..._agentTools.map((t) {
-              final tool = t as Map<String, dynamic>;
-              final name = tool['name'] as String? ?? tool['tool_id']?.toString() ?? '未知';
-              final enabled = tool['enabled'] == true;
-              final toolId = tool['tool_id']?.toString() ?? tool['id']?.toString() ?? '';
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.bgSecondary,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.borderSubtle),
+              ),
+              if (hasConfig)
+                IconButton(
+                  icon: Icon(isExpanded ? Icons.expand_less : Icons.settings, color: AppColors.textSecondary, size: 18),
+                  onPressed: () => setState(() => _expandedToolId = isExpanded ? null : id),
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      enabled ? Icons.check_circle : Icons.cancel,
-                      color: enabled ? AppColors.success : AppColors.textTertiary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13))),
-                    Switch(
-                      value: enabled,
-                      onChanged: (v) => _toggleTool(toolId, v),
-                      activeColor: AppColors.accentPrimary,
-                    ),
-                  ],
-                ),
-              );
-            }),
+              Switch(
+                value: enabled,
+                onChanged: (v) => _toggleTool(id, v),
+                activeColor: AppColors.accentPrimary,
+              ),
+            ],
+          ),
+          if (isExpanded && hasConfig) ...[
+            const Divider(height: 16),
+            _buildToolConfigFields(id, configSchema, agentConfig: agentConfig, globalConfig: globalConfig),
           ],
         ],
       ),
@@ -2801,7 +2855,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
     }
 
-    // Viewing a skill file
+    // Viewing a skill file content
     if (_viewingSkillContent != null) {
       return Column(
         children: [
@@ -2813,6 +2867,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   icon: const Icon(Icons.arrow_back, color: AppColors.textSecondary, size: 18),
                   onPressed: () => setState(() {
                     _viewingSkillContent = null;
+                    // If we came from a sub-folder, go back to it; otherwise go to root
+                    if (_skillSubFolder != null && _viewingSkillName != null && _viewingSkillName!.contains('/')) {
+                      // Stay in sub-folder view
+                    } else {
+                      _skillSubFolder = null;
+                      _skillSubFiles = [];
+                    }
                     _viewingSkillName = null;
                   }),
                 ),
@@ -2853,6 +2914,90 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       );
     }
 
+    // Viewing files inside a skill folder
+    if (_skillSubFolder != null) {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: AppColors.textSecondary, size: 18),
+                  onPressed: () {
+                    // If nested (e.g. skill-creator/agents), go up one level
+                    if (_skillSubFolder != null && _skillSubFolder!.contains('/')) {
+                      final parent = _skillSubFolder!.substring(0, _skillSubFolder!.lastIndexOf('/'));
+                      _api.listFiles(widget.agentId, path: 'skills/$parent').then((files) {
+                        if (!mounted) return;
+                        setState(() {
+                          _skillSubFolder = parent;
+                          _skillSubFiles = files;
+                        });
+                      }).catchError((_) {});
+                    } else {
+                      setState(() {
+                        _skillSubFolder = null;
+                        _skillSubFiles = [];
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _skillSubFolder!,
+                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
+                  tooltip: '删除技能',
+                  onPressed: () => _deleteSkillFile(_skillSubFolder!),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _skillSubFiles.isEmpty
+                ? _emptyState('文件夹为空', '该技能文件夹下没有文件。')
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _skillSubFiles.length,
+                    itemBuilder: (ctx, i) {
+                      final sf = _skillSubFiles[i] as Map<String, dynamic>;
+                      final sfName = sf['name'] as String? ?? '';
+                      final sfSize = sf['size'] ?? 0;
+                      final sfIsDir = sf['is_dir'] == true;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgSecondary,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.borderSubtle),
+                        ),
+                        child: ListTile(
+                          dense: true,
+                          leading: Icon(
+                            sfIsDir ? Icons.folder : Icons.insert_drive_file,
+                            color: sfIsDir ? AppColors.warning : AppColors.textTertiary,
+                            size: 20,
+                          ),
+                          title: Text(sfName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                          subtitle: sfIsDir
+                              ? null
+                              : Text('$sfSize 字节', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                          onTap: () => _openSkillSubFile(sf),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      );
+    }
+
     // Skill list
     return Column(
       children: [
@@ -2865,7 +3010,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const Expanded(
                 child: Text('技能', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
-              IconButton(icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18), onPressed: _fetchSkillsData),
               IconButton(
                 icon: const Icon(Icons.add, color: AppColors.accentPrimary, size: 18),
                 tooltip: '新建技能',
@@ -2927,7 +3071,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                   itemBuilder: (ctx, i) {
                     final file = _skillFiles[i] as Map<String, dynamic>;
                     final name = file['name'] as String? ?? '';
-                    final size = file['size'] ?? 0;
+                    // Strip .md extension for display
+                    final displayName = name.endsWith('.md') ? name.substring(0, name.length - 3) : name;
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
@@ -2937,22 +3082,15 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       ),
                       child: ListTile(
                         dense: true,
-                        leading: const Icon(Icons.code, color: AppColors.accentPrimary, size: 20),
-                        title: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
-                        subtitle: Text('$size 字节', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                        leading: const Icon(Icons.auto_fix_high, color: AppColors.accentPrimary, size: 20),
+                        title: Text(displayName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.visibility, color: AppColors.textSecondary, size: 18),
-                              onPressed: () => _openSkillFile(file),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
-                              onPressed: () => _deleteSkillFile(name),
-                            ),
+                            const Icon(Icons.chevron_right, color: AppColors.textTertiary, size: 18),
                           ],
                         ),
+                        onTap: () => _openSkillFile(file),
                       ),
                     );
                   },
@@ -2981,7 +3119,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const Icon(Icons.people, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
               const Expanded(child: Text('关系', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600))),
-              IconButton(icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18), onPressed: _fetchRelationshipsData),
             ],
           ),
           const SizedBox(height: 16),
@@ -3243,10 +3380,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 tooltip: '上传文件',
                 onPressed: _uploadWorkspaceFile,
               ),
-              IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18),
-                onPressed: () => _fetchWorkspaceFiles(_currentPath),
-              ),
             ],
           ),
         ),
@@ -3381,10 +3514,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 },
               ),
               const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18),
-                onPressed: _fetchActivity,
-              ),
             ],
           ),
         ),
@@ -3686,21 +3815,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ),
           const SizedBox(height: 16),
 
-          // ── Autonomy Policy ──
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _SectionHeader(icon: Icons.security, label: '自主权限策略'),
-                const SizedBox(height: 4),
-                const Text('控制 Agent 执行操作时的审批级别', style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
-                const SizedBox(height: 12),
-                ..._buildAutonomyPolicyRows(agent),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
           // ── Heartbeat (Settings) ──
           _card(
             child: Column(
@@ -3799,51 +3913,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ),
           const SizedBox(height: 16),
 
-          // ── Access Permissions ──
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _SectionHeader(icon: Icons.lock_outline, label: '访问权限'),
-                const SizedBox(height: 12),
-                const Text('作用范围', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _radioOption('company', '公司', agent['scope_type'] as String? ?? 'company', (v) async {
-                      await _api.updateAgent(widget.agentId, {'scope_type': v});
-                      _fetchAgentSilent();
-                    }),
-                    const SizedBox(width: 16),
-                    _radioOption('user', '个人', agent['scope_type'] as String? ?? 'company', (v) async {
-                      await _api.updateAgent(widget.agentId, {'scope_type': v});
-                      _fetchAgentSilent();
-                    }),
-                  ],
-                ),
-                if ((agent['scope_type'] as String? ?? 'company') == 'company') ...[
-                  const SizedBox(height: 16),
-                  const Text('访问级别', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _radioOption('use', '使用', agent['access_level'] as String? ?? 'manage', (v) async {
-                        await _api.updateAgent(widget.agentId, {'access_level': v});
-                        _fetchAgentSilent();
-                      }),
-                      const SizedBox(width: 16),
-                      _radioOption('manage', '管理', agent['access_level'] as String? ?? 'manage', (v) async {
-                        await _api.updateAgent(widget.agentId, {'access_level': v});
-                        _fetchAgentSilent();
-                      }),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
           // ── Channel Configuration ──
           _card(
             child: Column(
@@ -3856,7 +3925,6 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     const Expanded(
                       child: Text('通道配置', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
-                    IconButton(icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 18), onPressed: _fetchSettingsData),
                   ],
                 ),
                 const SizedBox(height: 12),
