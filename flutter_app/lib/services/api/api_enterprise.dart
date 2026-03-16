@@ -43,6 +43,11 @@ extension ApiEnterprise on ApiService {
     return r.data as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> getTenantQuotas() async {
+    final r = await _apiDio.get('/enterprise/tenant-quotas');
+    return r.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>?> getNotificationBar() async {
     try {
       final r = await _apiDio.get('/enterprise/system-settings/notification_bar/public');

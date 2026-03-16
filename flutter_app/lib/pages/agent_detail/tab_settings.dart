@@ -155,6 +155,9 @@ extension _SettingsTab on _AgentDetailPageState {
                       ),
                       const SizedBox(width: 6),
                       const Text('分钟', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                      const SizedBox(width: 8),
+                      Text('(最低 $_minHeartbeatInterval 分钟)',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -187,13 +190,24 @@ extension _SettingsTab on _AgentDetailPageState {
                         _heartbeatIntervalCtrl.text = '$clamped';
                         final hours = _heartbeatActiveHoursCtrl.text.trim();
                         try {
-                          await _api.updateAgent(widget.agentId, {
+                          final updated = await _api.updateAgent(widget.agentId, {
                             'heartbeat_interval_minutes': clamped,
                             'heartbeat_active_hours': hours,
                           });
-                          _showSnack('心跳设置已保存');
+                          if (!mounted) return;
+                          // Sync controllers with actual saved values (backend may clamp)
+                          final savedInterval = updated['heartbeat_interval_minutes'] ?? clamped;
+                          final savedHours = updated['heartbeat_active_hours'] ?? hours;
+                          _heartbeatIntervalCtrl.text = '$savedInterval';
+                          _heartbeatActiveHoursCtrl.text = '$savedHours';
+                          if (savedInterval != clamped) {
+                            _showSnack('间隔已调整为最低 $savedInterval 分钟');
+                          } else {
+                            _showSnack('心跳设置已保存');
+                          }
                           _fetchAgentSilent();
                         } catch (e) {
+                          if (!mounted) return;
                           _showSnack('保存失败: ${_errMsg(e)}');
                         }
                       },

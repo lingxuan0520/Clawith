@@ -120,6 +120,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   final _heartbeatActiveHoursCtrl = TextEditingController(text: '09:00-18:00');
   List<dynamic> _llmModels = [];
   Map<String, dynamic>? _channelConfig;
+  int _minHeartbeatInterval = 120;
   bool _loadingSettings = false;
   bool _savingSettings = false;
   bool _showDeleteConfirm = false;
@@ -419,12 +420,15 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       final results = await Future.wait([
         _api.listLlmModels().catchError((_) => <dynamic>[]),
         _api.getChannel(widget.agentId),
+        _api.getTenantQuotas().catchError((_) => <String, dynamic>{}),
       ]);
       if (!mounted) return;
       final agent = _agent ?? {};
+      final quotas = results[2] as Map<String, dynamic>;
       setState(() {
         _llmModels = results[0] as List<dynamic>;
         _channelConfig = results[1] as Map<String, dynamic>?;
+        _minHeartbeatInterval = (quotas['min_heartbeat_interval_minutes'] as int?) ?? 120;
         _modelCtrl.text = (agent['primary_model_id'] ?? agent['model'] ?? '') as String;
         _fallbackModelCtrl.text = (agent['fallback_model_id'] ?? agent['fallback_model'] ?? '') as String;
         _maxTokensCtrl.text = (agent['max_tokens'] ?? 4096).toString();

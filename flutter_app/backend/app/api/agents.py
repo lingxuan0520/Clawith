@@ -120,7 +120,7 @@ async def create_agent(
         template_id=data.template_id,
         status="creating",
         expires_at=None,
-        max_llm_calls_per_day=None,
+        max_llm_calls_per_day=0,
     )
     if data.autonomy_policy:
         agent.autonomy_policy = data.autonomy_policy
