@@ -151,13 +151,6 @@ extension _SettingsTab on _AgentDetailPageState {
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                           ),
-                          onSubmitted: (val) async {
-                            final v = int.tryParse(val) ?? 120;
-                            final clamped = v < 1 ? 1 : v;
-                            _heartbeatIntervalCtrl.text = '$clamped';
-                            await _api.updateAgent(widget.agentId, {'heartbeat_interval_minutes': clamped});
-                            _fetchAgentSilent();
-                          },
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -180,13 +173,32 @@ extension _SettingsTab on _AgentDetailPageState {
                             hintText: '09:00-18:00',
                             hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 12),
                           ),
-                          onSubmitted: (val) async {
-                            await _api.updateAgent(widget.agentId, {'heartbeat_active_hours': val.trim()});
-                            _fetchAgentSilent();
-                          },
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final interval = int.tryParse(_heartbeatIntervalCtrl.text) ?? 120;
+                        final clamped = interval < 1 ? 1 : interval;
+                        _heartbeatIntervalCtrl.text = '$clamped';
+                        final hours = _heartbeatActiveHoursCtrl.text.trim();
+                        try {
+                          await _api.updateAgent(widget.agentId, {
+                            'heartbeat_interval_minutes': clamped,
+                            'heartbeat_active_hours': hours,
+                          });
+                          _showSnack('心跳设置已保存');
+                          _fetchAgentSilent();
+                        } catch (e) {
+                          _showSnack('保存失败: ${_errMsg(e)}');
+                        }
+                      },
+                      child: const Text('保存'),
+                    ),
                   ),
                   if (agent['last_heartbeat_at'] != null) ...[
                     const SizedBox(height: 8),
