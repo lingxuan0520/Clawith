@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../services/api.dart';
@@ -15,7 +16,7 @@ class SectionHeader extends StatelessWidget {
       children: [
         Icon(icon, color: AppColors.textSecondary, size: 18),
         const SizedBox(width: 8),
-        Text(label, style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+        Text(label, style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -49,7 +50,7 @@ class _FileViewerDialogState extends State<FileViewerDialog> {
       setState(() { _content = data['content'] as String? ?? ''; _loading = false; });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _error = '读取失败: $e'; _loading = false; });
+      setState(() { _error = AppLocalizations.of(context)!.sharedWidgetsReadFailed(e.toString()); _loading = false; });
     }
   }
 
@@ -76,7 +77,7 @@ class _FileViewerDialogState extends State<FileViewerDialog> {
                 ],
               ),
             ),
-            const Divider(color: AppColors.borderSubtle),
+            Divider(color: AppColors.borderSubtle),
             // Content
             Flexible(
               child: _loading
@@ -85,7 +86,7 @@ class _FileViewerDialogState extends State<FileViewerDialog> {
                       ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, style: const TextStyle(color: AppColors.error))))
                       : SingleChildScrollView(
                           padding: const EdgeInsets.all(16),
-                          child: SelectableText(_content ?? '', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)),
+                          child: SelectableText(_content ?? '', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)),
                         ),
             ),
           ],
@@ -151,22 +152,22 @@ class _TaskDetailSheetState extends State<TaskDetailSheet> {
                 children: [
                   Expanded(child: Text(widget.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
                   if (widget.status == 'pending')
-                    TextButton(onPressed: widget.onTrigger, child: const Text('触发执行', style: TextStyle(color: AppColors.accentPrimary))),
+                    TextButton(onPressed: widget.onTrigger, child: Text(AppLocalizations.of(context)!.sharedWidgetsTrigger, style: const TextStyle(color: AppColors.accentPrimary))),
                 ],
               ),
             ),
             if (widget.desc.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: Align(alignment: Alignment.centerLeft, child: Text(widget.desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
+                child: Align(alignment: Alignment.centerLeft, child: Text(widget.desc, style: TextStyle(color: AppColors.textSecondary, fontSize: 13))),
               ),
-            const Divider(height: 20, color: AppColors.borderSubtle),
+            Divider(height: 20, color: AppColors.borderSubtle),
             // Logs / Result
             Flexible(
               child: _loading
                   ? const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(color: AppColors.accentPrimary)))
                   : _logs.isEmpty
-                      ? const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('暂无执行记录', style: TextStyle(color: AppColors.textTertiary))))
+                      ? Center(child: Padding(padding: const EdgeInsets.all(32), child: Text(AppLocalizations.of(context)!.sharedWidgetsNoRecords, style: TextStyle(color: AppColors.textTertiary))))
                       : ListView.separated(
                           shrinkWrap: true,
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -179,7 +180,7 @@ class _TaskDetailSheetState extends State<TaskDetailSheet> {
                             if (isResult) {
                               return _buildResultContent(content);
                             }
-                            return Text(content, style: const TextStyle(color: AppColors.textTertiary, fontSize: 12));
+                            return Text(content, style: TextStyle(color: AppColors.textTertiary, fontSize: 12));
                           },
                         ),
             ),
@@ -192,13 +193,13 @@ class _TaskDetailSheetState extends State<TaskDetailSheet> {
   Widget _buildResultContent(String content) {
     final matches = _filePathRegex.allMatches(content).toList();
     if (matches.isEmpty) {
-      return SelectableText(content, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6));
+      return SelectableText(content, style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6));
     }
     final widgets = <Widget>[];
     int cursor = 0;
     for (final m in matches) {
       if (m.start > cursor) {
-        widgets.add(SelectableText(content.substring(cursor, m.start), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)));
+        widgets.add(SelectableText(content.substring(cursor, m.start), style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)));
       }
       final path = m.group(0)!;
       widgets.add(
@@ -228,7 +229,7 @@ class _TaskDetailSheetState extends State<TaskDetailSheet> {
       cursor = m.end;
     }
     if (cursor < content.length) {
-      widgets.add(SelectableText(content.substring(cursor), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)));
+      widgets.add(SelectableText(content.substring(cursor), style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6)));
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
   }

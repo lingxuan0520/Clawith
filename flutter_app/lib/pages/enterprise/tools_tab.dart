@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../../services/api.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/network/api_client.dart';
@@ -55,22 +56,23 @@ class _ToolsTabState extends State<ToolsTab>
   }
 
   Future<void> _deleteTool(String toolId, String displayName) async {
+    final l = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
-        title: const Text('删除工具',
+        title: Text(l.toolsTabDeleteTitle,
             style: TextStyle(color: AppColors.textPrimary)),
-        content: Text('确定删除 "$displayName" 吗？',
-            style: const TextStyle(color: AppColors.textSecondary)),
+        content: Text(l.toolsTabDeleteConfirm(displayName),
+            style: TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
+              child: Text(l.commonCancel)),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
               child:
-                  const Text('删除', style: TextStyle(color: AppColors.error))),
+                  Text(l.commonDelete, style: const TextStyle(color: AppColors.error))),
         ],
       ),
     );
@@ -79,7 +81,7 @@ class _ToolsTabState extends State<ToolsTab>
       await _dio.delete('/tools/$toolId');
       _loadTools();
     } catch (_) {
-      _showError('删除工具失败');
+      _showError(l.toolsTabDeleteFailed);
     }
   }
 
@@ -118,11 +120,11 @@ class _ToolsTabState extends State<ToolsTab>
       _loadTools();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已导入 ${tool['name']}')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.toolsTabImported(tool['name'] as String? ?? ''))),
         );
       }
     } catch (_) {
-      _showError('导入工具失败');
+      _showError(AppLocalizations.of(context)!.toolsTabImportFailed);
     }
   }
 
@@ -135,6 +137,7 @@ class _ToolsTabState extends State<ToolsTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final l = AppLocalizations.of(context)!;
     if (_loading) {
       return const Center(
           child: CircularProgressIndicator(color: AppColors.accentPrimary));
@@ -146,7 +149,7 @@ class _ToolsTabState extends State<ToolsTab>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('全局工具',
+            Text(l.toolsTabGlobal,
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -154,7 +157,7 @@ class _ToolsTabState extends State<ToolsTab>
             ElevatedButton.icon(
               onPressed: () => setState(() => _showAddMCP = true),
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('MCP 服务器'),
+              label: Text(l.toolsTabMcp),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accentPrimary,
                 foregroundColor: Colors.white,
@@ -170,31 +173,31 @@ class _ToolsTabState extends State<ToolsTab>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('添加 MCP 服务器',
+                Text(l.toolsTabAddMcp,
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary)),
                 const SizedBox(height: 12),
-                const Text('服务器名称',
+                Text(l.toolsTabServerName,
                     style: TextStyle(
                         fontSize: 12, color: AppColors.textSecondary)),
                 const SizedBox(height: 4),
                 TextField(
                   controller: _mcpNameCtl,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 13, color: AppColors.textPrimary),
                   decoration:
-                      const InputDecoration(hintText: '我的 MCP 服务器'),
+                      const InputDecoration(hintText: 'My MCP Server'),
                 ),
                 const SizedBox(height: 10),
-                const Text('MCP 服务器地址',
+                Text(l.toolsTabServerUrl,
                     style: TextStyle(
                         fontSize: 12, color: AppColors.textSecondary)),
                 const SizedBox(height: 4),
                 TextField(
                   controller: _mcpUrlCtl,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 13, color: AppColors.textPrimary),
                   decoration: const InputDecoration(
                       hintText: 'http://localhost:3000/mcp'),
@@ -207,7 +210,7 @@ class _ToolsTabState extends State<ToolsTab>
                           ? null
                           : _testMcpConnection,
                       child: Text(
-                          _mcpTesting ? '测试中...' : '测试连接'),
+                          _mcpTesting ? l.toolsTabTesting : l.toolsTabTestConnection),
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton(
@@ -215,7 +218,7 @@ class _ToolsTabState extends State<ToolsTab>
                         _showAddMCP = false;
                         _mcpTestResult = null;
                       }),
-                      child: const Text('取消'),
+                      child: Text(l.commonCancel),
                     ),
                   ],
                 ),
@@ -239,7 +242,7 @@ class _ToolsTabState extends State<ToolsTab>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '连接成功！发现 ${(_mcpTestResult!['tools'] as List?)?.length ?? 0} 个工具',
+                                l.toolsTabConnectSuccess((_mcpTestResult!['tools'] as List?)?.length ?? 0),
                                 style: const TextStyle(
                                     color: AppColors.success,
                                     fontWeight: FontWeight.w600,
@@ -260,7 +263,7 @@ class _ToolsTabState extends State<ToolsTab>
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(t['name'] as String? ?? '',
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                     fontWeight: FontWeight.w500,
                                                     fontSize: 13,
                                                     color:
@@ -278,7 +281,7 @@ class _ToolsTabState extends State<ToolsTab>
                                                             : (t['description']
                                                                     as String)
                                                                 .length),
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                     fontSize: 11,
                                                     color: AppColors
                                                         .textTertiary),
@@ -294,7 +297,7 @@ class _ToolsTabState extends State<ToolsTab>
                                           textStyle:
                                               const TextStyle(fontSize: 11),
                                         ),
-                                        child: const Text('导入'),
+                                        child: Text(l.toolsTabImport),
                                       ),
                                     ],
                                   ),
@@ -303,7 +306,7 @@ class _ToolsTabState extends State<ToolsTab>
                             ],
                           )
                         : Text(
-                            '连接失败: ${_mcpTestResult!['error'] ?? '未知错误'}',
+                            l.toolsTabConnectFailed(_mcpTestResult!['error']?.toString() ?? l.toolsTabUnknownError),
                             style: const TextStyle(
                                 color: AppColors.error, fontSize: 13),
                           ),
@@ -317,10 +320,10 @@ class _ToolsTabState extends State<ToolsTab>
 
         // Tool list
         if (_tools.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(40),
-              child: Text('暂无可用工具',
+              padding: const EdgeInsets.all(40),
+              child: Text(l.toolsTabNoTools,
                   style:
                       TextStyle(color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -332,6 +335,7 @@ class _ToolsTabState extends State<ToolsTab>
   }
 
   Widget _buildToolCard(Map<String, dynamic> tool) {
+    final l = AppLocalizations.of(context)!;
     final enabled = tool['enabled'] == true;
     final isMcp = tool['type'] == 'mcp';
     final isBuiltin = tool['type'] == 'builtin';
@@ -366,7 +370,7 @@ class _ToolsTabState extends State<ToolsTab>
                       Flexible(
                         child: Text(
                           displayName,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w500,
                               fontSize: 13,
                               color: AppColors.textPrimary),
@@ -375,7 +379,7 @@ class _ToolsTabState extends State<ToolsTab>
                       ),
                       const SizedBox(width: 6),
                       _buildBadge(
-                        isMcp ? 'MCP' : '内置',
+                        isMcp ? 'MCP' : l.toolsTabBuiltIn,
                         isMcp
                             ? AppColors.accentPrimary
                             : AppColors.bgTertiary,
@@ -385,7 +389,7 @@ class _ToolsTabState extends State<ToolsTab>
                       ),
                       if (isDefault) ...[
                         const SizedBox(width: 4),
-                        _buildBadge('默认', AppColors.success,
+                        _buildBadge(l.toolsTabDefault, AppColors.success,
                             textColor: Colors.white),
                       ],
                     ],
@@ -398,7 +402,7 @@ class _ToolsTabState extends State<ToolsTab>
                             (mcpServerName.isNotEmpty
                                 ? ' \u00b7 $mcpServerName'
                                 : ''),
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 11, color: AppColors.textTertiary),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -412,7 +416,7 @@ class _ToolsTabState extends State<ToolsTab>
                     size: 16, color: AppColors.error),
                 onPressed: () =>
                     _deleteTool(tool['id'] as String, displayName),
-                tooltip: '删除',
+                tooltip: l.commonDelete,
                 visualDensity: VisualDensity.compact,
               ),
             const SizedBox(width: 4),

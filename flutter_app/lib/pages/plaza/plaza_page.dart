@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../../stores/auth_store.dart';
 import '../../services/api.dart';
 import '../../core/theme/app_theme.dart';
@@ -58,12 +59,13 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
   Future<void> _createPost() async {
     if (_postCtl.text.trim().isEmpty) return;
     final auth = ref.read(authProvider);
+    final l = AppLocalizations.of(context)!;
     try {
       await ApiService.instance.createPlazaPost({
         'content': _postCtl.text,
         'author_id': auth.userId,
         'author_type': 'human',
-        'author_name': auth.displayName.isNotEmpty ? auth.displayName : '匿名用户',
+        'author_name': auth.displayName.isNotEmpty ? auth.displayName : l.plazaAnonymous,
       });
       _postCtl.clear();
       _loadData();
@@ -81,12 +83,13 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
   Future<void> _addComment(String postId) async {
     if (_commentCtl.text.trim().isEmpty) return;
     final auth = ref.read(authProvider);
+    final l = AppLocalizations.of(context)!;
     try {
       await ApiService.instance.addPlazaComment(postId, {
         'content': _commentCtl.text,
         'author_id': auth.userId,
         'author_type': 'human',
-        'author_name': auth.displayName.isNotEmpty ? auth.displayName : '匿名用户',
+        'author_name': auth.displayName.isNotEmpty ? auth.displayName : l.plazaAnonymous,
       });
       _commentCtl.clear();
       _loadPostDetail(postId);
@@ -101,17 +104,18 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
     } catch (_) {}
   }
 
-  String _timeAgo(String dateStr) {
+  String _timeAgo(String dateStr, AppLocalizations l) {
     final diff = DateTime.now().difference(DateTime.parse(dateStr));
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-    if (diff.inHours < 24) return '${diff.inHours}小时前';
-    return '${diff.inDays}天前';
+    if (diff.inMinutes < 1) return l.timeJustNow;
+    if (diff.inMinutes < 60) return l.timeMinutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return l.timeHoursAgo(diff.inHours);
+    return l.timeDaysAgo(diff.inDays);
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final l = AppLocalizations.of(context)!;
     final runningAgents = _agents.where((a) => a['status'] == 'running').toList();
 
     // Extract trending tags
@@ -132,29 +136,29 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
           // Header
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('工作台', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+            children: [
+              Text(l.plazaTitle, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
               SizedBox(height: 2),
-              Text('Agent 动态和社区分享',
+              Text(l.plazaSubtitle,
                   style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
             ],
           ),
           const SizedBox(height: 24),
 
           // Stats
-          if (_stats != null) _buildStats(),
+          if (_stats != null) _buildStats(l),
           const SizedBox(height: 16),
 
           // Two column layout (responsive)
           LayoutBuilder(
             builder: (context, constraints) {
               final showSidebar = constraints.maxWidth > 700;
-              final sidebarContent = _buildSidebarContent(runningAgents, trendingTags);
+              final sidebarContent = _buildSidebarContent(runningAgents, trendingTags, l);
               if (!showSidebar) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildFeed(auth),
+                    _buildFeed(auth, l),
                     const SizedBox(height: 16),
                     sidebarContent,
                   ],
@@ -163,7 +167,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _buildFeed(auth)),
+                  Expanded(child: _buildFeed(auth, l)),
                   const SizedBox(width: 24),
                   SizedBox(width: 260, child: sidebarContent),
                 ],
@@ -175,7 +179,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
     );
   }
 
-  Widget _buildFeed(AuthState auth) {
+  Widget _buildFeed(AuthState auth, AppLocalizations l) {
     return Column(
       children: [
         // Composer
@@ -198,8 +202,8 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                       maxLines: 3,
                       minLines: 2,
                       maxLength: 500,
-                      decoration: const InputDecoration(
-                        hintText: '说点什么...',
+                      decoration: InputDecoration(
+                        hintText: l.plazaPostHint,
                         border: InputBorder.none,
                         counterText: '',
                       ),
@@ -211,15 +215,15 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${_postCtl.text.length}/500 · 支持 #话题标签',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                  Text(l.plazaCharCount(_postCtl.text.length),
+                      style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                   ElevatedButton(
                     onPressed: _postCtl.text.trim().isNotEmpty ? _createPost : null,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       textStyle: const TextStyle(fontSize: 12),
                     ),
-                    child: const Text('发布'),
+                    child: Text(l.plazaPublish),
                   ),
                 ],
               ),
@@ -238,7 +242,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
               border: Border.all(color: AppColors.borderSubtle),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Center(child: Text('还没有动态，来发第一条吧！',
+            child: Center(child: Text(l.plazaEmptyFeed,
                 style: TextStyle(color: AppColors.textTertiary, fontSize: 13))),
           )
         else
@@ -251,7 +255,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
               children: _posts.asMap().entries.map((entry) {
                 final i = entry.key;
                 final post = entry.value;
-                return _buildPost(post, i < _posts.length - 1);
+                return _buildPost(post, i < _posts.length - 1, l);
               }).toList(),
             ),
           ),
@@ -259,12 +263,12 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
     );
   }
 
-  Widget _buildSidebarContent(List<Map<String, dynamic>> runningAgents, List<MapEntry<String, int>> trendingTags) {
+  Widget _buildSidebarContent(List<Map<String, dynamic>> runningAgents, List<MapEntry<String, int>> trendingTags, AppLocalizations l) {
     return Column(
       children: [
         if (runningAgents.isNotEmpty) _sidebarSection(
           icon: Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.statusRunning)),
-          title: '在线 Agent (${runningAgents.length})',
+          title: l.plazaOnlineAgents(runningAgents.length),
           child: Wrap(
             spacing: 6, runSpacing: 6,
             children: runningAgents.take(12).map((a) {
@@ -279,7 +283,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                     border: Border.all(color: AppColors.borderSubtle),
                   ),
                   child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                 ),
               );
             }).toList(),
@@ -288,8 +292,8 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
         if (trendingTags.isNotEmpty) ...[
           const SizedBox(height: 12),
           _sidebarSection(
-            icon: const Icon(Icons.tag, size: 14, color: AppColors.textTertiary),
-            title: '热门话题',
+            icon: Icon(Icons.tag, size: 14, color: AppColors.textTertiary),
+            title: l.plazaHotTopics,
             child: Wrap(
               spacing: 4, runSpacing: 4,
               children: trendingTags.take(8).map((e) => Container(
@@ -298,8 +302,8 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                   color: AppColors.bgTertiary,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text('${e.key} ×${e.value}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                child: Text('${e.key} \u00d7${e.value}',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
               )).toList(),
             ),
           ),
@@ -309,7 +313,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
           const SizedBox(height: 12),
           _sidebarSection(
             icon: const Text('🏆', style: TextStyle(fontSize: 14)),
-            title: '活跃贡献者',
+            title: l.plazaActiveContributors,
             child: Column(
               children: (_stats!['top_contributors'] as List).asMap().entries.take(5).map((entry) {
                 final i = entry.key;
@@ -320,7 +324,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                     children: [
                       SizedBox(
                         width: 20,
-                        child: Text('${i + 1}', style: const TextStyle(fontSize: 13, color: AppColors.textTertiary, fontFamily: 'monospace')),
+                        child: Text('${i + 1}', style: TextStyle(fontSize: 13, color: AppColors.textTertiary, fontFamily: 'monospace')),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -328,7 +332,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                             style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
                       ),
                       Text('${c['posts'] ?? 0}',
-                          style: const TextStyle(fontSize: 13, color: AppColors.textTertiary, fontFamily: 'monospace')),
+                          style: TextStyle(fontSize: 13, color: AppColors.textTertiary, fontFamily: 'monospace')),
                     ],
                   ),
                 );
@@ -339,10 +343,10 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
         // Tips
         const SizedBox(height: 12),
         _sidebarSection(
-          icon: const Icon(Icons.info_outline, size: 14, color: AppColors.textTertiary),
+          icon: Icon(Icons.info_outline, size: 14, color: AppColors.textTertiary),
           title: 'Tips',
-          child: const Text(
-            'Agent 会在这里自动分享工作进展和发现。你也可以发帖，支持 **加粗**、`代码` 和 #话题标签。',
+          child: Text(
+            l.plazaAbout,
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6),
           ),
         ),
@@ -350,11 +354,11 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
     );
   }
 
-  Widget _buildStats() {
+  Widget _buildStats(AppLocalizations l) {
     final items = [
-      {'label': '帖子', 'value': _stats!['total_posts'] ?? 0},
-      {'label': '评论', 'value': _stats!['total_comments'] ?? 0},
-      {'label': '今日', 'value': _stats!['today_posts'] ?? 0},
+      {'label': l.plazaPosts, 'value': _stats!['total_posts'] ?? 0},
+      {'label': l.plazaComments, 'value': _stats!['total_comments'] ?? 0},
+      {'label': l.plazaToday, 'value': _stats!['today_posts'] ?? 0},
     ];
     return Container(
       decoration: BoxDecoration(
@@ -369,7 +373,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(s['label'] as String, style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                Text(s['label'] as String, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
                 const SizedBox(height: 4),
                 Text('${s['value']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
               ],
@@ -380,8 +384,8 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
     );
   }
 
-  Widget _buildPost(Map<String, dynamic> post, bool showBorder) {
-    final authorName = post['author_name'] as String? ?? '匿名用户';
+  Widget _buildPost(Map<String, dynamic> post, bool showBorder, AppLocalizations l) {
+    final authorName = post['author_name'] as String? ?? l.plazaAnonymous;
     final isAgent = post['author_type'] == 'agent';
     final isExpanded = _expandedPostId == post['id'];
 
@@ -413,14 +417,14 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                                 border: Border.all(color: AppColors.borderSubtle),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                              child: Text('AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                             ),
                           ],
                         ],
                       ),
                     ),
-                    Text(_timeAgo(post['created_at'] as String? ?? DateTime.now().toIso8601String()),
-                        style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontFamily: 'monospace')),
+                    Text(_timeAgo(post['created_at'] as String? ?? DateTime.now().toIso8601String(), l),
+                        style: TextStyle(fontSize: 12, color: AppColors.textTertiary, fontFamily: 'monospace')),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -487,13 +491,13 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                                             Text(cm['author_name'] as String? ?? '?',
                                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                                             const SizedBox(width: 6),
-                                            Text(_timeAgo(cm['created_at'] as String? ?? ''),
-                                                style: const TextStyle(fontSize: 11, color: AppColors.textTertiary, fontFamily: 'monospace')),
+                                            Text(_timeAgo(cm['created_at'] as String? ?? '', l),
+                                                style: TextStyle(fontSize: 11, color: AppColors.textTertiary, fontFamily: 'monospace')),
                                           ],
                                         ),
                                         const SizedBox(height: 2),
                                         PlazaRichText(text: cm['content'] as String? ?? '',
-                                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                                       ],
                                     ),
                                   ),
@@ -507,9 +511,9 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                               child: TextField(
                                 controller: _commentCtl,
                                 style: const TextStyle(fontSize: 13),
-                                decoration: const InputDecoration(
-                                  hintText: '写条评论...',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: InputDecoration(
+                                  hintText: l.plazaCommentHint,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   isDense: true,
                                 ),
                                 maxLength: 300,
@@ -523,7 +527,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 textStyle: const TextStyle(fontSize: 12),
                               ),
-                              child: const Text('发送'),
+                              child: Text(l.plazaSend),
                             ),
                           ],
                         ),
@@ -586,7 +590,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
               children: [
                 icon,
                 const SizedBox(width: 6),
-                Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
               ],
             ),
           ),

@@ -5,20 +5,21 @@ part of 'agent_detail_page.dart';
 // ═══════════════════════════════════════════════════════════
 
 extension _ToolsTab on _AgentDetailPageState {
-  static const _categoryLabels = {
-    'file': '文件操作',
-    'task': '任务管理',
-    'communication': '通讯',
-    'search': '搜索',
-    'code': '代码',
-    'discovery': '发现',
-    'trigger': '触发器',
-    'plaza': '广场',
-    'custom': '自定义',
-    'general': '通用',
+  static Map<String, String> _categoryLabelsOf(AppLocalizations l) => {
+    'file': l.toolsCategoryFileOps,
+    'task': l.toolsCategoryTaskMgmt,
+    'communication': l.toolsCategoryComm,
+    'search': l.toolsCategorySearch,
+    'code': l.toolsCategoryCode,
+    'discovery': l.toolsCategoryDiscovery,
+    'trigger': l.toolsCategoryTrigger,
+    'plaza': l.toolsCategoryPlaza,
+    'custom': l.toolsCategoryCustom,
+    'general': l.toolsCategoryGeneral,
   };
 
   Widget _buildToolsTab() {
+    final l = AppLocalizations.of(context)!;
     if (_loadingTools) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
     }
@@ -30,9 +31,9 @@ extension _ToolsTab on _AgentDetailPageState {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Row(
             children: [
-              const Icon(Icons.build, color: AppColors.textSecondary, size: 18),
+              Icon(Icons.build, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
-              const Text('工具', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+              Text(l.toolsCount, style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -41,9 +42,9 @@ extension _ToolsTab on _AgentDetailPageState {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              _toolSectionBtn(0, '平台工具', _platformTools.length),
+              _toolSectionBtn(0, l.toolsPlatform, _platformTools.length),
               const SizedBox(width: 8),
-              _toolSectionBtn(1, 'Agent 安装', _agentTools.length),
+              _toolSectionBtn(1, l.toolsAgentInstalled, _agentTools.length),
             ],
           ),
         ),
@@ -81,8 +82,9 @@ extension _ToolsTab on _AgentDetailPageState {
   }
 
   Widget _buildPlatformToolsList() {
+    final l = AppLocalizations.of(context)!;
     if (_platformTools.isEmpty) {
-      return _emptyState('暂无平台工具', '');
+      return _emptyState(l.toolsNoPlatform, '');
     }
     // Group by category
     final grouped = <String, List<Map<String, dynamic>>>{};
@@ -99,13 +101,13 @@ extension _ToolsTab on _AgentDetailPageState {
       itemBuilder: (context, i) {
         final cat = categories[i];
         final tools = grouped[cat]!;
-        final catLabel = _categoryLabels[cat] ?? cat.toUpperCase();
+        final catLabel = _categoryLabelsOf(l)[cat] ?? cat.toUpperCase();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 6),
-              child: Text(catLabel, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+              child: Text(catLabel, style: TextStyle(color: AppColors.textTertiary, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
             ),
             ...tools.map(_buildToolCard),
           ],
@@ -116,7 +118,8 @@ extension _ToolsTab on _AgentDetailPageState {
 
   Widget _buildAgentInstalledToolsList() {
     if (_agentTools.isEmpty) {
-      return _emptyState('暂无安装的工具', 'Agent 可通过 import_mcp_server 工具自行安装。');
+      final l = AppLocalizations.of(context)!;
+      return _emptyState(l.toolsNoInstalled, l.toolsNoInstalledHint);
     }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -127,7 +130,7 @@ extension _ToolsTab on _AgentDetailPageState {
 
   Widget _buildToolCard(Map<String, dynamic> tool) {
     final id = tool['id']?.toString() ?? '';
-    final name = tool['name'] as String? ?? '未知';
+    final name = tool['name'] as String? ?? AppLocalizations.of(context)!.toolsUnknown;
     final displayName = tool['display_name'] as String? ?? name;
     final description = tool['description'] as String? ?? '';
     final category = tool['category'] as String? ?? '';
@@ -160,7 +163,7 @@ extension _ToolsTab on _AgentDetailPageState {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(displayName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
+                          child: Text(displayName, style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
                         ),
                         if (toolType == 'mcp') ...[
                           const SizedBox(width: 6),
@@ -175,7 +178,7 @@ extension _ToolsTab on _AgentDetailPageState {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                             decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(4)),
-                            child: Text(category, style: const TextStyle(color: AppColors.textTertiary, fontSize: 9)),
+                            child: Text(category, style: TextStyle(color: AppColors.textTertiary, fontSize: 9)),
                           ),
                         ],
                       ],
@@ -185,7 +188,7 @@ extension _ToolsTab on _AgentDetailPageState {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           mcpServer.isNotEmpty ? '$description · $mcpServer' : description,
-                          style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                          style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),

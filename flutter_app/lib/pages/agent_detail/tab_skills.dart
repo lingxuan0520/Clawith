@@ -6,6 +6,7 @@ part of 'agent_detail_page.dart';
 
 extension _SkillsTab on _AgentDetailPageState {
   Widget _buildSkillsTab() {
+    final l = AppLocalizations.of(context)!;
     if (_loadingSkills) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
     }
@@ -19,7 +20,7 @@ extension _SkillsTab on _AgentDetailPageState {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: AppColors.textSecondary, size: 18),
+                  icon: Icon(Icons.arrow_back, color: AppColors.textSecondary, size: 18),
                   onPressed: () => setState(() {
                     _viewingSkillContent = null;
                     // If we came from a sub-folder, go back to it; otherwise go to root
@@ -35,13 +36,13 @@ extension _SkillsTab on _AgentDetailPageState {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _viewingSkillName ?? '技能',
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+                    _viewingSkillName ?? l.skillsLabel,
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit, color: AppColors.accentPrimary, size: 18),
-                  tooltip: '编辑',
+                  tooltip: l.commonEdit,
                   onPressed: _editSkillFile,
                 ),
               ],
@@ -60,7 +61,7 @@ extension _SkillsTab on _AgentDetailPageState {
                 ),
                 child: SelectableText(
                   _viewingSkillContent ?? '',
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontFamily: 'monospace'),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontFamily: 'monospace'),
                 ),
               ),
             ),
@@ -78,7 +79,7 @@ extension _SkillsTab on _AgentDetailPageState {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: AppColors.textSecondary, size: 18),
+                  icon: Icon(Icons.arrow_back, color: AppColors.textSecondary, size: 18),
                   onPressed: () {
                     // If nested (e.g. skill-creator/agents), go up one level
                     if (_skillSubFolder != null && _skillSubFolder!.contains('/')) {
@@ -102,12 +103,12 @@ extension _SkillsTab on _AgentDetailPageState {
                 Expanded(
                   child: Text(
                     _skillSubFolder!,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
-                  tooltip: '删除技能',
+                  tooltip: l.skillsDeleteTooltip,
                   onPressed: () => _deleteSkillFile(_skillSubFolder!),
                 ),
               ],
@@ -116,7 +117,7 @@ extension _SkillsTab on _AgentDetailPageState {
           const SizedBox(height: 8),
           Expanded(
             child: _skillSubFiles.isEmpty
-                ? _emptyState('文件夹为空', '该技能文件夹下没有文件。')
+                ? _emptyState(l.skillsFolderEmpty, l.skillsFolderEmptyHint)
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: _skillSubFiles.length,
@@ -139,10 +140,10 @@ extension _SkillsTab on _AgentDetailPageState {
                             color: sfIsDir ? AppColors.warning : AppColors.textTertiary,
                             size: 20,
                           ),
-                          title: Text(sfName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                          title: Text(sfName, style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
                           subtitle: sfIsDir
                               ? null
-                              : Text('$sfSize 字节', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                              : Text(l.skillsBytes(sfSize as int), style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                           onTap: () => _openSkillSubFile(sf),
                         ),
                       );
@@ -160,19 +161,19 @@ extension _SkillsTab on _AgentDetailPageState {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Row(
             children: [
-              const Icon(Icons.auto_fix_high, color: AppColors.textSecondary, size: 18),
+              Icon(Icons.auto_fix_high, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text('技能', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+              Expanded(
+                child: Text(l.skillsLabel, style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               IconButton(
                 icon: const Icon(Icons.add, color: AppColors.accentPrimary, size: 18),
-                tooltip: '新建技能',
+                tooltip: l.skillsNewTooltip,
                 onPressed: _createSkillFile,
               ),
               IconButton(
                 icon: const Icon(Icons.download, color: AppColors.accentPrimary, size: 18),
-                tooltip: '导入预设技能',
+                tooltip: l.skillsImportPreset,
                 onPressed: () async {
                   await _fetchSkillPresets();
                   if (!mounted) return;
@@ -196,7 +197,7 @@ extension _SkillsTab on _AgentDetailPageState {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('预设技能', style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(l.skillsPreset, style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -204,7 +205,7 @@ extension _SkillsTab on _AgentDetailPageState {
                   children: _skillPresets.map((s) {
                     final skill = s as Map<String, dynamic>;
                     final id = skill['id']?.toString() ?? '';
-                    final name = skill['name'] as String? ?? '未知';
+                    final name = skill['name'] as String? ?? l.skillsUnknown;
                     return ActionChip(
                       avatar: const Icon(Icons.add, size: 14),
                       label: Text(name, style: const TextStyle(fontSize: 12)),
@@ -219,7 +220,7 @@ extension _SkillsTab on _AgentDetailPageState {
         ],
         Expanded(
           child: _skillFiles.isEmpty
-              ? _emptyState('暂无技能', '该 Agent 未找到技能文件。')
+              ? _emptyState(l.skillsNoSkills, l.skillsNoSkillsHint)
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: _skillFiles.length,
@@ -238,11 +239,11 @@ extension _SkillsTab on _AgentDetailPageState {
                       child: ListTile(
                         dense: true,
                         leading: const Icon(Icons.auto_fix_high, color: AppColors.accentPrimary, size: 20),
-                        title: Text(displayName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                        title: Text(displayName, style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.chevron_right, color: AppColors.textTertiary, size: 18),
+                            Icon(Icons.chevron_right, color: AppColors.textTertiary, size: 18),
                           ],
                         ),
                         onTap: () => _openSkillFile(file),

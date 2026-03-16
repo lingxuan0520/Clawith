@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../core/theme/app_theme.dart';
 import '../services/api.dart';
 import 'agent_npc.dart';
-import 'hud_button.dart';
 import 'office_map.dart';
 import 'office_player.dart';
 
@@ -103,7 +102,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
   @override
   Widget build(BuildContext context) {
     if (_loading || _player == null || _npcs == null) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.bgPrimary,
         body: Center(
           child: Column(
@@ -180,8 +179,6 @@ class _OfficePageState extends ConsumerState<OfficePage> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            HudButton(icon: Icons.arrow_back, onTap: () => context.pop()),
-            const SizedBox(width: 8),
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -190,7 +187,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: AppColors.borderSubtle),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.business, size: 14, color: AppColors.accentText),
@@ -265,7 +262,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.chat_bubble_outline,
+                Icon(Icons.chat_bubble_outline,
                     size: 16, color: AppColors.accentText),
                 const SizedBox(width: 8),
                 Text(
@@ -277,7 +274,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.touch_app,
+                Icon(Icons.touch_app,
                     size: 14, color: AppColors.accentText),
               ],
             ),
@@ -380,7 +377,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
                         children: [
                           Text(
                             name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -412,7 +409,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close,
+                      icon: Icon(Icons.close,
                           color: AppColors.textTertiary),
                       onPressed: () =>
                           setState(() => _panelOpen = false),
@@ -424,7 +421,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
                   const SizedBox(height: 12),
                   Text(
                     description,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
                       height: 1.4,
@@ -465,7 +462,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
                           padding:
                               const EdgeInsets.symmetric(vertical: 12),
                           foregroundColor: AppColors.textSecondary,
-                          side: const BorderSide(
+                          side: BorderSide(
                               color: AppColors.borderDefault),
                         ),
                         onPressed: () {

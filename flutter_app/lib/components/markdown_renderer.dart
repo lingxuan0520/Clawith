@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../core/theme/app_theme.dart';
 
 /// Markdown renderer widget matching the React frontend's markdown display.
@@ -34,10 +35,10 @@ class MarkdownRenderer extends StatelessWidget {
 
   MarkdownStyleSheet _buildStyleSheet(BuildContext context) {
     return MarkdownStyleSheet(
-      p: const TextStyle(fontSize: 14, color: AppColors.textPrimary, height: 1.6),
-      h1: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-      h2: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-      h3: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+      p: TextStyle(fontSize: 14, color: AppColors.textPrimary, height: 1.6),
+      h1: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+      h2: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+      h3: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
       code: TextStyle(
         fontSize: 13,
         fontFamily: 'monospace',
@@ -51,9 +52,9 @@ class MarkdownRenderer extends StatelessWidget {
       ),
       blockquotePadding: const EdgeInsets.only(left: 12),
       a: const TextStyle(color: AppColors.accentPrimary, decoration: TextDecoration.underline),
-      listBullet: const TextStyle(color: AppColors.textSecondary),
-      tableHead: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-      tableBody: const TextStyle(color: AppColors.textSecondary),
+      listBullet: TextStyle(color: AppColors.textSecondary),
+      tableHead: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+      tableBody: TextStyle(color: AppColors.textSecondary),
       tableBorder: TableBorder.all(color: AppColors.borderSubtle, width: 0.5),
       horizontalRuleDecoration: BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.borderSubtle)),
@@ -115,6 +116,7 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -138,7 +140,7 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
                 if (widget.language.isNotEmpty)
                   Text(
                     widget.language,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textTertiary,
                       fontFamily: 'monospace',
@@ -157,7 +159,7 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        _copied ? '已复制' : '复制',
+                        _copied ? l.markdownCopied : l.markdownCopy,
                         style: TextStyle(
                           fontSize: 12,
                           color: _copied ? Colors.green : AppColors.textTertiary,
@@ -175,7 +177,7 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
             padding: const EdgeInsets.all(12),
             child: SelectableText(
               widget.code,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontFamily: 'monospace',
                 color: AppColors.textPrimary,

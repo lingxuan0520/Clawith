@@ -18,12 +18,12 @@ Future<bool?> showConfirmModal(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
       content: message != null
-          ? Text(message, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))
+          ? Text(message, style: TextStyle(fontSize: 13, color: AppColors.textSecondary))
           : null,
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: Text(cancelLabel, style: const TextStyle(color: AppColors.textTertiary)),
+          child: Text(cancelLabel, style: TextStyle(color: AppColors.textTertiary)),
         ),
         ElevatedButton(
           onPressed: () => Navigator.of(context).pop(true),

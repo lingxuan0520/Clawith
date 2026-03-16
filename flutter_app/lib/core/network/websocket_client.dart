@@ -94,10 +94,10 @@ class WsEvent {
         final msg = json['content'] as String? ??
             json['detail'] as String? ??
             json['message'] as String? ??
-            '请求失败';
+            'Request failed';
         return WsEvent(type: WsEventType.error, content: msg);
       case 'quota_exceeded':
-        final msg = json['content'] as String? ?? '配额已用尽';
+        final msg = json['content'] as String? ?? 'Quota exceeded';
         return WsEvent(type: WsEventType.quotaExceeded, content: msg);
       case 'trigger_notification':
         return WsEvent(type: WsEventType.triggerNotification, content: json['content'] as String?);

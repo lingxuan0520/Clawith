@@ -5,8 +5,7 @@ import '../../stores/auth_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../pages/login.dart';
 import '../../pages/layout_shell.dart';
-import '../../pages/dashboard.dart';
-import '../../pages/plaza.dart';
+import '../../pages/home_page.dart';
 import '../../pages/chat_list.dart';
 import '../../pages/profile_page.dart';
 import '../../pages/agent_create.dart';
@@ -87,7 +86,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/plaza',
-              pageBuilder: (context, state) => const NoTransitionPage(child: PlazaPage()),
+              pageBuilder: (context, state) => const NoTransitionPage(child: HomePage()),
             ),
           ]),
           StatefulShellBranch(routes: [
@@ -106,12 +105,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             GoRoute(
               path: '/profile',
               pageBuilder: (context, state) => const NoTransitionPage(child: ProfilePage()),
-            ),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: '/dashboard',
-              pageBuilder: (context, state) => const NoTransitionPage(child: DashboardPage()),
             ),
           ]),
           StatefulShellBranch(routes: [
@@ -137,7 +130,7 @@ class _SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       body: Center(
         child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary),

@@ -6,6 +6,7 @@ part of 'agent_detail_page.dart';
 
 extension _TasksTab on _AgentDetailPageState {
   Widget _buildTasksTab() {
+    final l = AppLocalizations.of(context)!;
     // Categorize tasks into columns
     final todoTasks = _tasks.where((t) {
       final m = t as Map<String, dynamic>;
@@ -21,9 +22,9 @@ extension _TasksTab on _AgentDetailPageState {
     }).toList();
 
     final columns = {
-      'pending': ('待办', todoTasks.length + _schedules.length),
-      'doing': ('进行中', doingTasks.length),
-      'done': ('已完成', doneTasks.length),
+      'pending': (l.tasksTodo, todoTasks.length + _schedules.length),
+      'doing': (l.tasksInProgress, doingTasks.length),
+      'done': (l.tasksCompleted, doneTasks.length),
     };
 
     List<dynamic> currentTasks;
@@ -86,13 +87,14 @@ extension _TasksTab on _AgentDetailPageState {
   }
 
   Widget _buildTaskColumnContent(String column, List<dynamic> tasks) {
+    final l = AppLocalizations.of(context)!;
     final showSchedules = column == 'pending';
     final hasContent = tasks.isNotEmpty || (showSchedules && _schedules.isNotEmpty);
 
     if (!hasContent) {
       return _emptyState(
-        column == 'pending' ? '暂无待办' : column == 'doing' ? '暂无进行中' : '暂无已完成',
-        column == 'pending' ? '创建任务或计划开始吧' : '',
+        column == 'pending' ? l.tasksNoTodo : column == 'doing' ? l.tasksNoInProgress : l.tasksNoCompleted,
+        column == 'pending' ? l.tasksCreateToStart : '',
       );
     }
 
@@ -108,7 +110,7 @@ extension _TasksTab on _AgentDetailPageState {
           if (_schedules.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Text('暂无计划', style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+              child: Text(l.tasksNoSchedules, style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
             ),
           ..._schedules.map((s) => _buildScheduleCard(s as Map<String, dynamic>)),
           if (tasks.isNotEmpty)
@@ -124,7 +126,7 @@ extension _TasksTab on _AgentDetailPageState {
   }
 
   Widget _buildScheduleCard(Map<String, dynamic> sched) {
-    final name = sched['name'] as String? ?? '计划';
+    final name = sched['name'] as String? ?? AppLocalizations.of(context)!.tasksScheduleFallback;
     final id = sched['id']?.toString() ?? '';
     final enabled = sched['is_enabled'] == true || sched['enabled'] == true;
     final instruction = sched['instruction'] as String? ?? '';
@@ -159,7 +161,7 @@ extension _TasksTab on _AgentDetailPageState {
           ),
           if (instruction.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(instruction, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(instruction, style: TextStyle(color: AppColors.textSecondary, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
           const SizedBox(height: 6),
           Row(
@@ -168,14 +170,14 @@ extension _TasksTab on _AgentDetailPageState {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(4)),
-                  child: Text(cronExpr, style: const TextStyle(color: AppColors.textTertiary, fontSize: 10, fontFamily: 'monospace')),
+                  child: Text(cronExpr, style: TextStyle(color: AppColors.textTertiary, fontSize: 10, fontFamily: 'monospace')),
                 ),
               if (cronExpr.isNotEmpty) const SizedBox(width: 8),
               if (nextFire != null)
-                Text('下次: ${_fmtRelative(nextFire)}', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                Text(AppLocalizations.of(context)!.tasksNextFire(_fmtRelative(nextFire)), style: TextStyle(color: AppColors.textTertiary, fontSize: 10)),
               if (runCount > 0) ...[
                 const SizedBox(width: 8),
-                Text('已执行 $runCount 次', style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                Text(AppLocalizations.of(context)!.tasksRunCount(runCount as int), style: TextStyle(color: AppColors.textTertiary, fontSize: 10)),
               ],
               const Spacer(),
               InkWell(
@@ -201,7 +203,7 @@ extension _TasksTab on _AgentDetailPageState {
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task) {
-    final title = task['title'] as String? ?? '无标题';
+    final title = task['title'] as String? ?? AppLocalizations.of(context)!.tasksNoTitle;
     final desc = task['description'] as String? ?? '';
     final status = task['status'] as String? ?? 'pending';
     final creator = task['creator_username'] as String? ?? '';
@@ -227,19 +229,19 @@ extension _TasksTab on _AgentDetailPageState {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(color: AppColors.warning.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                    child: const Text('进行中', style: TextStyle(color: AppColors.warning, fontSize: 9)),
+                    child: Text(AppLocalizations.of(context)!.tasksInProgress, style: TextStyle(color: AppColors.warning, fontSize: 9)),
                   ),
                 if (status == 'done' || status == 'completed')
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                    child: const Text('已完成', style: TextStyle(color: AppColors.success, fontSize: 9)),
+                    child: Text(AppLocalizations.of(context)!.tasksCompleted, style: TextStyle(color: AppColors.success, fontSize: 9)),
                   ),
               ],
             ),
             if (desc.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+              Text(desc, style: TextStyle(color: AppColors.textSecondary, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
             ],
             if (creator.isNotEmpty) ...[
               const SizedBox(height: 4),
@@ -258,7 +260,7 @@ extension _TasksTab on _AgentDetailPageState {
                         color: AppColors.accentPrimary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text('触发', style: TextStyle(color: AppColors.accentPrimary, fontSize: 10, fontWeight: FontWeight.w500)),
+                      child: Text(AppLocalizations.of(context)!.tasksTrigger, style: const TextStyle(color: AppColors.accentPrimary, fontSize: 10, fontWeight: FontWeight.w500)),
                     ),
                   ),
               ],
@@ -302,7 +304,8 @@ extension _TasksTab on _AgentDetailPageState {
     bool creating = false;
 
     bool needsTime(String f) => f == 'month' || f == 'week' || f == 'day';
-    const weekLabels = ['一', '二', '三', '四', '五', '六', '日'];
+    final ll = AppLocalizations.of(context)!;
+    final weekLabels = [ll.tasksWeekMon, ll.tasksWeekTue, ll.tasksWeekWed, ll.tasksWeekThu, ll.tasksWeekFri, ll.tasksWeekSat, ll.tasksWeekSun];
 
     showModalBottomSheet(
       context: context,
@@ -319,18 +322,18 @@ extension _TasksTab on _AgentDetailPageState {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('新建任务', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(ll.tasksNewTask, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 16),
                   TextField(
                     controller: titleCtrl,
-                    decoration: InputDecoration(hintText: '任务标题', filled: true, fillColor: AppColors.bgTertiary, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                    decoration: InputDecoration(hintText: ll.tasksTaskTitle, filled: true, fillColor: AppColors.bgTertiary, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
                     onChanged: (_) => setSheetState(() {}),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: descCtrl,
                     maxLines: 3,
-                    decoration: InputDecoration(hintText: '任务描述（可选）', filled: true, fillColor: AppColors.bgTertiary, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                    decoration: InputDecoration(hintText: ll.tasksTaskDesc, filled: true, fillColor: AppColors.bgTertiary, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
                   ),
                   const SizedBox(height: 14),
                   // Execution mode toggle
@@ -346,7 +349,7 @@ extension _TasksTab on _AgentDetailPageState {
                               borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
                               border: Border.all(color: !isRepeat ? AppColors.accentPrimary : AppColors.borderSubtle),
                             ),
-                            child: Center(child: Text('一次性执行', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: !isRepeat ? Colors.white : AppColors.textSecondary))),
+                            child: Center(child: Text(ll.tasksOneTime, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: !isRepeat ? Colors.white : AppColors.textSecondary))),
                           ),
                         ),
                       ),
@@ -360,7 +363,7 @@ extension _TasksTab on _AgentDetailPageState {
                               borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
                               border: Border.all(color: isRepeat ? AppColors.accentPrimary : AppColors.borderSubtle),
                             ),
-                            child: Center(child: Text('重复执行', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: isRepeat ? Colors.white : AppColors.textSecondary))),
+                            child: Center(child: Text(ll.tasksRecurring, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: isRepeat ? Colors.white : AppColors.textSecondary))),
                           ),
                         ),
                       ),
@@ -375,9 +378,9 @@ extension _TasksTab on _AgentDetailPageState {
                       decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(10)),
                       child: Row(
                         children: [
-                          const Icon(Icons.repeat, size: 16, color: AppColors.textTertiary),
+                          Icon(Icons.repeat, size: 16, color: AppColors.textTertiary),
                           const SizedBox(width: 8),
-                          const Text('重复频率', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                          Text(ll.tasksFrequency, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                           const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -386,14 +389,14 @@ extension _TasksTab on _AgentDetailPageState {
                               child: DropdownButton<String>(
                                 value: freq,
                                 isDense: true,
-                                style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                                style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
                                 dropdownColor: AppColors.bgElevated,
-                                items: const [
-                                  DropdownMenuItem(value: 'day', child: Text('每天')),
-                                  DropdownMenuItem(value: 'week', child: Text('每周')),
-                                  DropdownMenuItem(value: 'month', child: Text('每月')),
-                                  DropdownMenuItem(value: 'hour', child: Text('每小时')),
-                                  DropdownMenuItem(value: 'minute', child: Text('每分钟')),
+                                items: [
+                                  DropdownMenuItem(value: 'day', child: Text(ll.tasksDaily)),
+                                  DropdownMenuItem(value: 'week', child: Text(ll.tasksWeekly)),
+                                  DropdownMenuItem(value: 'month', child: Text(ll.tasksMonthly)),
+                                  DropdownMenuItem(value: 'hour', child: Text(ll.tasksHourly)),
+                                  DropdownMenuItem(value: 'minute', child: Text(ll.tasksEveryMinute)),
                                 ],
                                 onChanged: (v) { if (v != null) setSheetState(() => freq = v); },
                               ),
@@ -417,7 +420,7 @@ extension _TasksTab on _AgentDetailPageState {
                           // Interval row: "每 [N] 天/周/月/小时/分钟"
                           Row(
                             children: [
-                              const Text('每', style: TextStyle(fontSize: 14)),
+                              Text(ll.tasksEvery, style: const TextStyle(fontSize: 14)),
                               const SizedBox(width: 8),
                               SizedBox(
                                 width: 48,
@@ -438,7 +441,7 @@ extension _TasksTab on _AgentDetailPageState {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                {'day': '天', 'week': '周', 'month': '个月', 'hour': '小时', 'minute': '分钟'}[freq] ?? '天',
+                                {'day': ll.tasksUnitDay, 'week': ll.tasksUnitWeek, 'month': ll.tasksUnitMonth, 'hour': ll.tasksUnitHour, 'minute': ll.tasksUnitMinute}[freq] ?? ll.tasksUnitDay,
                                 style: const TextStyle(fontSize: 14),
                               ),
                             ],
@@ -446,13 +449,13 @@ extension _TasksTab on _AgentDetailPageState {
                           // Day-of-month picker — for monthly
                           if (freq == 'month') ...[
                             const SizedBox(height: 12),
-                            const Divider(height: 1, color: AppColors.borderSubtle),
+                            Divider(height: 1, color: AppColors.borderSubtle),
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                const Icon(Icons.calendar_today_outlined, size: 15, color: AppColors.textTertiary),
+                                Icon(Icons.calendar_today_outlined, size: 15, color: AppColors.textTertiary),
                                 const SizedBox(width: 6),
-                                const Text('几号执行', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                Text(ll.tasksDayOfMonth, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                                 const Spacer(),
                                 Container(
                                   height: 34,
@@ -462,9 +465,9 @@ extension _TasksTab on _AgentDetailPageState {
                                     child: DropdownButton<int>(
                                       value: dayOfMonth,
                                       isDense: true,
-                                      style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                                      style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
                                       dropdownColor: AppColors.bgElevated,
-                                      items: List.generate(31, (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}号'))),
+                                      items: List.generate(31, (i) => DropdownMenuItem(value: i + 1, child: Text(ll.tasksDaySuffix(i + 1)))),
                                       onChanged: (v) { if (v != null) setSheetState(() => dayOfMonth = v); },
                                     ),
                                   ),
@@ -475,13 +478,13 @@ extension _TasksTab on _AgentDetailPageState {
                           // Day-of-week picker — for weekly
                           if (freq == 'week') ...[
                             const SizedBox(height: 12),
-                            const Divider(height: 1, color: AppColors.borderSubtle),
+                            Divider(height: 1, color: AppColors.borderSubtle),
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                const Icon(Icons.view_week_outlined, size: 15, color: AppColors.textTertiary),
+                                Icon(Icons.view_week_outlined, size: 15, color: AppColors.textTertiary),
                                 const SizedBox(width: 6),
-                                const Text('周几执行', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                Text(ll.tasksDayOfWeek, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                                 const Spacer(),
                                 ...List.generate(7, (i) {
                                   final d = i + 1; // 1=周一 ... 7=周日
@@ -509,13 +512,13 @@ extension _TasksTab on _AgentDetailPageState {
                           // Time picker row — only for day/week/month
                           if (needsTime(freq)) ...[
                             const SizedBox(height: 12),
-                            const Divider(height: 1, color: AppColors.borderSubtle),
+                            Divider(height: 1, color: AppColors.borderSubtle),
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                const Icon(Icons.schedule_outlined, size: 15, color: AppColors.textTertiary),
+                                Icon(Icons.schedule_outlined, size: 15, color: AppColors.textTertiary),
                                 const SizedBox(width: 6),
-                                const Text('几点执行', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                Text(ll.tasksTimeOfDay, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                                 const Spacer(),
                                 // Hour
                                 Container(
@@ -526,7 +529,7 @@ extension _TasksTab on _AgentDetailPageState {
                                     child: DropdownButton<int>(
                                       value: execHour,
                                       isDense: true,
-                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                                       dropdownColor: AppColors.bgElevated,
                                       items: List.generate(24, (i) => DropdownMenuItem(value: i, child: Text(i.toString().padLeft(2, '0')))),
                                       onChanged: (v) { if (v != null) setSheetState(() => execHour = v); },
@@ -543,7 +546,7 @@ extension _TasksTab on _AgentDetailPageState {
                                     child: DropdownButton<int>(
                                       value: execMinute,
                                       isDense: true,
-                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                                       dropdownColor: AppColors.bgElevated,
                                       items: List.generate(12, (i) => i * 5).map((m) => DropdownMenuItem(value: m, child: Text(m.toString().padLeft(2, '0')))).toList(),
                                       onChanged: (v) { if (v != null) setSheetState(() => execMinute = v); },
@@ -559,9 +562,9 @@ extension _TasksTab on _AgentDetailPageState {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Text('截止时间：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        Text(ll.tasksDeadline, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                         ChoiceChip(
-                          label: const Text('永不截止', style: TextStyle(fontSize: 12)),
+                          label: Text(ll.tasksNoDeadline, style: const TextStyle(fontSize: 12)),
                           selected: !hasDeadline,
                           onSelected: (_) => setSheetState(() => hasDeadline = false),
                           selectedColor: AppColors.accentPrimary,
@@ -570,7 +573,7 @@ extension _TasksTab on _AgentDetailPageState {
                         ),
                         const SizedBox(width: 6),
                         ChoiceChip(
-                          label: const Text('设置截止', style: TextStyle(fontSize: 12)),
+                          label: Text(ll.tasksSetDeadline, style: const TextStyle(fontSize: 12)),
                           selected: hasDeadline,
                           onSelected: (_) => setSheetState(() {
                             hasDeadline = true;
@@ -593,7 +596,7 @@ extension _TasksTab on _AgentDetailPageState {
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.borderSubtle)),
                           child: Text(
-                            deadline != null ? "${deadline!.year}-${deadline!.month.toString().padLeft(2, '0')}-${deadline!.day.toString().padLeft(2, '0')}" : '选择日期',
+                            deadline != null ? "${deadline!.year}-${deadline!.month.toString().padLeft(2, '0')}-${deadline!.day.toString().padLeft(2, '0')}" : ll.tasksSelectDate,
                             style: const TextStyle(fontSize: 13),
                           ),
                         ),
@@ -639,7 +642,7 @@ extension _TasksTab on _AgentDetailPageState {
                             await _api.createSchedule(widget.agentId, data);
                             if (!mounted) return;
                             Navigator.pop(ctx);
-                            _showSnack('计划已创建');
+                            _showSnack(ll.tasksScheduleCreated);
                             _fetchSchedules();
                           } else {
                             // Create one-time task
@@ -649,18 +652,18 @@ extension _TasksTab on _AgentDetailPageState {
                             });
                             if (!mounted) return;
                             Navigator.pop(ctx);
-                            _showSnack('任务已创建');
+                            _showSnack(ll.tasksTaskCreated);
                             _fetchTasks();
                           }
                         } catch (e) {
                           if (!mounted) return;
                           setSheetState(() => creating = false);
-                          _showSnack('创建失败: ${_errMsg(e)}');
+                          _showSnack(ll.tasksCreateFailed(_errMsg(e)));
                         }
                       },
                       child: creating
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('创建'),
+                          : Text(ll.commonCreate),
                     ),
                   ),
                 ],

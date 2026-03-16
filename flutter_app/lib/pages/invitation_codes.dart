@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../core/theme/app_theme.dart';
 import '../services/api.dart';
 
@@ -100,6 +101,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return Stack(
       children: [
         Center(
@@ -110,9 +112,9 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('邀请码', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                  Text(l.invitationCodesTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  const Text('Manage invitation codes for platform registration.',
+                  Text('Manage invitation codes for platform registration.',
                       style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
                   const SizedBox(height: 24),
 
@@ -133,7 +135,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                               const Text('Require Invitation Code for Registration',
                                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                               const SizedBox(height: 4),
-                              const Text('When enabled, new users must provide a valid invitation code to register.',
+                              Text('When enabled, new users must provide a valid invitation code to register.',
                                   style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
                             ],
                           ),
@@ -183,7 +185,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('创建邀请码', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                        Text(l.invitationCodesCreate, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -191,7 +193,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Number of Codes', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                  Text('Number of Codes', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                                   const SizedBox(height: 4),
                                   TextField(
                                     controller: _batchCountCtrl,
@@ -208,7 +210,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Max Uses per Code', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                  Text('Max Uses per Code', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                                   const SizedBox(height: 4),
                                   TextField(
                                     controller: _maxUsesCtrl,
@@ -246,13 +248,13 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('All Invitation Codes ($_total)',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                             SizedBox(
                               width: 200,
                               child: TextField(
                                 controller: _searchCtrl,
-                                decoration: const InputDecoration(
-                                  hintText: '搜索...',
+                                decoration: InputDecoration(
+                                  hintText: l.invitationCodesSearchHint,
                                   isDense: true,
                                   contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                                 ),
@@ -269,11 +271,11 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                         // Table header
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
                           ),
                           child: Row(
-                            children: const [
+                            children: [
                               Expanded(flex: 3, child: Text('CODE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textTertiary, letterSpacing: 0.05))),
                               Expanded(flex: 1, child: Text('USAGE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textTertiary))),
                               Expanded(flex: 1, child: Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textTertiary))),
@@ -285,7 +287,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                         if (_loading)
                           const Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(strokeWidth: 2))
                         else if (_codes.isEmpty)
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.all(24),
                             child: Text('No data', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                           )
@@ -298,7 +300,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                             final createdAt = code['created_at'] as String?;
                             return Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
                               ),
                               child: Row(
@@ -312,8 +314,8 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                                     child: RichText(
                                       text: TextSpan(
                                         children: [
-                                          TextSpan(text: '$usedCount', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
-                                          TextSpan(text: ' / $maxUses', style: const TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                                          TextSpan(text: '$usedCount', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                                          TextSpan(text: ' / $maxUses', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
                                         ],
                                       ),
                                     ),
@@ -326,7 +328,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                                     flex: 1,
                                     child: Text(
                                       createdAt != null ? DateTime.tryParse(createdAt)?.toLocal().toString().split(' ').first ?? '-' : '-',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                                      style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
                                     ),
                                   ),
                                   SizedBox(
@@ -355,7 +357,7 @@ class _InvitationCodesPageState extends ConsumerState<InvitationCodesPage> {
                                   onPressed: _page > 1 ? () { setState(() => _page--); _loadCodes(); } : null,
                                   icon: const Icon(Icons.chevron_left, size: 18),
                                 ),
-                                Text('$_page / $_totalPages', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                Text('$_page / $_totalPages', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                                 IconButton(
                                   onPressed: _page < _totalPages ? () { setState(() => _page++); _loadCodes(); } : null,
                                   icon: const Icon(Icons.chevron_right, size: 18),

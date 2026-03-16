@@ -1,14 +1,18 @@
+import 'dart:ui' show Brightness, Locale;
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/theme/app_theme.dart';
 
-// --- App-level state (sidebar, theme, tenant) ---
+// --- App-level state (sidebar, theme, tenant, locale) ---
 class AppState {
   final bool sidebarCollapsed;
   final String? selectedAgentId;
   final String currentTenantId;
-  final String themeMode; // 'dark' or 'light'
+  final String themeMode; // 'system', 'dark', or 'light'
   final String? accentColor; // hex, e.g. '#5A96FF'
+  final String locale; // 'zh' or 'en'
 
   const AppState({
     this.sidebarCollapsed = false,
@@ -16,7 +20,10 @@ class AppState {
     this.currentTenantId = '',
     this.themeMode = 'dark',
     this.accentColor,
+    this.locale = 'zh',
   });
+
+  Locale get flutterLocale => Locale(locale);
 
   AppState copyWith({
     bool? sidebarCollapsed,
@@ -24,6 +31,7 @@ class AppState {
     String? currentTenantId,
     String? themeMode,
     String? accentColor,
+    String? locale,
     bool clearAgent = false,
     bool clearAccent = false,
   }) {
@@ -33,6 +41,7 @@ class AppState {
       currentTenantId: currentTenantId ?? this.currentTenantId,
       themeMode: themeMode ?? this.themeMode,
       accentColor: clearAccent ? null : (accentColor ?? this.accentColor),
+      locale: locale ?? this.locale,
     );
   }
 }
@@ -52,12 +61,26 @@ class AppNotifier extends StateNotifier<AppState> {
     final theme = prefs.getString('theme') ?? 'dark';
     final tenant = prefs.getString('current_tenant_id') ?? '';
     final accent = prefs.getString('accent_color');
+    final locale = prefs.getString('locale') ?? 'zh';
+    _syncAppColorsDark(theme);
     state = state.copyWith(
       sidebarCollapsed: collapsed,
       themeMode: theme,
       currentTenantId: tenant,
       accentColor: accent,
+      locale: locale,
     );
+  }
+
+  /// Resolve effective dark/light from themeMode string and update AppColors.
+  static void _syncAppColorsDark(String mode) {
+    if (mode == 'system') {
+      final brightness =
+          SchedulerBinding.instance.platformDispatcher.platformBrightness;
+      AppColors.setDark(brightness == Brightness.dark);
+    } else {
+      AppColors.setDark(mode == 'dark');
+    }
   }
 
   void toggleSidebar() async {
@@ -69,9 +92,14 @@ class AppNotifier extends StateNotifier<AppState> {
 
   void toggleTheme() async {
     final next = state.themeMode == 'dark' ? 'light' : 'dark';
-    state = state.copyWith(themeMode: next);
+    setThemeMode(next);
+  }
+
+  void setThemeMode(String mode) async {
+    _syncAppColorsDark(mode);
+    state = state.copyWith(themeMode: mode);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('theme', next);
+    await prefs.setString('theme', mode);
   }
 
   void setTenant(String tenantId) async {
@@ -92,6 +120,12 @@ class AppNotifier extends StateNotifier<AppState> {
     } else {
       await prefs.setString('accent_color', hex);
     }
+  }
+
+  Future<void> setLocale(String locale) async {
+    state = state.copyWith(locale: locale);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('locale', locale);
   }
 }
 

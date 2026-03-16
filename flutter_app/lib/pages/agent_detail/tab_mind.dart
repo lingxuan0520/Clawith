@@ -6,6 +6,7 @@ part of 'agent_detail_page.dart';
 
 extension _MindTab on _AgentDetailPageState {
   Widget _buildMindTab() {
+    final l = AppLocalizations.of(context)!;
     if (_loadingMind) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
     }
@@ -26,12 +27,12 @@ extension _MindTab on _AgentDetailPageState {
                     children: [
                       const Icon(Icons.auto_awesome, color: AppColors.accentPrimary, size: 18),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text('soul.md', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                       ),
                       Text(
-                        _soulContent?.isNotEmpty == true ? '${_soulContent!.length} 字' : '空',
-                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                        _soulContent?.isNotEmpty == true ? l.mindCharCount(_soulContent!.length) : l.mindEmpty,
+                        style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
                       ),
                       const SizedBox(width: 4),
                       Icon(
@@ -47,9 +48,9 @@ extension _MindTab on _AgentDetailPageState {
                     TextField(
                       controller: _soulController,
                       maxLines: 15,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
-                      decoration: const InputDecoration(
-                        hintText: '定义 Agent 的性格和核心行为...',
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
+                      decoration: InputDecoration(
+                        hintText: l.mindSoulPlaceholder,
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -62,23 +63,23 @@ extension _MindTab on _AgentDetailPageState {
                             _soulController.text = _soulContent ?? '';
                             setState(() => _editingSoul = false);
                           },
-                          child: const Text('取消'),
+                          child: Text(l.commonCancel),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: _savingSoul ? null : _saveSoulMd,
-                          child: _savingSoul ? _miniSpinner() : const Text('保存'),
+                          child: _savingSoul ? _miniSpinner() : Text(l.commonSave),
                         ),
                       ],
                     ),
                   ] else ...[
-                    _codeBlock(_soulContent, '暂无内容，点击编辑按钮创建。'),
+                    _codeBlock(_soulContent, l.mindNoContent),
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
                         icon: const Icon(Icons.edit, size: 16),
-                        label: const Text('编辑'),
+                        label: Text(l.commonEdit),
                         onPressed: () => setState(() => _editingSoul = true),
                       ),
                     ),
@@ -101,12 +102,12 @@ extension _MindTab on _AgentDetailPageState {
                     children: [
                       const Icon(Icons.favorite_outline, color: AppColors.error, size: 18),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text('HEARTBEAT.md', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                       ),
                       Text(
-                        _heartbeatContent?.isNotEmpty == true ? '${_heartbeatContent!.length} 字' : '空',
-                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                        _heartbeatContent?.isNotEmpty == true ? l.mindCharCount(_heartbeatContent!.length) : l.mindEmpty,
+                        style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
                       ),
                       const SizedBox(width: 4),
                       Icon(
@@ -118,7 +119,7 @@ extension _MindTab on _AgentDetailPageState {
                 ),
                 if (_heartbeatExpanded) ...[
                   const SizedBox(height: 8),
-                  _codeBlock(_heartbeatContent, '暂无内容'),
+                  _codeBlock(_heartbeatContent, l.mindHeartbeatNoContent),
                 ],
               ],
             ),
@@ -137,12 +138,12 @@ extension _MindTab on _AgentDetailPageState {
                     children: [
                       const Icon(Icons.memory, color: AppColors.warning, size: 18),
                       const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text('记忆文件', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                      Expanded(
+                        child: Text(l.mindMemoryFiles, style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                       ),
                       Text(
-                        '${_memoryFiles.length} 个文件',
-                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                        l.mindFileCount(_memoryFiles.length),
+                        style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
                       ),
                       const SizedBox(width: 4),
                       Icon(
@@ -155,8 +156,8 @@ extension _MindTab on _AgentDetailPageState {
                 if (_memoryExpanded) ...[
                   const SizedBox(height: 12),
                 if (_memoryFiles.isEmpty)
-                  const Text(
-                    '暂无记忆文件。',
+                  Text(
+                    l.mindNoMemoryFiles,
                     style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic),
                   )
                 else
@@ -177,13 +178,13 @@ extension _MindTab on _AgentDetailPageState {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.insert_drive_file, color: AppColors.textTertiary, size: 16),
+                            Icon(Icons.insert_drive_file, color: AppColors.textTertiary, size: 16),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13))),
+                            Expanded(child: Text(name, style: TextStyle(color: AppColors.textPrimary, fontSize: 13))),
                             if (modified != null)
-                              Text(_fmtRelative(modified), style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                              Text(_fmtRelative(modified), style: TextStyle(color: AppColors.textTertiary, fontSize: 10)),
                             const SizedBox(width: 8),
-                            Text('$size 字节', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                            Text(l.mindBytes(size as int), style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                           ],
                         ),
                       ),

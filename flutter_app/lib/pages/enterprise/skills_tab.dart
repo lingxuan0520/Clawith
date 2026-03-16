@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../../services/api.dart';
 import '../../core/theme/app_theme.dart';
 import 'section_card.dart';
@@ -109,6 +110,7 @@ class _SkillsTabState extends State<SkillsTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final l = AppLocalizations.of(context)!;
 
     // View B: file browser for selected skill
     if (_selectedSkillFolder != null) {
@@ -119,15 +121,15 @@ class _SkillsTabState extends State<SkillsTab>
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Text('Skills 注册表',
+        Text(l.skillsTabTitle,
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary)),
         const SizedBox(height: 4),
-        const Text(
-          '管理全局技能。每个技能是一个包含 SKILL.md 文件的文件夹。'
-          "创建 Agent 时选择的技能会被复制到 Agent 的工作区。",
+        Text(
+          '${l.skillsTabDesc1}'
+          '${l.skillsTabDesc2}',
           style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
         ),
         const SizedBox(height: 16),
@@ -138,10 +140,10 @@ class _SkillsTabState extends State<SkillsTab>
               child:
                   CircularProgressIndicator(color: AppColors.accentPrimary))
         else if (_skills.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(40),
-              child: Text('暂无技能',
+              padding: const EdgeInsets.all(40),
+              child: Text(l.skillsTabNoSkills,
                   style: TextStyle(
                       color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -153,6 +155,7 @@ class _SkillsTabState extends State<SkillsTab>
   }
 
   Widget _buildFileBrowserView() {
+    final l = AppLocalizations.of(context)!;
     // Sub-path relative to the skill folder
     final subPath = _currentPath.length > (_selectedSkillFolder?.length ?? 0)
         ? _currentPath.substring((_selectedSkillFolder?.length ?? 0) + 1)
@@ -167,7 +170,7 @@ class _SkillsTabState extends State<SkillsTab>
             InkWell(
               onTap: _backToSkillList,
               borderRadius: BorderRadius.circular(4),
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.all(4),
                 child: Icon(Icons.arrow_back,
                     size: 20, color: AppColors.textSecondary),
@@ -178,7 +181,7 @@ class _SkillsTabState extends State<SkillsTab>
             InkWell(
               onTap: () => _loadFiles(_selectedSkillFolder ?? ''),
               child: Text(_selectedSkillName,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: AppColors.accentText,
@@ -193,13 +196,13 @@ class _SkillsTabState extends State<SkillsTab>
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(' / ',
+                    Text(' / ',
                         style: TextStyle(
                             fontSize: 12, color: AppColors.textTertiary)),
                     InkWell(
                       onTap: () => _loadFiles(pathUpTo),
                       child: Text(part,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
                               color: AppColors.accentText,
                               decoration: TextDecoration.underline)),
@@ -210,17 +213,17 @@ class _SkillsTabState extends State<SkillsTab>
             const Spacer(),
             if (subPath.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.arrow_upward,
+                icon: Icon(Icons.arrow_upward,
                     size: 16, color: AppColors.textSecondary),
                 onPressed: _navigateUp,
-                tooltip: '返回上级',
+                tooltip: l.skillsTabGoUp,
                 visualDensity: VisualDensity.compact,
               ),
             IconButton(
-              icon: const Icon(Icons.refresh,
+              icon: Icon(Icons.refresh,
                   size: 16, color: AppColors.textSecondary),
               onPressed: () => _loadFiles(_currentPath),
-              tooltip: '刷新',
+              tooltip: l.skillsTabRefresh,
               visualDensity: VisualDensity.compact,
             ),
           ],
@@ -232,10 +235,10 @@ class _SkillsTabState extends State<SkillsTab>
               child:
                   CircularProgressIndicator(color: AppColors.accentPrimary))
         else if (_files.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('空目录',
+              padding: const EdgeInsets.all(24),
+              child: Text(l.skillsTabEmptyDir,
                   style: TextStyle(
                       color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -257,7 +260,7 @@ class _SkillsTabState extends State<SkillsTab>
                     decoration: BoxDecoration(
                       border: isLast
                           ? null
-                          : const Border(
+                          : Border(
                               bottom: BorderSide(
                                   color: AppColors.borderSubtle)),
                     ),
@@ -283,7 +286,7 @@ class _SkillsTabState extends State<SkillsTab>
                         ),
                         if (f['size'] != null)
                           Text(_formatBytes(f['size'] as int),
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 11,
                                   color: AppColors.textTertiary)),
                       ],
@@ -326,20 +329,20 @@ class _SkillsTabState extends State<SkillsTab>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(name,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontWeight: FontWeight.w500,
                             fontSize: 13,
                             color: AppColors.textPrimary)),
                     if (description.isNotEmpty)
                       Text(description,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 11, color: AppColors.textTertiary),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right,
+              Icon(Icons.chevron_right,
                   size: 18, color: AppColors.textTertiary),
             ],
           ),
@@ -401,7 +404,7 @@ class _SkillFileViewerState extends State<SkillFileViewer> {
             padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
             child: Row(
               children: [
-                const Icon(Icons.description_outlined, size: 18, color: AppColors.textSecondary),
+                Icon(Icons.description_outlined, size: 18, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(fileName,
@@ -419,14 +422,14 @@ class _SkillFileViewerState extends State<SkillFileViewer> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : _error != null
-                    ? Center(child: Text('加载失败: $_error',
+                    ? Center(child: Text(AppLocalizations.of(context)!.skillsTabLoadFailed(_error!),
                         style: const TextStyle(color: AppColors.error, fontSize: 13)))
                     : SingleChildScrollView(
                         controller: scrollController,
                         padding: const EdgeInsets.all(16),
                         child: SelectableText(
                           _content,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontFamily: 'monospace',
                             color: AppColors.textPrimary,

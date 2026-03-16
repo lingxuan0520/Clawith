@@ -117,7 +117,7 @@ class _FileBrowserState extends State<FileBrowser> {
                       Expanded(
                         child: Text(
                           _currentPath.isEmpty ? '/' : '/$_currentPath',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontFamily: 'monospace'),
+                          style: TextStyle(fontSize: 12, color: AppColors.textTertiary, fontFamily: 'monospace'),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -138,7 +138,7 @@ class _FileBrowserState extends State<FileBrowser> {
                     child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                   )
                 else if (_files.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.all(20),
                     child: Text('Empty directory', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
                   )
@@ -186,7 +186,7 @@ class _FileBrowserState extends State<FileBrowser> {
         // File content viewer
         Expanded(
           child: _selectedFile == null
-              ? const Center(
+              ? Center(
                   child: Text('Select a file to view', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                 )
               : _loadingContent
@@ -200,7 +200,7 @@ class _FileBrowserState extends State<FileBrowser> {
                             children: [
                               Expanded(
                                 child: Text(_selectedFile!,
-                                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: AppColors.textSecondary)),
+                                    style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: AppColors.textSecondary)),
                               ),
                             ],
                           ),
@@ -211,7 +211,7 @@ class _FileBrowserState extends State<FileBrowser> {
                             padding: const EdgeInsets.all(12),
                             child: SelectableText(
                               _fileContent ?? '',
-                              style: const TextStyle(fontSize: 13, fontFamily: 'monospace', color: AppColors.textPrimary, height: 1.5),
+                              style: TextStyle(fontSize: 13, fontFamily: 'monospace', color: AppColors.textPrimary, height: 1.5),
                             ),
                           ),
                         ),

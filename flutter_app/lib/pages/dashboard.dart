@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/app_lifecycle.dart';
@@ -77,13 +78,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     }
   }
 
-  String _timeAgo(String? dateStr) {
+  String _timeAgo(String? dateStr, AppLocalizations l) {
     if (dateStr == null) return '-';
     final diff = DateTime.now().difference(DateTime.parse(dateStr));
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-    if (diff.inHours < 24) return '${diff.inHours}小时前';
-    return '${diff.inDays}天前';
+    if (diff.inMinutes < 1) return l.timeJustNow;
+    if (diff.inMinutes < 60) return l.timeMinutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return l.timeHoursAgo(diff.inHours);
+    return l.timeDaysAgo(diff.inDays);
   }
 
   String _formatTokens(num n) {
@@ -92,12 +93,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return n.toString();
   }
 
-  String _greeting() {
+  String _greeting(AppLocalizations l) {
     final h = DateTime.now().hour;
-    if (h < 6) return '🌙 夜深了';
-    if (h < 12) return '☀️ 早上好';
-    if (h < 18) return '🌤️ 下午好';
-    return '🌙 晚上好';
+    if (h < 6) return l.greetingLateNight;
+    if (h < 12) return l.greetingMorning;
+    if (h < 18) return l.greetingAfternoon;
+    return l.greetingEvening;
   }
 
   Color _statusColor(String s) {
@@ -110,19 +111,20 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     }
   }
 
-  String _statusLabel(String s) {
+  String _statusLabel(String s, AppLocalizations l) {
     switch (s) {
-      case 'running': return '运行中';
-      case 'idle': return '待机';
-      case 'stopped': return '已停止';
-      case 'error': return '错误';
-      case 'creating': return '创建中';
+      case 'running': return l.statusRunning;
+      case 'idle': return l.statusStandby;
+      case 'stopped': return l.statusStopped;
+      case 'error': return l.statusError;
+      case 'creating': return l.statusCreating;
       default: return s;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -144,8 +146,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_greeting(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                    Text('${_agents.length} 位数字员工', style: const TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                    Text(_greeting(l), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                    Text(l.dashboardAgentCount(_agents.length), style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
                   ],
                 ),
               ),
@@ -153,7 +155,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ElevatedButton.icon(
                 onPressed: () => context.push('/agents/new'),
                 icon: const Icon(Icons.add, size: 16),
-                label: const Text('新建智能体'),
+                label: Text(l.dashboardNewAgent),
               ),
             ],
           ),
@@ -165,14 +167,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 padding: const EdgeInsets.all(60),
                 child: Column(
                   children: [
-                    const Icon(Icons.smart_toy, size: 48, color: AppColors.textTertiary),
+                    Icon(Icons.smart_toy, size: 48, color: AppColors.textTertiary),
                     const SizedBox(height: 16),
-                    const Text('还没有数字员工', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                    Text(l.dashboardNoAgents, style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () => context.push('/agents/new'),
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text('创建第一个智能体'),
+                      label: Text(l.dashboardCreateFirst),
                     ),
                   ],
                 ),
@@ -187,14 +189,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ),
               child: Row(
                 children: [
-                  _statCard('数字员工', '${_agents.length}', '$activeAgents 在线'),
-                  _statCard('进行中任务', '$pendingTasks', '处理中'),
-                  _statCard('今日 Token', _formatTokens(totalTokensToday), '全部 Agent 合计'),
-                  _statCard('最近活跃', '${_agents.where((a) {
+                  _statCard(l.dashboardDigitalEmployees, '${_agents.length}', l.dashboardOnlineCount(activeAgents)),
+                  _statCard(l.dashboardActiveTasks, '$pendingTasks', l.dashboardProcessing),
+                  _statCard(l.dashboardTodayTokens, _formatTokens(totalTokensToday), l.dashboardAllAgentsTotal),
+                  _statCard(l.dashboardRecentActive, '${_agents.where((a) {
                     final la = a['last_active_at'] as String?;
                     if (la == null) return false;
                     return DateTime.now().difference(DateTime.parse(la)).inHours < 1;
-                  }).length}', '最近1小时'),
+                  }).length}', l.dashboardLastHour),
                 ],
               ),
             ),
@@ -202,13 +204,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
             // Agent list header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 16),
               child: Row(
-                children: const [
-                  Expanded(flex: 3, child: Text('员工', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
-                  Expanded(flex: 4, child: Text('最近活动', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
+                children: [
+                  Expanded(flex: 3, child: Text(l.dashboardStaff, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
+                  Expanded(flex: 4, child: Text(l.dashboardRecentActivity, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
                   Expanded(flex: 2, child: Text('TOKEN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
-                  SizedBox(width: 80, child: Text('活跃', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
+                  SizedBox(width: 80, child: Text(l.dashboardActive, textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
                 ],
               ),
             ),
@@ -222,7 +224,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               final aTime = DateTime.tryParse(a['last_active_at'] as String? ?? '') ?? DateTime(2000);
               final bTime = DateTime.tryParse(b['last_active_at'] as String? ?? '') ?? DateTime(2000);
               return bTime.compareTo(aTime);
-            })).map((agent) => _agentRow(agent)),
+            })).map((agent) => _agentRow(agent, l)),
 
             const SizedBox(height: 32),
 
@@ -240,21 +242,21 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
-                          children: const [
+                          children: [
                             Icon(Icons.show_chart, size: 16, color: AppColors.textTertiary),
                             SizedBox(width: 6),
-                            Text('全局动态', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                            Text(l.dashboardGlobalFeed, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                           ],
                         ),
-                        Text('最近 20 条', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                        Text(l.dashboardRecent20, style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                       ],
                     ),
                   ),
                   const Divider(height: 1),
                   if (_allActivities.isEmpty)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.all(32),
-                      child: Text('暂无动态', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+                      child: Text(l.dashboardNoFeed, style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                     )
                   else
                     ConstrainedBox(
@@ -273,20 +275,20 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                             child: Row(
                               children: [
-                                SizedBox(width: 52, child: Text(_timeAgo(act['created_at'] as String?),
-                                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary, fontFamily: 'monospace'))),
+                                SizedBox(width: 52, child: Text(_timeAgo(act['created_at'] as String?, l),
+                                    style: TextStyle(fontSize: 11, color: AppColors.textTertiary, fontFamily: 'monospace'))),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                   decoration: BoxDecoration(
                                     color: AppColors.bgTertiary,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
-                                  child: Text(agentName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                                  child: Text(agentName, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(act['summary'] as String? ?? '',
-                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                                       overflow: TextOverflow.ellipsis),
                                 ),
                               ],
@@ -315,17 +317,17 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+            Text(label, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
             const SizedBox(height: 4),
             Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
-            Text(sub, style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+            Text(sub, style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
           ],
         ),
       ),
     );
   }
 
-  Widget _agentRow(Map<String, dynamic> agent) {
+  Widget _agentRow(Map<String, dynamic> agent, AppLocalizations l) {
     final id = agent['id'] as String;
     final name = agent['name'] as String? ?? 'Agent';
     final status = agent['status'] as String? ?? 'idle';
@@ -353,7 +355,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       color: AppColors.bgTertiary,
                       border: Border.all(color: AppColors.borderSubtle),
                     ),
-                    child: const Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
+                    child: Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -366,10 +368,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                             const SizedBox(width: 6),
                             Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: _statusColor(status))),
                             const SizedBox(width: 4),
-                            Text(_statusLabel(status), style: TextStyle(fontSize: 11, color: _statusColor(status))),
+                            Text(_statusLabel(status, l), style: TextStyle(fontSize: 11, color: _statusColor(status))),
                           ],
                         ),
-                        Text(roleDesc, style: const TextStyle(fontSize: 12, color: AppColors.textTertiary), overflow: TextOverflow.ellipsis),
+                        Text(roleDesc, style: TextStyle(fontSize: 12, color: AppColors.textTertiary), overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
@@ -380,9 +382,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             Expanded(
               flex: 4,
               child: activity != null
-                  ? Text('${_timeAgo(activity['created_at'] as String?)}  ${activity['summary'] ?? ''}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)
-                  : const Text('暂无活动', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                  ? Text('${_timeAgo(activity['created_at'] as String?, l)}  ${activity['summary'] ?? ''}',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)
+                  : Text(l.dashboardNoActivity, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
             ),
             // Tokens
             Expanded(
@@ -391,7 +393,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('${_formatTokens(usedTokens)}${maxTokens > 0 ? ' / ${_formatTokens(maxTokens)}' : ''}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                      style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
                   if (maxTokens > 0)
                     Container(
                       margin: const EdgeInsets.only(top: 3),
@@ -414,9 +416,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             // Last active
             SizedBox(
               width: 80,
-              child: Text(_timeAgo(agent['last_active_at'] as String?),
+              child: Text(_timeAgo(agent['last_active_at'] as String?, l),
                   textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                  style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
             ),
           ],
         ),

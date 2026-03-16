@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
   # State management
   flutter_riverpod: ^2.6.1
@@ -32,7 +34,7 @@ dependencies:
   # Image picker (for chat uploads)
   image_picker: ^1.1.2
   # Intl for date formatting
-  intl: ^0.19.0
+  intl: ^0.20.2
   # JSON
   json_annotation: ^4.9.0
   # Mime type
@@ -71,6 +73,7 @@ dependency_overrides:
     path: local_packages/bonfire
 
 flutter:
+  generate: true
   uses-material-design: true
   assets:
     - assets/images/

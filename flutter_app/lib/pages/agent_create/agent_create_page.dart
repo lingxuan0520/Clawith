@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -51,9 +52,11 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   final _maxDayCtrl = TextEditingController(text: '100000');
   final _maxMonthCtrl = TextEditingController(text: '3000000');
 
-  static const _stepLabels = [
-    '基本信息',
-    '性格设定',
+  static const _stepCount = 2;
+
+  List<String> _stepLabels(AppLocalizations l) => [
+    l.agentCreateStepBasic,
+    l.agentCreateStepPersonality,
   ];
 
   // ── Lifecycle ─────────────────────────────────────────────
@@ -90,7 +93,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = '加载资源失败: $e';
+        _errorMessage = AppLocalizations.of(context)!.agentCreateLoadFailed(e.toString());
         _loadingResources = false;
       });
     }
@@ -111,14 +114,15 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   // ── Validation per step ───────────────────────────────────
   bool _validateCurrentStep() {
     _syncFormFromControllers();
+    final l = AppLocalizations.of(context)!;
     switch (_currentStep) {
       case 0:
         if ((_form['name'] as String).isEmpty) {
-          _showError('请输入 Agent 名称');
+          _showError(l.agentCreateNameRequired);
           return false;
         }
         if ((_form['primary_model_id'] as String).isEmpty) {
-          _showError('请选择主模型');
+          _showError(l.agentCreateModelRequired);
           return false;
         }
         return true;
@@ -137,7 +141,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   // ── Navigation ────────────────────────────────────────────
   void _goNext() {
     if (!_validateCurrentStep()) return;
-    if (_currentStep < _stepLabels.length - 1) {
+    if (_currentStep < _stepCount - 1) {
       setState(() => _currentStep++);
     }
   }
@@ -182,7 +186,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _errorMessage = '创建失败: $e';
+        _errorMessage = AppLocalizations.of(context)!.agentCreateFailed(e.toString());
       });
     }
   }
@@ -198,10 +202,11 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   // ────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: const Text('招募新员工'),
+        title: Text(l.agentCreateTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -263,11 +268,13 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
 
   // ── Step Indicator ────────────────────────────────────────
   Widget _buildStepIndicator() {
+    final l = AppLocalizations.of(context)!;
+    final labels = _stepLabels(l);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       color: AppColors.bgSecondary,
       child: Row(
-        children: List.generate(_stepLabels.length, (i) {
+        children: List.generate(labels.length, (i) {
           final isActive = i == _currentStep;
           final isCompleted = i < _currentStep;
           return Expanded(
@@ -319,7 +326,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
                   // Label — only show on wider screens
                   Flexible(
                     child: Text(
-                      _stepLabels[i],
+                      labels[i],
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -335,7 +342,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
                     ),
                   ),
                   // Connector line between steps
-                  if (i < _stepLabels.length - 1)
+                  if (i < labels.length - 1)
                     Expanded(
                       child: Container(
                         height: 1,
@@ -356,8 +363,9 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
 
   // ── Bottom navigation buttons ─────────────────────────────
   Widget _buildBottomButtons() {
+    final l = AppLocalizations.of(context)!;
     final isFirst = _currentStep == 0;
-    final isLast = _currentStep == _stepLabels.length - 1;
+    final isLast = _currentStep == _stepCount - 1;
 
     return Container(
       color: AppColors.bgSecondary,
@@ -368,14 +376,14 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
             OutlinedButton.icon(
               onPressed: _goPrevious,
               icon: const Icon(Icons.chevron_left, size: 18),
-              label: const Text('上一步'),
+              label: Text(l.agentCreatePrevStep),
             ),
           const Spacer(),
           if (!isLast)
             ElevatedButton.icon(
               onPressed: _goNext,
               icon: const Icon(Icons.chevron_right, size: 18),
-              label: const Text('下一步'),
+              label: Text(l.agentCreateNextStep),
             ),
           if (isLast)
             ElevatedButton.icon(
@@ -388,7 +396,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
                           strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.check, size: 18),
-              label: Text(_submitting ? '创建中...' : '创建 Agent'),
+              label: Text(_submitting ? l.agentCreateCreating : l.agentCreateSubmit),
             ),
         ],
       ),
@@ -411,38 +419,39 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   //  STEP 0 — Basic Info & Model
   // ────────────────────────────────────────────────────────────
   Widget _buildStepBasicInfo() {
+    final l = AppLocalizations.of(context)!;
     return StepCard(
-      title: '基本信息与模型',
-      subtitle: '设置 Agent 的名称、角色和使用的 AI 模型。',
+      title: l.agentCreateBasicTitle,
+      subtitle: l.agentCreateBasicSubtitle,
       children: [
         // Name
-        const FieldLabel('Agent 名称 *'),
+        FieldLabel(l.agentCreateNameLabel),
         const SizedBox(height: 6),
         TextField(
           controller: _nameCtrl,
-          decoration: const InputDecoration(hintText: '例：研究助手'),
+          decoration: InputDecoration(hintText: l.agentCreateNameHint),
         ),
         const SizedBox(height: 18),
 
         // Role description
-        const FieldLabel('角色描述'),
+        FieldLabel(l.agentCreateRoleLabel),
         const SizedBox(height: 6),
         TextField(
           controller: _roleDescCtrl,
           maxLines: 3,
-          decoration: const InputDecoration(
-              hintText: '描述这个 Agent 的职责...'),
+          decoration: InputDecoration(
+              hintText: l.agentCreateRoleHint),
         ),
         const SizedBox(height: 18),
 
         // Template
-        const FieldLabel('模板'),
+        FieldLabel(l.agentCreateTemplateLabel),
         const SizedBox(height: 6),
         _buildDropdown<String>(
           value: (_form['template_id'] as String).isEmpty
               ? null
               : _form['template_id'] as String,
-          hint: '选择模板（可选）',
+          hint: l.agentCreateTemplateHint,
           items: _templates.map((t) {
             final id = t['id']?.toString() ?? '';
             final name = t['name']?.toString() ?? id;
@@ -453,17 +462,17 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         const SizedBox(height: 18),
 
         // Primary model
-        const FieldLabel('主模型 *'),
+        FieldLabel(l.agentCreatePrimaryModelLabel),
         const SizedBox(height: 6),
         if (_llmModels.isEmpty)
-          const Text('提示：请先前往「设置 → 模型池」添加 LLM 模型',
+          Text(l.agentCreateModelTip,
               style: TextStyle(fontSize: 12, color: AppColors.textTertiary))
         else
         _buildDropdown<String>(
           value: (_form['primary_model_id'] as String).isEmpty
               ? null
               : _form['primary_model_id'] as String,
-          hint: '选择主 AI 模型',
+          hint: l.agentCreatePrimaryModelHint,
           items: _llmModels.map((m) {
             final id = m['id']?.toString() ?? '';
             final label = (m['label'] as String?)?.isNotEmpty == true
@@ -485,7 +494,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         const SizedBox(height: 18),
 
         // Fallback model
-        const FieldLabel('备用模型'),
+        FieldLabel(l.agentCreateFallbackModelLabel),
         const SizedBox(height: 6),
         if (_llmModels.isEmpty)
           const SizedBox.shrink()
@@ -494,7 +503,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
           value: (_form['fallback_model_id'] as String).isEmpty
               ? null
               : _form['fallback_model_id'] as String,
-          hint: '选择备用模型（可选）',
+          hint: l.agentCreateFallbackModelHint,
           items: _llmModels.map((m) {
             final id = m['id']?.toString() ?? '';
             final label = (m['label'] as String?)?.isNotEmpty == true
@@ -522,7 +531,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const FieldLabel('每日 Token 上限'),
+                  FieldLabel(l.agentCreateDailyTokenLimit),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _maxDayCtrl,
@@ -539,7 +548,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const FieldLabel('每月 Token 上限'),
+                  FieldLabel(l.agentCreateMonthlyTokenLimit),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _maxMonthCtrl,
@@ -561,27 +570,28 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   //  STEP 1 — Personality & Boundaries
   // ────────────────────────────────────────────────────────────
   Widget _buildStepPersonality() {
+    final l = AppLocalizations.of(context)!;
     return StepCard(
-      title: '性格与边界',
-      subtitle: '定义 Agent 的沟通风格和行为边界。',
+      title: l.agentCreatePersonalityTitle,
+      subtitle: l.agentCreatePersonalitySubtitle,
       children: [
-        const FieldLabel('性格特征'),
+        FieldLabel(l.agentCreatePersonalityLabel),
         const SizedBox(height: 6),
         TextField(
           controller: _personalityCtrl,
           maxLines: 6,
-          decoration: const InputDecoration(
-            hintText: '描述性格特征、语气和沟通风格...',
+          decoration: InputDecoration(
+            hintText: l.agentCreatePersonalityHint,
           ),
         ),
         const SizedBox(height: 20),
-        const FieldLabel('行为边界'),
+        FieldLabel(l.agentCreateBoundariesLabel),
         const SizedBox(height: 6),
         TextField(
           controller: _boundariesCtrl,
           maxLines: 6,
-          decoration: const InputDecoration(
-            hintText: '列出 Agent 必须避免的话题或行为...',
+          decoration: InputDecoration(
+            hintText: l.agentCreateBoundariesHint,
           ),
         ),
       ],
@@ -599,11 +609,11 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
       value: value,
       hint: Text(hint,
           style:
-              const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+              TextStyle(color: AppColors.textTertiary, fontSize: 13)),
       decoration: const InputDecoration(),
       dropdownColor: AppColors.bgElevated,
       borderRadius: BorderRadius.circular(12),
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
       isExpanded: true,
       items: items,
       onChanged: onChanged,

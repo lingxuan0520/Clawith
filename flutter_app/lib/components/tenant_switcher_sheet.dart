@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../core/theme/app_theme.dart';
 
 /// Bottom sheet with tenant list + inline create form (matches Web sidebar pattern).
@@ -51,8 +52,9 @@ class _TenantSwitcherSheetState extends State<TenantSwitcherSheet> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
+        final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('创建失败：$e')),
+          SnackBar(content: Text(l.tenantSwitcherCreateFailed(e.toString()))),
         );
         setState(() => _creating = false);
       }
@@ -61,15 +63,16 @@ class _TenantSwitcherSheetState extends State<TenantSwitcherSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('我的公司', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(l.tenantSwitcherTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
             const Divider(height: 1),
             // Tenant list
@@ -90,7 +93,7 @@ class _TenantSwitcherSheetState extends State<TenantSwitcherSheet> {
                       const SizedBox(width: 8),
                       GestureDetector(
                         onTap: () => widget.onDelete!(id, name),
-                        child: const Icon(Icons.delete_outline, size: 18, color: AppColors.textTertiary),
+                        child: Icon(Icons.delete_outline, size: 18, color: AppColors.textTertiary),
                       ),
                     ],
                   ],
@@ -112,9 +115,9 @@ class _TenantSwitcherSheetState extends State<TenantSwitcherSheet> {
                           controller: _nameCtl,
                           autofocus: true,
                           style: const TextStyle(fontSize: 14),
-                          decoration: const InputDecoration(
-                            hintText: '公司名称',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                          decoration: InputDecoration(
+                            hintText: l.tenantSwitcherNameHint,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                           ),
                           onSubmitted: (_) => _doCreate(),
                         ),
@@ -128,7 +131,7 @@ class _TenantSwitcherSheetState extends State<TenantSwitcherSheet> {
                         child: _creating
                             ? const SizedBox(width: 16, height: 16,
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('创建'),
+                            : Text(l.tenantSwitcherCreate),
                       ),
                     ),
                     // Only show cancel button if there are existing tenants
@@ -136,7 +139,7 @@ class _TenantSwitcherSheetState extends State<TenantSwitcherSheet> {
                       const SizedBox(width: 4),
                       GestureDetector(
                         onTap: () => setState(() { _showNewForm = false; _nameCtl.clear(); }),
-                        child: const Icon(Icons.close, size: 20, color: AppColors.textTertiary),
+                        child: Icon(Icons.close, size: 20, color: AppColors.textTertiary),
                       ),
                     ],
                   ],
@@ -144,8 +147,8 @@ class _TenantSwitcherSheetState extends State<TenantSwitcherSheet> {
               )
             else
               ListTile(
-                leading: const Icon(Icons.add, color: AppColors.textTertiary),
-                title: const Text('新建公司', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                leading: Icon(Icons.add, color: AppColors.textTertiary),
+                title: Text(l.tenantSwitcherNew, style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
                 onTap: () => setState(() => _showNewForm = true),
               ),
             const SizedBox(height: 8),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
 import '../core/app_lifecycle.dart';
@@ -48,14 +49,14 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
     }
   }
 
-  String _formatTime(String? iso) {
+  String _formatTime(String? iso, AppLocalizations l) {
     if (iso == null || iso.isEmpty) return '';
     final d = DateTime.tryParse(iso);
     if (d == null) return '';
     final diff = DateTime.now().difference(d);
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-    if (diff.inHours < 24) return '${diff.inHours}小时前';
+    if (diff.inMinutes < 1) return l.timeJustNow;
+    if (diff.inMinutes < 60) return l.timeMinutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return l.timeHoursAgo(diff.inHours);
     return '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
@@ -75,6 +76,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final unreadCount = _messages.where((m) => m['read_at'] == null).length;
 
     return Center(
@@ -87,11 +89,11 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('消息', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                Text(l.messagesTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                 if (unreadCount > 0)
                   TextButton(
                     onPressed: _markAllRead,
-                    child: Text('全部标为已读 ($unreadCount)', style: const TextStyle(fontSize: 13)),
+                    child: Text(l.messagesMarkAllRead(unreadCount), style: const TextStyle(fontSize: 13)),
                   ),
               ],
             ),
@@ -110,7 +112,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                     color: AppColors.bgSecondary,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text('暂无消息', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+                  child: Text(l.messagesEmpty, style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                 ),
               )
             else
@@ -144,10 +146,10 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                                 Text(msg['sender_name'] as String? ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                                 const SizedBox(width: 8),
                                 Text('\u{2192} ${msg['receiver_name'] ?? ''}',
-                                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                    style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                                 const Spacer(),
-                                Text(_formatTime(msg['created_at'] as String?),
-                                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                Text(_formatTime(msg['created_at'] as String?, l),
+                                    style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                                 if (!isRead) ...[
                                   const SizedBox(width: 8),
                                   Container(
@@ -160,7 +162,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                             const SizedBox(height: 6),
                             Text(
                               msg['content'] as String? ?? '',
-                              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+                              style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),

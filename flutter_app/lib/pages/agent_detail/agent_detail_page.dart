@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:ohclaw/l10n/app_localizations.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../core/app_lifecycle.dart';
 import '../../services/api.dart';
@@ -133,15 +135,15 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   final _channelPublicKeyCtrl = TextEditingController();
 
 
-  static const _tabLabels = [
-    '状态',
-    '任务',
-    '思维',
-    '工具',
-    '技能',
-    '工作区',
-    '活动',
-    '设置',
+  static List<String> _tabLabelsOf(AppLocalizations l) => [
+    l.agentDetailTabOverview,
+    l.agentDetailTabTasks,
+    l.agentDetailTabMind,
+    l.agentDetailTabTools,
+    l.agentDetailTabSkills,
+    l.agentDetailTabWorkspace,
+    l.agentDetailTabActivity,
+    l.agentDetailTabSettings,
   ];
 
   // ─── Lifecycle ───────────────────────────────────────────
@@ -149,7 +151,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabLabels.length, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
     _tabController.addListener(_onTabChanged);
     _fetchAgent();
     _pollTimer = Timer.periodic(
@@ -279,7 +281,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingTasks = false);
-      _showSnack('加载任务失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailLoadTasksFailed(_errMsg(e)));
     }
   }
 
@@ -376,7 +378,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingWorkspace = false);
-      _showSnack('加载文件失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailLoadFilesFailed(_errMsg(e)));
     }
   }
 
@@ -392,7 +394,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingActivity = false);
-      _showSnack('加载活动失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailLoadActivityFailed(_errMsg(e)));
     }
   }
 
@@ -408,9 +410,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       await _api.importSkill(widget.agentId, skillId);
       _fetchSkillsData();
-      _showSnack('技能已导入');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSkillImported);
     } catch (e) {
-      _showSnack('导入失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailImportFailed(_errMsg(e)));
     }
   }
 
@@ -450,18 +452,19 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   // ─── Actions ─────────────────────────────────────────────
 
   Future<void> _deleteAgent() async {
+    final l = AppLocalizations.of(context)!;
     final confirmed = await _showConfirmDialog(
-      '删除智能体',
-      '确认永久删除这个智能体吗？此操作不可撤销。',
+      l.agentDetailDeleteTitle,
+      l.agentDetailDeleteConfirm,
     );
     if (confirmed != true) return;
     try {
       await _api.deleteAgent(widget.agentId);
       if (!mounted) return;
       context.go('/dashboard');
-      _showSnack('智能体已删除');
+      _showSnack(l.agentDetailDeleted);
     } catch (e) {
-      _showSnack('删除失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailDeleteFailed(_errMsg(e)));
     }
   }
 
@@ -476,11 +479,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _editingSoul = false;
         _savingSoul = false;
       });
-      _showSnack('soul.md 已保存');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSoulSaved);
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingSoul = false);
-      _showSnack('保存 soul.md 失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSoulSaveFailed(_errMsg(e)));
     }
   }
 
@@ -503,7 +506,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       // Revert on failure
       _fetchToolsData();
       if (!mounted) return;
-      _showSnack('工具开关失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailToolToggleFailed(_errMsg(e)));
     }
   }
 
@@ -514,7 +517,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('配置', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.agentDetailConfig, style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         ...fields.map((f) {
           final field = f as Map<String, dynamic>;
@@ -529,7 +532,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             child: TextField(
               controller: _toolConfigControllers[ctrlKey],
               obscureText: isPassword,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
               decoration: InputDecoration(
                 labelText: label,
                 isDense: true,
@@ -551,12 +554,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               }
               try {
                 await _api.updateToolConfig(widget.agentId, toolId, config);
-                _showSnack('工具配置已保存');
+                _showSnack(AppLocalizations.of(context)!.agentDetailToolConfigSaved);
               } catch (e) {
-                _showSnack('保存失败: ${_errMsg(e)}');
+                _showSnack(AppLocalizations.of(context)!.agentDetailSaveFailed(_errMsg(e)));
               }
             },
-            child: const Text('保存配置'),
+            child: Text(AppLocalizations.of(context)!.agentDetailSaveConfig),
           ),
         ),
       ],
@@ -587,11 +590,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       await _fetchAgentSilent();
       if (!mounted) return;
       setState(() => _savingSettings = false);
-      _showSnack('设置已保存');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSettingsSaved);
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingSettings = false);
-      _showSnack('保存设置失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSettingsSaveFailed(_errMsg(e)));
     }
   }
 
@@ -612,7 +615,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _viewingFileName = name;
       });
     } catch (e) {
-      _showSnack('读取文件失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailReadFileFailed(_errMsg(e)));
     }
   }
 
@@ -630,7 +633,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         });
       } catch (e) {
         if (!mounted) return;
-        _showSnack('打开技能文件夹失败: ${_errMsg(e)}');
+        _showSnack(AppLocalizations.of(context)!.agentDetailOpenSkillFolderFailed(_errMsg(e)));
       }
     } else {
       // Flat .md file — read and show content directly
@@ -643,7 +646,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         });
       } catch (e) {
         if (!mounted) return;
-        _showSnack('读取技能文件失败: ${_errMsg(e)}');
+        _showSnack(AppLocalizations.of(context)!.agentDetailReadSkillFileFailed(_errMsg(e)));
       }
     }
   }
@@ -663,7 +666,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         });
       } catch (e) {
         if (!mounted) return;
-        _showSnack('打开文件夹失败: ${_errMsg(e)}');
+        _showSnack(AppLocalizations.of(context)!.agentDetailOpenFolderFailed(_errMsg(e)));
       }
     } else {
       try {
@@ -675,20 +678,21 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         });
       } catch (e) {
         if (!mounted) return;
-        _showSnack('读取文件失败: ${_errMsg(e)}');
+        _showSnack(AppLocalizations.of(context)!.agentDetailReadFileFailed(_errMsg(e)));
       }
     }
   }
 
   Future<void> _deleteSkillFile(String name) async {
+    final l = AppLocalizations.of(context)!;
     final confirmed = await _showConfirmDialog(
-      '删除技能',
-      '确认删除 "$name" 吗？',
+      l.agentDetailDeleteSkillTitle,
+      l.agentDetailDeleteSkillConfirm(name),
     );
     if (confirmed != true) return;
     try {
       await _api.deleteFile(widget.agentId, 'skills/$name');
-      _showSnack('技能已删除');
+      _showSnack(l.agentDetailSkillDeleted);
       setState(() {
         _skillSubFolder = null;
         _skillSubFiles = [];
@@ -697,23 +701,24 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       });
       _fetchSkillsData();
     } catch (e) {
-      _showSnack('删除技能失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailDeleteSkillFailed(_errMsg(e)));
     }
   }
 
   Future<void> _deleteWorkspaceFile(String name) async {
+    final l = AppLocalizations.of(context)!;
     final confirmed = await _showConfirmDialog(
-      '删除文件',
-      '确认删除 "$name" 吗？',
+      l.agentDetailDeleteFileTitle,
+      l.agentDetailDeleteFileConfirm(name),
     );
     if (confirmed != true) return;
     try {
       final filePath = _currentPath.isEmpty ? name : '$_currentPath/$name';
       await _api.deleteFile(widget.agentId, filePath);
-      _showSnack('文件已删除');
+      _showSnack(l.agentDetailFileDeleted);
       _fetchWorkspaceFiles(_currentPath);
     } catch (e) {
-      _showSnack('删除文件失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailDeleteFileFailed(_errMsg(e)));
     }
   }
 
@@ -721,39 +726,42 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       final res = await _api.readFile(widget.agentId, 'memory/$name');
       if (!mounted) return;
-      _showContentDialog(name, res['content'] as String? ?? '(空)');
+      final l = AppLocalizations.of(context)!;
+      _showContentDialog(name, res['content'] as String? ?? l.agentDetailMemoryEmpty);
     } catch (e) {
-      _showSnack('读取记忆文件失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailReadMemoryFailed(_errMsg(e)));
     }
   }
 
   Future<void> _deleteChannel() async {
+    final l = AppLocalizations.of(context)!;
     final confirmed = await _showConfirmDialog(
-      '删除通道',
-      '确认删除通道配置吗？',
+      l.agentDetailDeleteChannelTitle,
+      l.agentDetailDeleteChannelConfirm,
     );
     if (confirmed != true) return;
     try {
       await _api.deleteChannel(widget.agentId);
-      _showSnack('通道已删除');
+      _showSnack(l.agentDetailChannelDeleted);
       _fetchSettingsData();
     } catch (e) {
-      _showSnack('删除通道失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailDeleteChannelFailed(_errMsg(e)));
     }
   }
 
   Future<void> _deleteSchedule(String scheduleId) async {
+    final l = AppLocalizations.of(context)!;
     final confirmed = await _showConfirmDialog(
-      '删除计划',
-      '确认删除此计划吗？',
+      l.agentDetailDeleteScheduleTitle,
+      l.agentDetailDeleteScheduleConfirm,
     );
     if (confirmed != true) return;
     try {
       await _api.deleteSchedule(widget.agentId, scheduleId);
-      _showSnack('计划已删除');
+      _showSnack(l.agentDetailScheduleDeleted);
       _fetchSchedules();
     } catch (e) {
-      _showSnack('删除计划失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailDeleteScheduleFailed(_errMsg(e)));
     }
   }
 
@@ -769,11 +777,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         _editingName = false;
         _savingName = false;
       });
-      _showSnack('名称已更新');
+      _showSnack(AppLocalizations.of(context)!.agentDetailNameUpdated);
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingName = false);
-      _showSnack('更新名称失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailNameUpdateFailed(_errMsg(e)));
     }
   }
 
@@ -782,7 +790,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   Future<void> _triggerTask(String taskId) async {
     try {
       await _api.triggerTask(widget.agentId, taskId);
-      _showSnack('任务已触发，执行中...');
+      _showSnack(AppLocalizations.of(context)!.agentDetailTaskTriggered);
       setState(() => _taskFilter = 'doing');
       _fetchTasks();
       // Poll every 3s until task leaves 'doing'
@@ -797,17 +805,17 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         }
       });
     } catch (e) {
-      _showSnack('触发任务失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailTriggerTaskFailed(_errMsg(e)));
     }
   }
 
   Future<void> _triggerSchedule(String scheduleId) async {
     try {
       await _api.triggerSchedule(widget.agentId, scheduleId);
-      _showSnack('计划已手动触发');
+      _showSnack(AppLocalizations.of(context)!.agentDetailScheduleTriggered);
       _fetchSchedules();
     } catch (e) {
-      _showSnack('触发计划失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailTriggerScheduleFailed(_errMsg(e)));
     }
   }
 
@@ -830,10 +838,10 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       _channelSecretCtrl.clear();
       if (!mounted) return;
       setState(() => _showCreateChannel = false);
-      _showSnack('通道已创建');
+      _showSnack(AppLocalizations.of(context)!.agentDetailChannelCreated);
       _fetchSettingsData();
     } catch (e) {
-      _showSnack('创建通道失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailCreateChannelFailed(_errMsg(e)));
     }
   }
 
@@ -848,10 +856,10 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         result['name'] as String,
         path: _currentPath.isEmpty ? 'workspace' : 'workspace/$_currentPath',
       );
-      _showSnack('文件已上传');
+      _showSnack(AppLocalizations.of(context)!.agentDetailFileUploaded);
       _fetchWorkspaceFiles(_currentPath);
     } catch (e) {
-      _showSnack('上传失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailUploadFailed(_errMsg(e)));
     }
   }
 
@@ -862,6 +870,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   Future<Map<String, dynamic>?> _showCreateFileDialog() async {
+    final l = AppLocalizations.of(context)!;
     final nameCtrl = TextEditingController();
     final contentCtrl = TextEditingController();
     final result = await showDialog<Map<String, dynamic>>(
@@ -869,7 +878,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('新建文件', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        title: Text(l.agentDetailNewFile, style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
         content: SizedBox(
           width: double.maxFinite,
           child: Column(
@@ -877,27 +886,27 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             children: [
               TextField(
                 controller: nameCtrl,
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                decoration: const InputDecoration(labelText: '文件名', hintText: 'example.md', isDense: true),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                decoration: InputDecoration(labelText: l.agentDetailFileName, hintText: l.agentDetailFileNameHint, isDense: true),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: contentCtrl,
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
                 maxLines: 8,
-                decoration: const InputDecoration(labelText: '内容', isDense: true, alignLabelWithHint: true),
+                decoration: InputDecoration(labelText: l.agentDetailContent, isDense: true, alignLabelWithHint: true),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.commonCancel)),
           ElevatedButton(
             onPressed: () {
               if (nameCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx, {'name': nameCtrl.text.trim(), 'content': contentCtrl.text});
             },
-            child: const Text('创建'),
+            child: Text(l.commonCreate),
           ),
         ],
       ),
@@ -913,33 +922,34 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       final path = _currentPath.isEmpty ? result['name'] : '$_currentPath/${result['name']}';
       await _api.writeFile(widget.agentId, path, result['content'] as String);
-      _showSnack('文件已创建');
+      _showSnack(AppLocalizations.of(context)!.agentDetailFileCreated);
       _fetchWorkspaceFiles(_currentPath);
     } catch (e) {
-      _showSnack('创建文件失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailCreateFileFailed(_errMsg(e)));
     }
   }
 
   Future<void> _createWorkspaceFolder() async {
+    final l = AppLocalizations.of(context)!;
     final nameCtrl = TextEditingController();
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
-        title: const Text('新建文件夹', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        title: Text(l.agentDetailNewFolder, style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
         content: TextField(
           controller: nameCtrl,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-          decoration: const InputDecoration(labelText: '文件夹名', isDense: true),
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          decoration: InputDecoration(labelText: l.agentDetailFolderName, isDense: true),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.commonCancel)),
           ElevatedButton(
             onPressed: () {
               if (nameCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx, nameCtrl.text.trim());
             },
-            child: const Text('创建'),
+            child: Text(l.commonCreate),
           ),
         ],
       ),
@@ -950,28 +960,29 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       // Create folder by writing a placeholder .gitkeep file inside it
       final path = _currentPath.isEmpty ? '$name/.gitkeep' : '$_currentPath/$name/.gitkeep';
       await _api.writeFile(widget.agentId, path, '');
-      _showSnack('文件夹已创建');
+      _showSnack(AppLocalizations.of(context)!.agentDetailFolderCreated);
       _fetchWorkspaceFiles(_currentPath);
     } catch (e) {
-      _showSnack('创建文件夹失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailCreateFolderFailed(_errMsg(e)));
     }
   }
 
   Future<void> _editWorkspaceFile() async {
     if (_viewingFileContent == null || _viewingFileName == null) return;
+    final l = AppLocalizations.of(context)!;
     final ctrl = TextEditingController(text: _viewingFileContent);
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('编辑 $_viewingFileName', style: const TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        title: Text(l.agentDetailEditFile(_viewingFileName!), style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
         content: SizedBox(
           width: double.maxFinite,
           height: 300,
           child: TextField(
             controller: ctrl,
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'monospace'),
             maxLines: null,
             expands: true,
             textAlignVertical: TextAlignVertical.top,
@@ -979,10 +990,10 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.commonCancel)),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('保存'),
+            child: Text(l.commonSave),
           ),
         ],
       ),
@@ -992,22 +1003,23 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       final path = _currentPath.isEmpty ? _viewingFileName! : '$_currentPath/$_viewingFileName';
       await _api.writeFile(widget.agentId, path, ctrl.text);
       setState(() => _viewingFileContent = ctrl.text);
-      _showSnack('文件已保存');
+      _showSnack(AppLocalizations.of(context)!.agentDetailFileSaved);
     } catch (e) {
-      _showSnack('保存失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSaveFailed(_errMsg(e)));
     }
     ctrl.dispose();
   }
 
   Future<void> _createSkillFile() async {
+    final l = AppLocalizations.of(context)!;
     final nameCtrl = TextEditingController(text: 'new_skill.md');
-    final contentCtrl = TextEditingController(text: '# Skill: 新技能\n\n## 触发条件\n当用户请求...\n\n## 执行步骤\n1. ...\n2. ...\n\n## 注意事项\n- ...\n');
+    final contentCtrl = TextEditingController(text: l.skillTemplateContent);
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('新建技能', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        title: Text(l.agentDetailNewSkill, style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
         content: SizedBox(
           width: double.maxFinite,
           child: Column(
@@ -1015,32 +1027,32 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             children: [
               TextField(
                 controller: nameCtrl,
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                decoration: const InputDecoration(labelText: '文件名', isDense: true),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                decoration: InputDecoration(labelText: l.agentDetailFileName, isDense: true),
               ),
               const SizedBox(height: 12),
               SizedBox(
                 height: 200,
                 child: TextField(
                   controller: contentCtrl,
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontFamily: 'monospace'),
                   maxLines: null,
                   expands: true,
                   textAlignVertical: TextAlignVertical.top,
-                  decoration: const InputDecoration(labelText: '内容', isDense: true, alignLabelWithHint: true, border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: l.agentDetailContent, isDense: true, alignLabelWithHint: true, border: const OutlineInputBorder()),
                 ),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.commonCancel)),
           ElevatedButton(
             onPressed: () {
               if (nameCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx, {'name': nameCtrl.text.trim(), 'content': contentCtrl.text});
             },
-            child: const Text('创建'),
+            child: Text(l.commonCreate),
           ),
         ],
       ),
@@ -1050,28 +1062,29 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     if (result == null) return;
     try {
       await _api.writeFile(widget.agentId, 'skills/${result['name']}', result['content'] as String);
-      _showSnack('技能已创建');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSkillCreated);
       _fetchSkillsData();
     } catch (e) {
-      _showSnack('创建技能失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailCreateSkillFailed(_errMsg(e)));
     }
   }
 
   Future<void> _editSkillFile() async {
     if (_viewingSkillContent == null || _viewingSkillName == null) return;
+    final l = AppLocalizations.of(context)!;
     final ctrl = TextEditingController(text: _viewingSkillContent);
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('编辑 $_viewingSkillName', style: const TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        title: Text(l.agentDetailEditSkill(_viewingSkillName!), style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
         content: SizedBox(
           width: double.maxFinite,
           height: 300,
           child: TextField(
             controller: ctrl,
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontFamily: 'monospace'),
             maxLines: null,
             expands: true,
             textAlignVertical: TextAlignVertical.top,
@@ -1079,8 +1092,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.commonCancel)),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.commonSave)),
         ],
       ),
     );
@@ -1088,9 +1101,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       await _api.writeFile(widget.agentId, 'skills/$_viewingSkillName', ctrl.text);
       setState(() => _viewingSkillContent = ctrl.text);
-      _showSnack('技能已保存');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSkillSaved);
     } catch (e) {
-      _showSnack('保存失败: ${_errMsg(e)}');
+      _showSnack(AppLocalizations.of(context)!.agentDetailSaveFailed(_errMsg(e)));
     }
     ctrl.dispose();
   }
@@ -1098,19 +1111,21 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   // ─── Helpers ─────────────────────────────────────────────
 
 
-  static const _segmentLabelMap = {
-    'all': '全部',
-    'pending': '待处理',
-    'running': '进行中',
-    'completed': '已完成',
-    'failed': '失败',
-    'user': '用户',
-    'system': '系统',
-    'error': '错误',
+  static Map<String, String> _segmentLabelMapOf(AppLocalizations l) => {
+    'all': l.agentDetailFilterAll,
+    'pending': l.agentDetailFilterPending,
+    'running': l.agentDetailFilterInProgress,
+    'completed': l.agentDetailFilterCompleted,
+    'failed': l.agentDetailFilterFailed,
+    'user': l.agentDetailFilterUser,
+    'system': l.agentDetailFilterSystem,
+    'error': l.agentDetailFilterError,
   };
 
   String _segmentLabel(String key) {
-    return _segmentLabelMap[key] ?? (key[0].toUpperCase() + key.substring(1));
+    final l = AppLocalizations.of(context)!;
+    final map = _segmentLabelMapOf(l);
+    return map[key] ?? (key[0].toUpperCase() + key.substring(1));
   }
 
   void _showSnack(String msg) {
@@ -1131,12 +1146,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         if (msg is String && msg.isNotEmpty) return msg;
       }
       final sc = e.response?.statusCode;
-      return sc != null ? 'HTTP $sc' : '网络错误';
+      return sc != null ? 'HTTP $sc' : AppLocalizations.of(context)!.commonNetworkError;
     }
     return e.toString();
   }
 
   Future<bool?> _showConfirmDialog(String title, String message) {
+    final l = AppLocalizations.of(context)!;
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1144,7 +1160,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -1152,17 +1168,17 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         ),
         content: Text(
           message,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
+            child: Text(l.commonCancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确认'),
+            child: Text(l.commonConfirm),
           ),
         ],
       ),
@@ -1170,6 +1186,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   void _showContentDialog(String title, String content) {
+    final l = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1177,7 +1194,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -1189,7 +1206,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           child: SingleChildScrollView(
             child: SelectableText(
               content,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 13,
                 fontFamily: 'monospace',
@@ -1200,7 +1217,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('关闭'),
+            child: Text(l.commonClose),
           ),
         ],
       ),
@@ -1220,12 +1237,13 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   String _fmtRelative(dynamic ts) {
     if (ts == null) return '';
     try {
+      final l = AppLocalizations.of(context)!;
       final dt = DateTime.parse(ts.toString()).toLocal();
       final diff = DateTime.now().difference(dt);
-      if (diff.inSeconds < 60) return '${diff.inSeconds}秒前';
-      if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-      if (diff.inHours < 24) return '${diff.inHours}小时前';
-      if (diff.inDays < 30) return '${diff.inDays}天前';
+      if (diff.inSeconds < 60) return l.timeSecondsAgo(diff.inSeconds);
+      if (diff.inMinutes < 60) return l.timeMinutesAgo(diff.inMinutes);
+      if (diff.inHours < 24) return l.timeHoursAgo(diff.inHours);
+      if (diff.inDays < 30) return l.timeDaysAgo(diff.inDays);
       return DateFormat('MMM d').format(dt);
     } catch (_) {
       return '';
@@ -1238,8 +1256,9 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.bgPrimary,
         body: Center(
           child: CircularProgressIndicator(color: AppColors.accentPrimary),
@@ -1257,11 +1276,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               const Icon(Icons.error_outline, color: AppColors.error, size: 48),
               const SizedBox(height: 16),
               Text(
-                _error ?? '未找到 Agent',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                _error ?? l.agentDetailNotFound,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _fetchAgent, child: const Text('重试')),
+              ElevatedButton(onPressed: _fetchAgent, child: Text(l.commonRetry)),
             ],
           ),
         ),
@@ -1269,7 +1288,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     }
 
     final agent = _agent!;
-    final name = agent['name'] as String? ?? '未命名 Agent';
+    final name = agent['name'] as String? ?? l.agentDetailUntitled;
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -1277,7 +1296,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         backgroundColor: AppColors.bgPrimary,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
         title: _editingName
@@ -1287,7 +1306,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     child: TextField(
                       controller: _nameController,
                       autofocus: true,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
                       decoration: const InputDecoration(
                         isDense: true,
                         contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1304,7 +1323,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                     onPressed: _savingName ? null : _saveAgentName,
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textTertiary, size: 20),
+                    icon: Icon(Icons.close, color: AppColors.textTertiary, size: 20),
                     onPressed: () => setState(() => _editingName = false),
                   ),
                 ],
@@ -1319,7 +1338,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                       },
                       child: Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -1341,7 +1360,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
           labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
           unselectedLabelStyle: const TextStyle(fontSize: 13),
           tabAlignment: TabAlignment.start,
-          tabs: _tabLabels.map((l) => Tab(text: l)).toList(),
+          tabs: _tabLabelsOf(l).map((t) => Tab(text: t)).toList(),
         ),
       ),
       body: TabBarView(
@@ -1400,11 +1419,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.inbox, size: 48, color: AppColors.textTertiary),
+          Icon(Icons.inbox, size: 48, color: AppColors.textTertiary),
           const SizedBox(height: 12),
-          Text(title, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w500)),
+          Text(title, style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
-          Text(subtitle, style: const TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+          Text(subtitle, style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
         ],
       ),
     );
@@ -1417,16 +1436,17 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   }
 
   List<Widget> _buildAutonomyPolicyRows(Map<String, dynamic> agent) {
+    final l = AppLocalizations.of(context)!;
     final policy = (agent['autonomy_policy'] as Map<String, dynamic>?) ?? {};
-    const fields = [
-      {'key': 'read_files', 'label': '读取文件'},
-      {'key': 'write_workspace_files', 'label': '写入工作区文件'},
-      {'key': 'delete_files', 'label': '删除文件'},
-      {'key': 'send_feishu_message', 'label': '发送消息'},
-      {'key': 'web_search', 'label': '网络搜索'},
-      {'key': 'manage_tasks', 'label': '管理任务'},
+    final fields = [
+      {'key': 'read_files', 'label': l.agentDetailToolReadFile},
+      {'key': 'write_workspace_files', 'label': l.agentDetailToolWriteFile},
+      {'key': 'delete_files', 'label': l.agentDetailToolDeleteFile},
+      {'key': 'send_feishu_message', 'label': l.agentDetailToolSendMessage},
+      {'key': 'web_search', 'label': l.agentDetailToolWebSearch},
+      {'key': 'manage_tasks', 'label': l.agentDetailToolManageTasks},
     ];
-    const levelLabels = {'L1': '自动', 'L2': '通知', 'L3': '审批'};
+    final levelLabels = {'L1': l.agentDetailToolLevelAuto, 'L2': l.agentDetailToolLevelNotify, 'L3': l.agentDetailToolLevelApproval};
     return fields.map((f) {
       final key = f['key']!;
       final label = f['label']!;
@@ -1435,7 +1455,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         padding: const EdgeInsets.only(bottom: 8),
         child: Row(
           children: [
-            Expanded(flex: 3, child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+            Expanded(flex: 3, child: Text(label, style: TextStyle(fontSize: 13, color: AppColors.textSecondary))),
             Expanded(
               flex: 4,
               child: DropdownButtonFormField<String>(
@@ -1444,7 +1464,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
                 decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6)),
                 dropdownColor: AppColors.bgElevated,
                   borderRadius: BorderRadius.circular(12),
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 12),
                 items: levelLabels.entries.map((e) => DropdownMenuItem(value: e.key, child: Text('${e.key} ${e.value}'))).toList(),
                 onChanged: (v) async {
                   if (v == null) return;
@@ -1476,7 +1496,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
           ),
-          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+          Text(label, style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
         ],
       ),
     );

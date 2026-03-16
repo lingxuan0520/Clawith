@@ -6,6 +6,7 @@ part of 'agent_detail_page.dart';
 
 extension _SettingsTab on _AgentDetailPageState {
   Widget _buildSettingsTab(Map<String, dynamic> agent) {
+    final l = AppLocalizations.of(context)!;
     if (_loadingSettings) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
     }
@@ -20,29 +21,29 @@ extension _SettingsTab on _AgentDetailPageState {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SectionHeader(icon: Icons.settings, label: '模型配置'),
+                SectionHeader(icon: Icons.settings, label: l.settingsModelConfig),
                 const SizedBox(height: 16),
-                _buildModelDropdown('主模型', _modelCtrl),
+                _buildModelDropdown(l.settingsPrimaryModel, _modelCtrl),
                 const SizedBox(height: 12),
-                _buildModelDropdown('备用模型', _fallbackModelCtrl),
+                _buildModelDropdown(l.settingsFallbackModel, _fallbackModelCtrl),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _maxTokensCtrl,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Token 上限', hintText: '4096'),
+                        decoration: InputDecoration(labelText: l.settingsMaxTokens, hintText: '4096'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
                         controller: _temperatureCtrl,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: '温度', hintText: '0.7'),
+                        decoration: InputDecoration(labelText: l.settingsTemperature, hintText: '0.7'),
                       ),
                     ),
                   ],
@@ -53,42 +54,42 @@ extension _SettingsTab on _AgentDetailPageState {
                     Expanded(
                       child: TextField(
                         controller: _contextWindowCtrl,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '上下文窗口', hintText: '100'),
+                        decoration: InputDecoration(labelText: l.settingsContextWindow, hintText: '100'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
                         controller: _maxToolRoundsCtrl,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '最大工具轮次', hintText: '50'),
+                        decoration: InputDecoration(labelText: l.settingsMaxToolRounds, hintText: '50'),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text('Token 限额', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                Text(l.settingsTokenLimits, style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _dailyTokenCtrl,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '每日 Token 限额', hintText: '不限'),
+                        decoration: InputDecoration(labelText: l.settingsDailyTokenLimit, hintText: l.settingsNoLimit),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
                         controller: _monthlyTokenCtrl,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '每月 Token 限额', hintText: '不限'),
+                        decoration: InputDecoration(labelText: l.settingsMonthlyTokenLimit, hintText: l.settingsNoLimit),
                       ),
                     ),
                   ],
@@ -98,7 +99,7 @@ extension _SettingsTab on _AgentDetailPageState {
                   alignment: Alignment.centerRight,
                   child: ElevatedButton(
                     onPressed: _savingSettings ? null : _saveSettings,
-                    child: _savingSettings ? _miniSpinner() : const Text('保存设置'),
+                    child: _savingSettings ? _miniSpinner() : Text(l.settingsSaveSettings),
                   ),
                 ),
               ],
@@ -115,13 +116,13 @@ extension _SettingsTab on _AgentDetailPageState {
                   children: [
                     const Icon(Icons.favorite_outline, color: AppColors.error, size: 18),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('心跳', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                          Text(l.settingsHeartbeat, style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                           SizedBox(height: 2),
-                          Text('定时巡检广场、执行工作，会消耗 Token', style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                          Text(l.settingsHeartbeatDesc, style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                         ],
                       ),
                     ),
@@ -139,7 +140,7 @@ extension _SettingsTab on _AgentDetailPageState {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Text('间隔', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      Text(l.settingsInterval, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                       const SizedBox(width: 10),
                       SizedBox(
                         width: 80,
@@ -154,23 +155,23 @@ extension _SettingsTab on _AgentDetailPageState {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text('分钟', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                      Text(l.settingsMinutes, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
                       const SizedBox(width: 8),
-                      Text('(最低 $_minHeartbeatInterval 分钟)',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                      Text(l.settingsMinInterval(_minHeartbeatInterval),
+                          style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Text('活跃时段', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      Text(l.settingsActiveHours, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                       const SizedBox(width: 10),
                       SizedBox(
                         width: 140,
                         child: TextField(
                           controller: _heartbeatActiveHoursCtrl,
                           style: const TextStyle(fontSize: 13),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                             hintText: '09:00-18:00',
@@ -201,24 +202,24 @@ extension _SettingsTab on _AgentDetailPageState {
                           _heartbeatIntervalCtrl.text = '$savedInterval';
                           _heartbeatActiveHoursCtrl.text = '$savedHours';
                           if (savedInterval != clamped) {
-                            _showSnack('间隔已调整为最低 $savedInterval 分钟');
+                            _showSnack(l.settingsIntervalAdjusted(savedInterval as int));
                           } else {
-                            _showSnack('心跳设置已保存');
+                            _showSnack(l.settingsHeartbeatSaved);
                           }
                           _fetchAgentSilent();
                         } catch (e) {
                           if (!mounted) return;
-                          _showSnack('保存失败: ${_errMsg(e)}');
+                          _showSnack(l.settingsSaveFailed(_errMsg(e)));
                         }
                       },
-                      child: const Text('保存'),
+                      child: Text(l.commonSave),
                     ),
                   ),
                   if (agent['last_heartbeat_at'] != null) ...[
                     const SizedBox(height: 8),
                     Text(
-                      '上次心跳: ${_formatDateTime(agent['last_heartbeat_at'] as String)}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                      '${l.settingsLastHeartbeat(_formatDateTime(agent['last_heartbeat_at'] as String))}',
+                      style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
                     ),
                   ],
                 ],
@@ -234,34 +235,34 @@ extension _SettingsTab on _AgentDetailPageState {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.wifi_tethering, color: AppColors.textSecondary, size: 18),
+                    Icon(Icons.wifi_tethering, color: AppColors.textSecondary, size: 18),
                     const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text('通道配置', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                    Expanded(
+                      child: Text(l.settingsChannelConfig, style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 if (_channelConfig == null && !_showCreateChannel) ...[
-                  const Text('未配置通道。', style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic)),
+                  Text(l.settingsNoChannel, style: TextStyle(color: AppColors.textTertiary, fontSize: 13, fontStyle: FontStyle.italic)),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.add, size: 16),
-                    label: const Text('配置通道'),
+                    label: Text(l.settingsConfigChannel),
                     onPressed: () => setState(() => _showCreateChannel = true),
                     style: ElevatedButton.styleFrom(textStyle: const TextStyle(fontSize: 12)),
                   ),
                 ] else if (_showCreateChannel) ...[
                   DropdownButtonFormField<String>(
                     value: _newChannelType,
-                    decoration: const InputDecoration(labelText: '通道类型', isDense: true),
+                    decoration: InputDecoration(labelText: l.settingsChannelType, isDense: true),
                     dropdownColor: AppColors.bgElevated,
                   borderRadius: BorderRadius.circular(12),
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                    items: const [
-                      DropdownMenuItem(value: 'feishu', child: Text('飞书')),
-                      DropdownMenuItem(value: 'slack', child: Text('Slack')),
-                      DropdownMenuItem(value: 'discord', child: Text('Discord')),
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                    items: [
+                      DropdownMenuItem(value: 'feishu', child: Text(l.settingsFeishu)),
+                      const DropdownMenuItem(value: 'slack', child: Text('Slack')),
+                      const DropdownMenuItem(value: 'discord', child: Text('Discord')),
                     ],
                     onChanged: (v) { if (v != null) setState(() => _newChannelType = v); },
                   ),
@@ -269,54 +270,54 @@ extension _SettingsTab on _AgentDetailPageState {
                   if (_newChannelType == 'feishu') ...[
                     TextField(
                       controller: _channelTokenCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                       decoration: const InputDecoration(labelText: 'App ID', isDense: true, hintText: 'cli_xxx...'),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _channelSecretCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                       obscureText: true,
                       decoration: const InputDecoration(labelText: 'App Secret', isDense: true),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _channelEncryptKeyCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                       obscureText: true,
-                      decoration: const InputDecoration(labelText: 'Encrypt Key (可选)', isDense: true),
+                      decoration: InputDecoration(labelText: l.settingsEncryptKey, isDense: true),
                     ),
                   ] else if (_newChannelType == 'slack') ...[
                     TextField(
                       controller: _channelTokenCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                       obscureText: true,
                       decoration: const InputDecoration(labelText: 'Bot Token', isDense: true, hintText: 'xoxb-...'),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _channelSecretCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                       obscureText: true,
                       decoration: const InputDecoration(labelText: 'Signing Secret', isDense: true),
                     ),
                   ] else if (_newChannelType == 'discord') ...[
                     TextField(
                       controller: _channelIdCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                       decoration: const InputDecoration(labelText: 'Application ID', isDense: true),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _channelTokenCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                       obscureText: true,
                       decoration: const InputDecoration(labelText: 'Bot Token', isDense: true),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _channelPublicKeyCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                       decoration: const InputDecoration(labelText: 'Public Key', isDense: true),
                     ),
                   ],
@@ -324,30 +325,30 @@ extension _SettingsTab on _AgentDetailPageState {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(onPressed: () => setState(() => _showCreateChannel = false), child: const Text('取消')),
+                      TextButton(onPressed: () => setState(() => _showCreateChannel = false), child: Text(l.commonCancel)),
                       const SizedBox(width: 8),
-                      ElevatedButton(onPressed: _createChannel, child: const Text('保存')),
+                      ElevatedButton(onPressed: _createChannel, child: Text(l.commonSave)),
                     ],
                   ),
                 ] else ...[
-                  _settingRow('类型', _channelConfig?['type']?.toString() ?? '-'),
-                  _settingRow('状态', _channelConfig?['status']?.toString() ?? '-'),
+                  _settingRow(l.settingsChannelTypeName, _channelConfig?['type']?.toString() ?? '-'),
+                  _settingRow(l.settingsChannelStatus, _channelConfig?['status']?.toString() ?? '-'),
                   _settingRow('Webhook URL', _channelConfig?['webhook_url']?.toString() ?? '-'),
                   if (_channelConfig?['bot_name'] != null)
-                    _settingRow('机器人名称', _channelConfig?['bot_name']?.toString() ?? '-'),
+                    _settingRow(l.settingsBotName, _channelConfig?['bot_name']?.toString() ?? '-'),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton.icon(
                         icon: const Icon(Icons.edit, size: 14),
-                        label: const Text('编辑'),
+                        label: Text(l.commonEdit),
                         onPressed: () => setState(() => _showCreateChannel = true),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                        label: const Text('删除通道', style: TextStyle(color: AppColors.error)),
+                        label: Text(l.settingsDeleteChannel, style: TextStyle(color: AppColors.error)),
                         style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
                         onPressed: _deleteChannel,
                       ),
@@ -371,40 +372,40 @@ extension _SettingsTab on _AgentDetailPageState {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.warning, color: AppColors.error, size: 18),
-                    SizedBox(width: 8),
-                    Text('危险操作', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
+                    const Icon(Icons.warning, color: AppColors.error, size: 18),
+                    const SizedBox(width: 8),
+                    Text(l.settingsDangerZone, style: const TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Agent 一旦删除将无法恢复，请谨慎操作。',
+                Text(
+                  l.settingsDangerHint,
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
                 if (!_showDeleteConfirm)
                   ElevatedButton.icon(
                     icon: const Icon(Icons.delete_forever, size: 18),
-                    label: const Text('删除智能体'),
+                    label: Text(l.settingsDeleteAgent),
                     style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
                     onPressed: () => setState(() => _showDeleteConfirm = true),
                   )
                 else
                   Row(
                     children: [
-                      const Text('确定要删除吗？', style: TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w500)),
+                      Text(l.settingsDeleteAgentConfirm, style: const TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w500)),
                       const SizedBox(width: 12),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
                         onPressed: _deleteAgent,
-                        child: const Text('确认删除'),
+                        child: Text(l.settingsConfirmDelete),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton(
                         onPressed: () => setState(() => _showDeleteConfirm = false),
-                        child: const Text('取消'),
+                        child: Text(l.commonCancel),
                       ),
                     ],
                   ),
@@ -418,6 +419,7 @@ extension _SettingsTab on _AgentDetailPageState {
   }
 
   Widget _buildModelDropdown(String label, TextEditingController ctrl) {
+    final l = AppLocalizations.of(context)!;
     if (_llmModels.isNotEmpty) {
       final currentValue = ctrl.text;
       final hasMatch = _llmModels.any((m) {
@@ -430,10 +432,10 @@ extension _SettingsTab on _AgentDetailPageState {
         decoration: InputDecoration(labelText: label),
         dropdownColor: AppColors.bgElevated,
         borderRadius: BorderRadius.circular(12),
-        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-        hint: Text('未选择', style: const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+        hint: Text(l.settingsNotSelected, style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
         items: [
-          const DropdownMenuItem(value: '', child: Text('不使用', style: TextStyle(color: AppColors.textTertiary))),
+          DropdownMenuItem(value: '', child: Text(l.settingsNotUsed, style: TextStyle(color: AppColors.textTertiary))),
           ..._llmModels.map((m) {
             final model = m as Map<String, dynamic>;
             final id = model['id']?.toString() ?? '';
@@ -460,11 +462,11 @@ extension _SettingsTab on _AgentDetailPageState {
       children: [
         TextField(
           controller: ctrl,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-          decoration: InputDecoration(labelText: label, hintText: '请先在设置中配置模型'),
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          decoration: InputDecoration(labelText: label, hintText: l.settingsNoModelHint),
         ),
         const SizedBox(height: 4),
-        const Text('提示：请先前往「设置 → 模型池」添加 LLM 模型',
+        Text(l.settingsModelTip,
             style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
       ],
     );
@@ -476,8 +478,8 @@ extension _SettingsTab on _AgentDetailPageState {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 110, child: Text(label, style: const TextStyle(color: AppColors.textTertiary, fontSize: 12))),
-          Expanded(child: SelectableText(value, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12))),
+          SizedBox(width: 110, child: Text(label, style: TextStyle(color: AppColors.textTertiary, fontSize: 12))),
+          Expanded(child: SelectableText(value, style: TextStyle(color: AppColors.textSecondary, fontSize: 12))),
         ],
       ),
     );

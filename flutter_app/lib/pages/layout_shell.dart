@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../stores/app_store.dart';
@@ -48,6 +49,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       body: SafeArea(child: widget.navigationShell),
@@ -66,11 +68,11 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
           selectedFontSize: 11,
           unselectedFontSize: 11,
           iconSize: 22,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.workspaces), label: '工作台'),
-            BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: '聊天'),
-            BottomNavigationBarItem(icon: Icon(Icons.meeting_room), label: '办公室'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: '我的'),
+          items: [
+            BottomNavigationBarItem(icon: const Icon(Icons.workspaces), label: l.navWorkbench),
+            BottomNavigationBarItem(icon: const Icon(Icons.chat_bubble_outline), label: l.navChat),
+            BottomNavigationBarItem(icon: const Icon(Icons.meeting_room), label: l.navOffice),
+            BottomNavigationBarItem(icon: const Icon(Icons.person_outline), label: l.navProfile),
           ],
         ),
       ),

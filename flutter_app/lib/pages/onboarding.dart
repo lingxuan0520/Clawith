@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../services/api.dart';
 import '../stores/auth_store.dart';
 import '../stores/app_store.dart';
@@ -105,8 +106,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       _goToStep(2);
     } catch (e) {
       if (mounted) {
+        final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('创建失败：$e')),
+          SnackBar(content: Text(l.onboardingCreateFailed(e.toString()))),
         );
       }
     } finally {
@@ -134,6 +136,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       body: SafeArea(
@@ -141,9 +144,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           controller: _pageController,
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            _buildStep1(),
-            _buildStep2(),
-            _buildStep3(),
+            _buildStep1(l),
+            _buildStep2(l),
+            _buildStep3(l),
           ],
         ),
       ),
@@ -151,7 +154,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   // ─── Step 1: Create Company (placeholder — bottom sheet handles it) ───
-  Widget _buildStep1() {
+  Widget _buildStep1(AppLocalizations l) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -159,10 +162,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         children: [
           const Text('🏢', style: TextStyle(fontSize: 64)),
           const SizedBox(height: 24),
-          const Text('欢迎来到 OhClaw',
+          Text(l.onboardingWelcome,
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
-          const Text('先给你的公司起个名字吧',
+          Text(l.onboardingNameCompany,
               style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
           const SizedBox(height: 40),
           SizedBox(
@@ -171,7 +174,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             child: ElevatedButton.icon(
               onPressed: _showCreateCompanySheet,
               icon: const Icon(Icons.add_business),
-              label: const Text('创建公司', style: TextStyle(fontSize: 16)),
+              label: Text(l.onboardingCreateCompany, style: const TextStyle(fontSize: 16)),
             ),
           ),
         ],
@@ -180,7 +183,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   // ─── Step 2: Choose Template & Name Agent ─────────────
-  Widget _buildStep2() {
+  Widget _buildStep2(AppLocalizations l) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -189,10 +192,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           const SizedBox(height: 40),
           const Text('🤖', style: TextStyle(fontSize: 48)),
           const SizedBox(height: 16),
-          const Text('招募你的第一个 AI 员工',
+          Text(l.onboardingRecruitFirst,
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const SizedBox(height: 8),
-          const Text('从模板中选择一个角色，给 TA 起个名字。',
+          Text(l.onboardingSelectTemplate,
               style: TextStyle(fontSize: 14, color: AppColors.textTertiary)),
           const SizedBox(height: 24),
           if (_loadingTemplates)
@@ -237,14 +240,14 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                                   style: const TextStyle(fontSize: 28)),
                               const SizedBox(height: 8),
                               Text(name,
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
                                       color: AppColors.textPrimary)),
                               if (desc.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(desc,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                    style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                               ],
                             ],
                           ),
@@ -256,9 +259,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     const SizedBox(height: 20),
                     TextField(
                       controller: _agentNameController,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
-                      decoration: const InputDecoration(
-                        hintText: '给 TA 起个名字',
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
+                      decoration: InputDecoration(
+                        hintText: l.onboardingNameHint,
                         prefixIcon: Icon(Icons.badge_outlined, color: AppColors.textTertiary),
                       ),
                       onSubmitted: (_) => _createAgentFromTemplate(),
@@ -277,7 +280,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                       child: _creatingAgent
                           ? const SizedBox(width: 20, height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('下一步', style: TextStyle(fontSize: 16)),
+                          : Text(l.onboardingNextStep, style: const TextStyle(fontSize: 16)),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -290,7 +293,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   // ─── Step 3: Start Chatting ───────────────────────────
-  Widget _buildStep3() {
+  Widget _buildStep3(AppLocalizations l) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -298,12 +301,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         children: [
           const Text('🎉', style: TextStyle(fontSize: 64)),
           const SizedBox(height: 24),
-          const Text('一切准备就绪！',
+          Text(l.onboardingAllReady,
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
-          Text('你的 AI 员工 "$_createdAgentName" 已就位，\n和 TA 打个招呼吧。',
+          Text(l.onboardingAgentReady(_createdAgentName),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15, color: AppColors.textSecondary, height: 1.5)),
+              style: TextStyle(fontSize: 15, color: AppColors.textSecondary, height: 1.5)),
           const SizedBox(height: 40),
           SizedBox(
             width: double.infinity,
@@ -311,13 +314,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             child: ElevatedButton.icon(
               onPressed: _finishOnboarding,
               icon: const Icon(Icons.chat_bubble_outline),
-              label: const Text('开始聊天', style: TextStyle(fontSize: 16)),
+              label: Text(l.onboardingStartChat, style: const TextStyle(fontSize: 16)),
             ),
           ),
           const SizedBox(height: 16),
           TextButton(
             onPressed: _skipToPlaza,
-            child: const Text('先去看看', style: TextStyle(color: AppColors.textTertiary)),
+            child: Text(l.onboardingExplore, style: TextStyle(color: AppColors.textTertiary)),
           ),
         ],
       ),

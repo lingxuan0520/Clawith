@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../../services/api.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/network/api_client.dart';
@@ -35,16 +36,16 @@ class _LlmModelsTabState extends State<LlmModelsTab>
   bool _supportsVision = false;
   bool _testing = false;
 
-  static const _providers = [
+  static List<(String, String)> _providersOf(AppLocalizations l) => [
     ('anthropic', 'Anthropic'),
     ('openai', 'OpenAI'),
     ('deepseek', 'DeepSeek'),
-    ('kimi', 'Kimi (月之暗面)'),
+    ('kimi', l.llmKimiProvider),
     ('minimax', 'MiniMax'),
     ('qwen', 'Qwen (DashScope)'),
     ('zhipu', 'Zhipu'),
     ('openrouter', 'OpenRouter'),
-    ('custom', '自定义'),
+    ('custom', l.llmCustomProvider),
   ];
 
   @override
@@ -113,27 +114,28 @@ class _LlmModelsTabState extends State<LlmModelsTab>
       });
       _loadModels();
     } catch (e) {
-      _showError('保存模型失败');
+      _showError(AppLocalizations.of(context)!.llmSaveFailed);
     }
   }
 
   Future<void> _deleteModel(String id) async {
+    final l = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgElevated,
-        title: const Text('删除模型',
+        title: Text(l.llmDeleteTitle,
             style: TextStyle(color: AppColors.textPrimary)),
-        content: const Text('确定要删除这个模型吗？',
+        content: Text(l.llmDeleteConfirm,
             style: TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
+              child: Text(l.commonCancel)),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
               child:
-                  const Text('删除', style: TextStyle(color: AppColors.error))),
+                  Text(l.commonDelete, style: const TextStyle(color: AppColors.error))),
         ],
       ),
     );
@@ -153,19 +155,19 @@ class _LlmModelsTabState extends State<LlmModelsTab>
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: AppColors.bgElevated,
-            title: const Text('模型使用中',
+            title: Text(l.llmModelInUse,
                 style: TextStyle(color: AppColors.textPrimary)),
             content: Text(
-                '此模型正在被以下 Agent 使用: $agents\n\n确定删除吗？',
-                style: const TextStyle(color: AppColors.textSecondary)),
+                l.llmModelInUseConfirm(agents),
+                style: TextStyle(color: AppColors.textSecondary)),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('取消')),
+                  child: Text(l.commonCancel)),
               TextButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('强制删除',
-                      style: TextStyle(color: AppColors.error))),
+                  child: Text(l.llmForceDelete,
+                      style: const TextStyle(color: AppColors.error))),
             ],
           ),
         );
@@ -175,7 +177,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
           _loadModels();
         }
       } else {
-        _showError('删除模型失败');
+        _showError(l.llmDeleteFailed);
       }
     }
   }
@@ -183,11 +185,11 @@ class _LlmModelsTabState extends State<LlmModelsTab>
   Future<void> _testModel() async {
     final apiKey = _apiKeyCtl.text.trim();
     if (apiKey.isEmpty && _editingModelId != null) {
-      _showError('测试需要重新输入 API Key');
+      _showError(AppLocalizations.of(context)!.llmTestNeedKey);
       return;
     }
     if (_modelCtl.text.trim().isEmpty || apiKey.isEmpty) {
-      _showError('请先填写模型名称和 API Key');
+      _showError(AppLocalizations.of(context)!.llmTestFillRequired);
       return;
     }
 
@@ -209,7 +211,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
       ));
     } catch (e) {
       if (!mounted) return;
-      _showError('测试请求失败');
+      _showError(AppLocalizations.of(context)!.llmTestFailed);
     } finally {
       if (mounted) setState(() => _testing = false);
     }
@@ -224,6 +226,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final l = AppLocalizations.of(context)!;
     if (_loading) {
       return const Center(
           child: CircularProgressIndicator(color: AppColors.accentPrimary));
@@ -237,7 +240,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
           child: ElevatedButton.icon(
             onPressed: _openAddForm,
             icon: const Icon(Icons.add, size: 16),
-            label: const Text('添加模型'),
+            label: Text(l.llmAddModel),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accentPrimary,
               foregroundColor: Colors.white,
@@ -253,8 +256,8 @@ class _LlmModelsTabState extends State<LlmModelsTab>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _editingModelId != null ? '编辑模型' : '添加模型',
-                  style: const TextStyle(
+                  _editingModelId != null ? l.llmEditModel : l.llmAddModel,
+                  style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary),
@@ -266,7 +269,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('供应商',
+                          Text(l.llmProvider,
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -287,10 +290,10 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                                 isExpanded: true,
                                 dropdownColor: AppColors.bgElevated,
                                 borderRadius: BorderRadius.circular(12),
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 13,
                                     color: AppColors.textPrimary),
-                                items: _providers
+                                items: _providersOf(l)
                                     .map((p) => DropdownMenuItem(
                                         value: p.$1,
                                         child: Text(p.$2)))
@@ -308,7 +311,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('模型名称',
+                          Text(l.llmModelName,
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -317,7 +320,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                           TextField(
                             controller: _modelCtl,
                             onChanged: (_) => setState(() {}),
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 13,
                                 color: AppColors.textPrimary),
                             decoration: const InputDecoration(
@@ -336,7 +339,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('显示名称',
+                          Text(l.llmDisplayName,
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -344,7 +347,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                           const SizedBox(height: 4),
                           TextField(
                             controller: _labelCtl,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 13,
                                 color: AppColors.textPrimary),
                             decoration: const InputDecoration(
@@ -359,7 +362,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('自定义 Base URL',
+                          Text(l.llmCustomBaseUrl,
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -367,7 +370,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                           const SizedBox(height: 4),
                           TextField(
                             controller: _baseUrlCtl,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 13,
                                 color: AppColors.textPrimary),
                             decoration: const InputDecoration(
@@ -383,7 +386,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('API Key',
+                    Text('API Key',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -393,11 +396,11 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                       controller: _apiKeyCtl,
                       onChanged: (_) => setState(() {}),
                       obscureText: true,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 13, color: AppColors.textPrimary),
                       decoration: InputDecoration(
                         hintText: _editingModelId != null
-                            ? '留空保持不变'
+                            ? l.llmKeepUnchanged
                             : 'sk-...',
                       ),
                     ),
@@ -417,18 +420,18 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text.rich(
                         TextSpan(
                           children: [
                             TextSpan(
-                                text: '支持视觉（多模态）',
+                                text: l.llmVisionSupport,
                                 style: TextStyle(
                                     fontSize: 13,
                                     color: AppColors.textPrimary)),
                             TextSpan(
                                 text:
-                                    ' — 勾选后可分析图片',
+                                    ' — ${l.llmVisionHint}',
                                 style: TextStyle(
                                     fontSize: 11,
                                     color: AppColors.textTertiary)),
@@ -447,7 +450,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                         _showForm = false;
                         _editingModelId = null;
                       }),
-                      child: const Text('取消'),
+                      child: Text(l.commonCancel),
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton(
@@ -456,7 +459,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                           : _testModel,
                       child: _testing
                           ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary))
-                          : const Text('测试'),
+                          : Text(l.llmTest),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
@@ -466,7 +469,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                                       _apiKeyCtl.text.isNotEmpty)
                               ? _saveModel
                               : null,
-                      child: const Text('保存'),
+                      child: Text(l.commonSave),
                     ),
                   ],
                 ),
@@ -478,10 +481,10 @@ class _LlmModelsTabState extends State<LlmModelsTab>
 
         // Model list
         if (_models.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(40),
-              child: Text('暂无模型配置',
+              padding: const EdgeInsets.all(40),
+              child: Text(l.llmNoModels,
                   style:
                       TextStyle(color: AppColors.textTertiary, fontSize: 13)),
             ),
@@ -493,6 +496,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
   }
 
   Widget _buildModelCard(Map<String, dynamic> m) {
+    final l = AppLocalizations.of(context)!;
     final enabled = m['enabled'] == true;
     final vision = m['supports_vision'] == true;
     return Padding(
@@ -507,7 +511,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                 children: [
                   Text(
                     (m['label'] ?? m['model'] ?? '') as String,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
                         color: AppColors.textPrimary),
@@ -515,7 +519,7 @@ class _LlmModelsTabState extends State<LlmModelsTab>
                   const SizedBox(height: 2),
                   Text(
                     '${m['provider']}/${m['model']}${m['base_url'] != null && (m['base_url'] as String).isNotEmpty ? ' \u00b7 ${m['base_url']}' : ''}',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12, color: AppColors.textTertiary),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -523,25 +527,25 @@ class _LlmModelsTabState extends State<LlmModelsTab>
               ),
             ),
             const SizedBox(width: 8),
-            _buildBadge(enabled ? '已启用' : '已禁用',
+            _buildBadge(enabled ? l.llmEnabled : l.llmDisabled,
                 enabled ? AppColors.success : AppColors.warning),
             if (vision) ...[
               const SizedBox(width: 6),
-              _buildBadge('视觉', const Color(0xFF6366F1)),
+              _buildBadge(l.llmVision, const Color(0xFF6366F1)),
             ],
             const SizedBox(width: 8),
             IconButton(
-              icon: const Icon(Icons.edit_outlined,
+              icon: Icon(Icons.edit_outlined,
                   size: 16, color: AppColors.textSecondary),
               onPressed: () => _openEditForm(m),
-              tooltip: '编辑',
+              tooltip: l.commonEdit,
               visualDensity: VisualDensity.compact,
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline,
                   size: 16, color: AppColors.error),
               onPressed: () => _deleteModel(m['id'] as String),
-              tooltip: '删除',
+              tooltip: l.commonDelete,
               visualDensity: VisualDensity.compact,
             ),
           ],

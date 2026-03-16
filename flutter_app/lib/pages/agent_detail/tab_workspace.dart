@@ -6,6 +6,7 @@ part of 'agent_detail_page.dart';
 
 extension _WorkspaceTab on _AgentDetailPageState {
   Widget _buildWorkspaceTab() {
+    final l = AppLocalizations.of(context)!;
     // Viewing a file
     if (_viewingFileContent != null) {
       return Column(
@@ -15,7 +16,7 @@ extension _WorkspaceTab on _AgentDetailPageState {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: AppColors.textSecondary, size: 18),
+                  icon: Icon(Icons.arrow_back, color: AppColors.textSecondary, size: 18),
                   onPressed: () => setState(() {
                     _viewingFileContent = null;
                     _viewingFileName = null;
@@ -24,13 +25,13 @@ extension _WorkspaceTab on _AgentDetailPageState {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _viewingFileName ?? '文件',
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+                    _viewingFileName ?? l.workspaceFile,
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit, color: AppColors.accentPrimary, size: 18),
-                  tooltip: '编辑',
+                  tooltip: l.commonEdit,
                   onPressed: _editWorkspaceFile,
                 ),
               ],
@@ -49,7 +50,7 @@ extension _WorkspaceTab on _AgentDetailPageState {
                 ),
                 child: SelectableText(
                   _viewingFileContent ?? '',
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontFamily: 'monospace'),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontFamily: 'monospace'),
                 ),
               ),
             ),
@@ -65,23 +66,23 @@ extension _WorkspaceTab on _AgentDetailPageState {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Row(
             children: [
-              const Icon(Icons.folder_open, color: AppColors.textSecondary, size: 18),
+              Icon(Icons.folder_open, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
               if (_currentPath.isNotEmpty) ...[
                 InkWell(
                   onTap: () => _fetchWorkspaceFiles(),
-                  child: const Text('根目录', style: TextStyle(color: AppColors.accentPrimary, fontSize: 13, decoration: TextDecoration.underline)),
+                  child: Text(l.workspaceRoot, style: const TextStyle(color: AppColors.accentPrimary, fontSize: 13, decoration: TextDecoration.underline)),
                 ),
-                const Text(' / ', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+                Text(' / ', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                 ..._buildBreadcrumbs(),
               ],
               if (_currentPath.isEmpty)
-                const Text('工作区 (根目录)', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(l.workspaceRootTitle, style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
               const Spacer(),
               if (_currentPath.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.arrow_upward, color: AppColors.textSecondary, size: 18),
-                  tooltip: '返回上级',
+                  icon: Icon(Icons.arrow_upward, color: AppColors.textSecondary, size: 18),
+                  tooltip: l.workspaceGoUp,
                   onPressed: () {
                     final parts = _currentPath.split('/');
                     parts.removeLast();
@@ -89,18 +90,18 @@ extension _WorkspaceTab on _AgentDetailPageState {
                   },
                 ),
               IconButton(
-                icon: const Icon(Icons.create_new_folder, color: AppColors.textSecondary, size: 18),
-                tooltip: '新建文件夹',
+                icon: Icon(Icons.create_new_folder, color: AppColors.textSecondary, size: 18),
+                tooltip: l.workspaceNewFolder,
                 onPressed: _createWorkspaceFolder,
               ),
               IconButton(
-                icon: const Icon(Icons.note_add, color: AppColors.textSecondary, size: 18),
-                tooltip: '新建文件',
+                icon: Icon(Icons.note_add, color: AppColors.textSecondary, size: 18),
+                tooltip: l.workspaceNewFile,
                 onPressed: _createWorkspaceFile,
               ),
               IconButton(
-                icon: const Icon(Icons.upload_file, color: AppColors.textSecondary, size: 18),
-                tooltip: '上传文件',
+                icon: Icon(Icons.upload_file, color: AppColors.textSecondary, size: 18),
+                tooltip: l.workspaceUploadFile,
                 onPressed: _uploadWorkspaceFile,
               ),
             ],
@@ -112,7 +113,7 @@ extension _WorkspaceTab on _AgentDetailPageState {
           child: _loadingWorkspace
               ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
               : _workspaceFiles.isEmpty
-                  ? _emptyState('空目录', '该目录下没有文件。')
+                  ? _emptyState(l.workspaceEmptyDir, l.workspaceEmptyDirHint)
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       itemCount: _workspaceFiles.length,
@@ -136,20 +137,20 @@ extension _WorkspaceTab on _AgentDetailPageState {
                               color: isDir ? AppColors.warning : AppColors.textTertiary,
                               size: 20,
                             ),
-                            title: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                            title: Text(name, style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
                             subtitle: isDir
                                 ? null
                                 : Row(
                                     children: [
-                                      Text('$size 字节', style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                                      Text(l.workspaceBytes(size as int), style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                                       if (modified != null) ...[
                                         const SizedBox(width: 12),
-                                        Text(_fmtRelative(modified), style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+                                        Text(_fmtRelative(modified), style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                                       ],
                                     ],
                                   ),
                             trailing: isDir
-                                ? const Icon(Icons.chevron_right, color: AppColors.textTertiary, size: 18)
+                                ? Icon(Icons.chevron_right, color: AppColors.textTertiary, size: 18)
                                 : IconButton(
                                     icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
                                     onPressed: () => _deleteWorkspaceFile(name),
@@ -201,13 +202,13 @@ extension _WorkspaceTab on _AgentDetailPageState {
       final isLast = i == parts.length - 1;
       final pathUpTo = parts.sublist(0, i + 1).join('/');
       if (isLast) {
-        widgets.add(Text(parts[i], style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)));
+        widgets.add(Text(parts[i], style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)));
       } else {
         widgets.add(InkWell(
           onTap: () => _fetchWorkspaceFiles(pathUpTo),
           child: Text(parts[i], style: const TextStyle(color: AppColors.accentPrimary, fontSize: 13, decoration: TextDecoration.underline)),
         ));
-        widgets.add(const Text(' / ', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)));
+        widgets.add(Text(' / ', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)));
       }
     }
     return widgets;

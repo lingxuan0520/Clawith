@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -103,6 +104,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final isIOS = Platform.isIOS || Platform.isMacOS;
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -139,25 +141,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              const Text('你的专属 AI 团队',
+                              Text(l.loginYourAiTeam,
                                   style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
                         const SizedBox(height: 32),
-                        const Text('OhClaw',
+                        Text('OhClaw',
                             style: TextStyle(fontSize: 48, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -1)),
-                        const Text('掌上 AI 团队',
+                        Text(l.loginSlogan,
                             style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                         const SizedBox(height: 16),
-                        const Text('AI 员工为你全天候工作，\n无需发工资。',
+                        Text(l.loginSubSlogan,
                             style: TextStyle(fontSize: 15, color: AppColors.textTertiary, height: 1.6)),
                         const SizedBox(height: 40),
-                        _heroFeature('🤖', 'AI 员工', '雇佣、配置和部署 AI 员工'),
+                        _heroFeature('🤖', l.loginAiEmployees, l.loginAiEmployeesDesc),
                         const SizedBox(height: 16),
-                        _heroFeature('🧠', '持久记忆', '他们能学习、记忆和成长'),
+                        _heroFeature('🧠', l.loginPersistentMemory, l.loginPersistentMemoryDesc),
                         const SizedBox(height: 16),
-                        _heroFeature('🚀', '独立运营', '扩展你的 AI 团队'),
+                        _heroFeature('🚀', l.loginIndependentOps, l.loginIndependentOpsDesc),
                       ],
                     ),
                   ),
@@ -175,7 +177,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Row(
+                            Row(
                               children: [
                                 Text('🚢', style: TextStyle(fontSize: 24)),
                                 SizedBox(width: 8),
@@ -183,10 +185,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ],
                             ),
                             const SizedBox(height: 32),
-                            const Text('欢迎回来',
+                            Text(l.loginWelcomeBack,
                                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                             const SizedBox(height: 4),
-                            const Text('登录以管理你的 AI 团队。',
+                            Text(l.loginSubtitle,
                                 style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
                             const SizedBox(height: 32),
                             if (_error.isNotEmpty)
@@ -213,38 +215,38 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               _SignInButton(
                                 onTap: (_googleLoading || _appleLoading) ? null : _signInWithApple,
                                 loading: _appleLoading,
-                                icon: const Icon(Icons.apple, size: 20, color: AppColors.textPrimary),
+                                icon: Icon(Icons.apple, size: 20, color: AppColors.textPrimary),
                                 label: 'Continue with Apple',
                               ),
                             ],
                             const SizedBox(height: 24),
-                            const Row(
+                            Row(
                               children: [
-                                Expanded(child: Divider()),
+                                const Expanded(child: Divider()),
                                 Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 12),
-                                  child: Text('安全登录', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text(l.loginSecure, style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                                 ),
-                                Expanded(child: Divider()),
+                                const Expanded(child: Divider()),
                               ],
                             ),
                             const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.lock_outline, size: 12, color: AppColors.textTertiary),
+                                Icon(Icons.lock_outline, size: 12, color: AppColors.textTertiary),
                                 const SizedBox(width: 4),
                                 Text(
-                                  isIOS ? '由 Google 与 Apple 提供安全登录' : '由 Google 提供安全登录',
-                                  style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                                  isIOS ? l.loginSecureByGoogleApple : l.loginSecureByGoogle,
+                                  style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 16),
                             GestureDetector(
                               onTap: () => context.push('/privacy'),
-                              child: const Text(
-                                '隐私政策',
+                              child: Text(
+                                l.loginPrivacyPolicy,
                                 style: TextStyle(fontSize: 12, color: AppColors.textTertiary, decoration: TextDecoration.underline),
                               ),
                             ),
@@ -270,8 +272,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-            Text(desc, style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+            Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            Text(desc, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
           ],
         ),
       ],
@@ -294,7 +296,7 @@ class _SignInButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.borderSubtle),
+          side: BorderSide(color: AppColors.borderSubtle),
           backgroundColor: AppColors.bgTertiary,
           foregroundColor: AppColors.textPrimary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

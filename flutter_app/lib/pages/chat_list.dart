@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../stores/app_store.dart';
@@ -48,14 +49,14 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
     }
   }
 
-  String _timeAgo(String? dateStr) {
+  String _timeAgo(String? dateStr, AppLocalizations l) {
     if (dateStr == null || dateStr.isEmpty) return '';
     final diff = DateTime.now().difference(DateTime.parse(dateStr));
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-    if (diff.inHours < 24) return '${diff.inHours}小时前';
-    if (diff.inDays < 30) return '${diff.inDays}天前';
-    return '${diff.inDays ~/ 30}个月前';
+    if (diff.inMinutes < 1) return l.timeJustNow;
+    if (diff.inMinutes < 60) return l.timeMinutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return l.timeHoursAgo(diff.inHours);
+    if (diff.inDays < 30) return l.timeDaysAgo(diff.inDays);
+    return l.timeMonthsAgo(diff.inDays ~/ 30);
   }
 
   Color _statusColor(String status) {
@@ -70,6 +71,7 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return Column(
       children: [
         // Top bar
@@ -77,23 +79,23 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
           padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
           child: Row(
             children: [
-              const Text('聊天', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              Text(l.chatListTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.person_add_alt_1, size: 22),
                 color: AppColors.textSecondary,
-                tooltip: '招募新员工',
+                tooltip: l.chatListRecruitTooltip,
                 onPressed: () => context.push('/agents/new'),
               ),
             ],
           ),
         ),
-        Expanded(child: _buildBody()),
+        Expanded(child: _buildBody(l)),
       ],
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(AppLocalizations l) {
     if (_loading) {
       return const Center(
         child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary),
@@ -107,12 +109,12 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
           children: [
             Icon(Icons.chat_bubble_outline, size: 48, color: AppColors.textTertiary),
             const SizedBox(height: 12),
-            const Text('还没有 Agent', style: TextStyle(color: AppColors.textTertiary, fontSize: 14)),
+            Text(l.chatListNoAgents, style: TextStyle(color: AppColors.textTertiary, fontSize: 14)),
             const SizedBox(height: 8),
             TextButton.icon(
               onPressed: () => context.push('/agents/new'),
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('创建第一个 Agent'),
+              label: Text(l.chatListCreateFirst),
             ),
           ],
         ),
@@ -148,7 +150,7 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
                   child: Center(
                     child: Text(
                       name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     ),
                   ),
                 ),
@@ -167,14 +169,14 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
             ),
             title: Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
             subtitle: Text(
-              role.isNotEmpty ? role : _statusLabel(status),
-              style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+              role.isNotEmpty ? role : _statusLabel(status, l),
+              style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             trailing: Text(
-              _timeAgo(updatedAt),
-              style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+              _timeAgo(updatedAt, l),
+              style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
             ),
             onTap: () => context.push('/agents/$id/chat'),
           );
@@ -183,13 +185,13 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
     );
   }
 
-  String _statusLabel(String status) {
+  String _statusLabel(String status, AppLocalizations l) {
     switch (status) {
-      case 'running': return '运行中';
-      case 'stopped': return '已停止';
-      case 'creating': return '创建中';
-      case 'error': return '错误';
-      default: return '空闲';
+      case 'running': return l.statusRunning;
+      case 'stopped': return l.statusStopped;
+      case 'creating': return l.statusCreating;
+      case 'error': return l.statusError;
+      default: return l.statusIdle;
     }
   }
 

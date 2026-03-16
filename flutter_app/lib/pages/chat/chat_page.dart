@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
@@ -304,8 +305,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (code == 4003) {
       setState(() => _agentExpired = true);
     } else if (code == 4002) {
+      final l = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Agent 配置错误，请检查模型设置')),
+        SnackBar(content: Text(l.chatConfigError)),
       );
     }
   }
@@ -365,7 +367,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         case WsEventType.error:
         case WsEventType.quotaExceeded:
           _waitingForResponse = false;
-          final errMsg = event.content ?? '请求失败';
+          final errMsg = event.content ?? AppLocalizations.of(context)!.chatRequestFailed;
           // Dedup: don't add if last message is identical
           if (_messages.isEmpty || _messages.last.content != '⚠️ $errMsg') {
             _messages.add(ChatMessage(role: 'assistant', content: '⚠️ $errMsg'));
@@ -438,14 +440,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               'description': desc,
             });
             if (mounted) {
+              final l = AppLocalizations.of(context)!;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('任务已创建'), duration: Duration(seconds: 2)),
+                SnackBar(content: Text(l.chatTaskCreated), duration: const Duration(seconds: 2)),
               );
             }
           } catch (e) {
             if (mounted) {
+              final l = AppLocalizations.of(context)!;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('创建失败: $e'), duration: const Duration(seconds: 2)),
+                SnackBar(content: Text(l.chatCreateFailed(_errMsg(e))), duration: const Duration(seconds: 2)),
               );
             }
           }
@@ -459,14 +463,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               'cron_expr': cronExpr,
             });
             if (mounted) {
+              final l = AppLocalizations.of(context)!;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('定时任务已创建'), duration: Duration(seconds: 2)),
+                SnackBar(content: Text(l.chatScheduleCreated), duration: const Duration(seconds: 2)),
               );
             }
           } catch (e) {
             if (mounted) {
+              final l = AppLocalizations.of(context)!;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('创建失败: $e'), duration: const Duration(seconds: 2)),
+                SnackBar(content: Text(l.chatCreateFailed(_errMsg(e))), duration: const Duration(seconds: 2)),
               );
             }
           }
@@ -498,8 +504,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
     } catch (e) {
       if (mounted) {
+        final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('上传失败: ${_errMsg(e)}')),
+          SnackBar(content: Text(l.chatUploadFailed(_errMsg(e)))),
         );
       }
     } finally {
@@ -511,6 +518,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (_ws == null || !_connected || _isReadOnly) return;
     final text = _inputCtrl.text.trim();
     if (text.isEmpty && _attachedFile == null) return;
+
+    final l = AppLocalizations.of(context)!;
 
     _pendingToolCalls.clear();
     _streamContent = '';
@@ -525,26 +534,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         // Vision model — embed image data for direct analysis
         contentForLLM = text.isNotEmpty
             ? '[image_data:${af.imageUrl}]\n$text'
-            : '[image_data:${af.imageUrl}]\n请分析这张图片';
-        if (userMsg.isEmpty) userMsg = '[图片] ${af.name}';
+            : '[image_data:${af.imageUrl}]\n${l.chatAnalyzeImage}';
+        if (userMsg.isEmpty) userMsg = l.chatImageLabel(af.name);
       } else if (af.imageUrl != null) {
         // Non-vision model — reference file path, let model use read_document tool
         final wsPath = af.path ?? '';
         contentForLLM = text.isNotEmpty
-            ? '[图片文件已上传: ${af.name}，保存在 $wsPath]\n\n$text'
-            : '[图片文件已上传: ${af.name}，保存在 $wsPath]\n请描述或处理这个图片文件。你可以使用 read_document 工具读取它。';
-        if (userMsg.isEmpty) userMsg = '[图片] ${af.name}';
+            ? '${l.chatImageUploaded(af.name, wsPath)}\n\n$text'
+            : l.chatImageUploadedAnalyze(af.name, wsPath);
+        if (userMsg.isEmpty) userMsg = l.chatImageLabel(af.name);
       } else {
         final wsPath = af.path ?? '';
         final codePath = wsPath.replaceFirst(RegExp(r'^workspace/'), '');
         final fileLoc = wsPath.isNotEmpty
             ? '\nFile location: $wsPath (for read_file/read_document tools)\nIn execute_code, use relative path: "$codePath"'
             : '';
-        final fileContext = '[文件: ${af.name}]$fileLoc\n\n${af.text}';
+        final fileContext = '${l.chatFileLabel(af.name)}$fileLoc\n\n${af.text}';
         contentForLLM = text.isNotEmpty
-            ? '$fileContext\n\n用户问题: $text'
-            : '请阅读并分析以下文件内容:\n\n$fileContext';
-        if (userMsg.isEmpty) userMsg = '[附件] ${af.name}';
+            ? '$fileContext\n\n${l.chatUserQuestion(text)}'
+            : l.chatAnalyzeFile(fileContext);
+        if (userMsg.isEmpty) userMsg = l.chatAttachmentLabel(af.name);
       }
     }
 
@@ -602,6 +611,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.bgPrimary,
@@ -612,7 +622,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       appBar: AppBar(
         backgroundColor: AppColors.bgSecondary,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
         title: Row(
@@ -624,7 +634,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 color: AppColors.bgTertiary,
                 border: Border.all(color: AppColors.borderSubtle),
               ),
-              child: const Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
+              child: Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -649,15 +659,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        _connected ? '已连接' : '未连接',
-                        style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                        _connected ? l.chatConnected : l.chatDisconnected,
+                        style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
                       ),
                       if (_activeSession != null) ...[
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             _activeSession!['title'] as String? ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               color: AppColors.textTertiary,
                               overflow: TextOverflow.ellipsis,
@@ -675,12 +685,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined, size: 20),
-            tooltip: 'Agent 详情',
+            tooltip: l.chatAgentDetail,
             onPressed: () => context.push('/agents/${widget.agentId}'),
           ),
           IconButton(
             icon: const Icon(Icons.forum_outlined, size: 20),
-            tooltip: '会话列表',
+            tooltip: l.chatSessionList,
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
           ),
         ],
@@ -697,21 +707,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildExpiredBanner() {
+    final l = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.timer_off, size: 48, color: AppColors.textTertiary),
+            Icon(Icons.timer_off, size: 48, color: AppColors.textTertiary),
             const SizedBox(height: 16),
-            const Text(
-              'Agent 已过期，暂停服务',
+            Text(
+              l.chatAgentExpired,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '请在 Agent 设置中更新过期时间',
+            Text(
+              l.chatAgentExpiredHint,
               style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
             ),
           ],
@@ -721,22 +732,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildChatView() {
+    final l = AppLocalizations.of(context)!;
     if (_activeSession == null && !_sessionsLoading) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
+            Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
             const SizedBox(height: 12),
             Text(
-              '开始与 ${_agent?['name'] ?? 'Agent'} 对话',
-              style: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
+              l.chatStartConversation(_agent?['name'] ?? 'Agent'),
+              style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _createSession,
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('新建会话'),
+              label: Text(l.chatNewSession),
             ),
           ],
         ),
@@ -748,14 +760,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
+                Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
                 const SizedBox(height: 12),
                 Text(
-                  '开始与 ${_agent?['name'] ?? 'Agent'} 对话',
-                  style: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                  l.chatStartConversation(_agent?['name'] ?? 'Agent'),
+                  style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
-                const Text('支持文本和文件上传',
+                Text(l.chatSupportUpload,
                     style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
               ],
             ),
@@ -796,7 +808,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     backgroundColor: AppColors.bgElevated,
                     foregroundColor: AppColors.textSecondary,
                     elevation: 2,
-                    tooltip: '滚动到底部',
+                    tooltip: l.chatScrollToBottom,
                     child: const Icon(Icons.keyboard_arrow_down, size: 20),
                   ),
                 ),
@@ -817,7 +829,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               color: AppColors.bgTertiary,
               border: Border.all(color: AppColors.borderSubtle),
             ),
-            child: const Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
+            child: Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
           ),
           const SizedBox(width: 10),
           Container(
@@ -835,6 +847,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildHistoryView() {
+    final l = AppLocalizations.of(context)!;
     return Column(
       children: [
         Container(
@@ -842,19 +855,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           color: AppColors.bgElevated,
           child: Row(
             children: [
-              const Icon(Icons.visibility, size: 14, color: AppColors.textTertiary),
+              Icon(Icons.visibility, size: 14, color: AppColors.textTertiary),
               const SizedBox(width: 6),
               Text(
-                '只读 · ${_activeSession?['username'] ?? '其他用户'}的会话',
-                style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                l.chatReadOnly(_activeSession?['username'] as String? ?? l.chatOtherUser),
+                style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
               ),
             ],
           ),
         ),
         Expanded(
           child: _historyMsgs.isEmpty
-              ? const Center(
-                  child: Text('暂无消息',
+              ? Center(
+                  child: Text(l.chatNoMessages,
                       style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                 )
               : ListView.builder(
@@ -868,6 +881,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildInputArea() {
+    final l = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -875,7 +889,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         if (_attachedFile != null)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.bgElevated,
               border: Border(top: BorderSide(color: AppColors.borderSubtle)),
             ),
@@ -889,16 +903,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       borderRadius: BorderRadius.circular(4),
                       color: AppColors.bgTertiary,
                     ),
-                    child: const Icon(Icons.image, size: 18, color: AppColors.textTertiary),
+                    child: Icon(Icons.image, size: 18, color: AppColors.textTertiary),
                   )
                 else
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(right: 6),
                     child: Icon(Icons.attach_file, size: 16, color: AppColors.textTertiary),
                   ),
                 Expanded(
                   child: Text(_attachedFile!.name,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                 ),
                 IconButton(
                   onPressed: () => setState(() => _attachedFile = null),
@@ -912,7 +926,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         // Input row
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(top: BorderSide(color: AppColors.borderSubtle)),
           ),
           child: Row(
@@ -927,7 +941,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       )
                     : const Icon(Icons.add_circle_outline, size: 22),
                 color: AppColors.textTertiary,
-                tooltip: '更多',
+                tooltip: l.chatMore,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -946,8 +960,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     enabled: _connected && !_isReadOnly,
                     decoration: InputDecoration(
                       hintText: _attachedFile != null
-                          ? '询问关于 ${_attachedFile!.name}...'
-                          : '输入消息...',
+                          ? l.chatAskAboutFile(_attachedFile!.name)
+                          : l.chatInputHint,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       isDense: true,
                     ),
@@ -965,7 +979,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         (_inputCtrl.text.trim().isNotEmpty || _attachedFile != null)
                     ? _sendMessage
                     : null,
-                child: const Text('发送'),
+                child: Text(l.chatSend),
               ),
             ],
           ),
@@ -975,6 +989,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildSessionsPanel() {
+    final l = AppLocalizations.of(context)!;
     return SafeArea(
       child: Column(
         children: [
@@ -983,7 +998,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
               children: [
-                const Text('会话', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                Text(l.chatSessions, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close, size: 18),
@@ -1001,16 +1016,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               child: OutlinedButton.icon(
                 onPressed: _createSession,
                 icon: const Icon(Icons.add, size: 14),
-                label: const Text('新建会话', style: TextStyle(fontSize: 12)),
+                label: Text(l.chatNewSession, style: const TextStyle(fontSize: 12)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  side: const BorderSide(color: AppColors.borderSubtle),
+                  side: BorderSide(color: AppColors.borderSubtle),
                   foregroundColor: AppColors.textSecondary,
                 ),
               ),
             ),
           ),
-          const Divider(height: 1, color: AppColors.borderSubtle),
+          Divider(height: 1, color: AppColors.borderSubtle),
           // Session list
           Expanded(
             child: _sessionsLoading
@@ -1018,10 +1033,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentPrimary),
                   )
                 : _sessions.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(20),
+                    ? Padding(
+                        padding: const EdgeInsets.all(20),
                         child: Text(
-                          '暂无会话\n点击「新建会话」开始',
+                          l.chatNoSessions,
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 12, color: AppColors.textTertiary, height: 1.6),
                         ),
@@ -1037,14 +1052,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildSessionItem(Map<String, dynamic> sess) {
+    final l = AppLocalizations.of(context)!;
     final isActive = _activeSession?['id'] == sess['id'];
-    final title = sess['title'] as String? ?? '未命名会话';
+    final title = sess['title'] as String? ?? l.chatUntitledSession;
     final channel = sess['source_channel'] as String?;
     final msgCount = sess['message_count'] as int? ?? 0;
     final timeStr = _formatSessionTime(
         sess['last_message_at'] as String? ?? sess['created_at'] as String?);
 
-    final channelLabels = {'feishu': '飞书', 'discord': 'Discord', 'slack': 'Slack'};
+    final channelLabels = {'feishu': l.chatFeishu, 'discord': 'Discord', 'slack': 'Slack'};
     final chLabel = channelLabels[channel];
 
     return InkWell(
@@ -1089,7 +1105,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       borderRadius: BorderRadius.circular(3),
                     ),
                     child: Text(chLabel,
-                        style: const TextStyle(fontSize: 9, color: AppColors.textTertiary)),
+                        style: TextStyle(fontSize: 9, color: AppColors.textTertiary)),
                   ),
               ],
             ),
@@ -1107,13 +1123,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ),
                 Text(
                   timeStr,
-                  style: const TextStyle(fontSize: 10, color: AppColors.textTertiary),
+                  style: TextStyle(fontSize: 10, color: AppColors.textTertiary),
                 ),
                 if (msgCount > 0) ...[
                   const Spacer(),
                   Text(
                     '$msgCount',
-                    style: const TextStyle(fontSize: 10, color: AppColors.textTertiary),
+                    style: TextStyle(fontSize: 10, color: AppColors.textTertiary),
                   ),
                 ],
               ],
@@ -1125,6 +1141,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildMessage(ChatMessage msg) {
+    final l = AppLocalizations.of(context)!;
     final isUser = msg.role == 'user';
     final bubbleChildren = <Widget>[];
 
@@ -1143,7 +1160,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ? Image.network(
                   msg.imageUrl!,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Padding(
+                  errorBuilder: (_, __, ___) => Padding(
                     padding: EdgeInsets.all(12),
                     child: Icon(Icons.broken_image, color: AppColors.textTertiary),
                   ),
@@ -1152,7 +1169,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   base64Decode(msg.imageUrl!
                       .replaceFirst(RegExp(r'^data:image/[^;]+;base64,'), '')),
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Padding(
+                  errorBuilder: (_, __, ___) => Padding(
                     padding: EdgeInsets.all(12),
                     child: Icon(Icons.broken_image, color: AppColors.textTertiary),
                   ),
@@ -1200,11 +1217,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           dense: true,
           tilePadding: const EdgeInsets.symmetric(horizontal: 10),
           childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-          title: const Row(
+          title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('💭 ', style: TextStyle(fontSize: 12)),
-              Text('思考中',
+              const Text('💭 ', style: TextStyle(fontSize: 12)),
+              Text(l.chatThinking,
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -1216,7 +1233,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               constraints: const BoxConstraints(maxHeight: 300),
               child: SingleChildScrollView(
                 child: Text(msg.thinking!,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
               ),
             ),
@@ -1243,7 +1260,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               const Icon(Icons.build, size: 13, color: AppColors.accentPrimary),
               const SizedBox(width: 4),
               Text(
-                '${msg.toolCalls!.length} 个工具调用',
+                l.chatToolCalls(msg.toolCalls!.length),
                 style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -1259,7 +1276,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               margin: EdgeInsets.only(bottom: j < msg.toolCalls!.length - 1 ? 6 : 0),
               decoration: BoxDecoration(
                 border: j < msg.toolCalls!.length - 1
-                    ? const Border(bottom: BorderSide(color: AppColors.borderSubtle))
+                    ? Border(bottom: BorderSide(color: AppColors.borderSubtle))
                     : null,
               ),
               child: Column(
@@ -1273,7 +1290,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   if (tc.args != null)
                     Text(
                       tc.args is String ? tc.args : jsonEncode(tc.args),
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11,
                           fontFamily: 'monospace',
                           color: AppColors.textTertiary),
@@ -1284,7 +1301,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       constraints: const BoxConstraints(maxHeight: 120),
                       child: SingleChildScrollView(
                         child: Text(tc.result!,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 11,
                                 fontFamily: 'monospace',
                                 color: AppColors.textSecondary)),
@@ -1338,7 +1355,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 color: AppColors.bgTertiary,
                 border: Border.all(color: AppColors.borderSubtle),
               ),
-              child: const Icon(Icons.person, size: 18, color: AppColors.textTertiary),
+              child: Icon(Icons.person, size: 18, color: AppColors.textTertiary),
             ),
           ],
         ),
@@ -1356,7 +1373,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 color: AppColors.bgTertiary,
                 border: Border.all(color: AppColors.borderSubtle),
               ),
-              child: const Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
+              child: Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
             ),
             const SizedBox(width: 10),
             Flexible(
@@ -1403,7 +1420,7 @@ String _errMsg(dynamic e) {
       if (msg != null && msg.isNotEmpty) return msg;
     }
     final sc = e.response?.statusCode;
-    return sc != null ? 'HTTP $sc' : '网络错误';
+    return sc != null ? 'HTTP $sc' : 'Network error';
   }
   return e.toString();
 }

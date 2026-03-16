@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../../core/theme/app_theme.dart';
 import 'llm_models_tab.dart';
 import 'tools_tab.dart';
@@ -19,19 +20,10 @@ class _EnterpriseSettingsPageState
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  static const _tabLabels = [
-    '模型池',
-    '工具',
-    'Skills',
-    // '知识库',     // 2C 不需要
-    // '配额管理',  // 2B feature — hidden for 2C
-    // '组织架构',  // 2B feature — hidden for 2C
-  ];
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabLabels.length, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -42,12 +34,18 @@ class _EnterpriseSettingsPageState
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final tabLabels = [
+      l.enterpriseModelPool,
+      l.enterpriseTools,
+      'Skills',
+    ];
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         backgroundColor: AppColors.bgPrimary,
-        title: const Text(
-          '设置',
+        title: Text(
+          l.enterpriseSettings,
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -64,7 +62,7 @@ class _EnterpriseSettingsPageState
               const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
           unselectedLabelStyle: const TextStyle(fontSize: 13),
           tabAlignment: TabAlignment.start,
-          tabs: _tabLabels.map((l) => Tab(text: l)).toList(),
+          tabs: tabLabels.map((t) => Tab(text: t)).toList(),
         ),
       ),
       body: TabBarView(

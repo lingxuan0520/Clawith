@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ohclaw/l10n/app_localizations.dart';
 import '../../core/theme/app_theme.dart';
 
 enum PlusMenuView { menu, task }
@@ -33,14 +34,19 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
   DateTime? _deadline;
   bool _creating = false;
 
-  static const _units = [
-    ('month', '月'),
-    ('week', '周'),
-    ('day', '天'),
-    ('hour', '小时'),
-    ('minute', '分钟'),
-  ];
+  static const _unitKeys = ['month', 'week', 'day', 'hour', 'minute'];
   bool _showExecTime(String f) => f == 'month' || f == 'week' || f == 'day';
+
+  String _unitLabel(AppLocalizations l, String key) {
+    switch (key) {
+      case 'month': return l.plusMenuMonth;
+      case 'week': return l.plusMenuWeek;
+      case 'day': return l.plusMenuDay;
+      case 'hour': return l.plusMenuHour;
+      case 'minute': return l.plusMenuMinute;
+      default: return key;
+    }
+  }
 
   @override
   void dispose() {
@@ -74,6 +80,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
   }
 
   Widget _buildMenu() {
+    final l = AppLocalizations.of(context)!;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -88,14 +95,14 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
           ),
           const SizedBox(height: 16),
           ListTile(
-            leading: const Icon(Icons.attach_file, color: AppColors.textSecondary),
-            title: const Text('发送文件'),
+            leading: Icon(Icons.attach_file, color: AppColors.textSecondary),
+            title: Text(l.plusMenuSendFile),
             onTap: widget.onFile,
           ),
           ListTile(
-            leading: const Icon(Icons.task_alt, color: AppColors.textSecondary),
-            title: const Text('创建任务'),
-            subtitle: const Text('一次性或重复执行的任务', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+            leading: Icon(Icons.task_alt, color: AppColors.textSecondary),
+            title: Text(l.plusMenuCreateTask),
+            subtitle: Text(l.plusMenuCreateTaskDesc, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
             onTap: () => setState(() => _view = PlusMenuView.task),
           ),
           const SizedBox(height: 8),
@@ -105,6 +112,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
   }
 
   Widget _buildTaskForm() {
+    final l = AppLocalizations.of(context)!;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -127,17 +135,17 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
               children: [
                 GestureDetector(
                   onTap: () => setState(() => _view = PlusMenuView.menu),
-                  child: const Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textSecondary),
+                  child: Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textSecondary),
                 ),
                 const SizedBox(width: 8),
-                const Text('创建任务', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                Text(l.plusMenuCreateTask, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 14),
             TextField(
               controller: _titleCtrl,
               decoration: InputDecoration(
-                hintText: '任务标题',
+                hintText: l.plusMenuTaskTitle,
                 filled: true,
                 fillColor: AppColors.bgTertiary,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -148,7 +156,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
             TextField(
               controller: _descCtrl,
               decoration: InputDecoration(
-                hintText: '任务描述（可选）',
+                hintText: l.plusMenuTaskDesc,
                 filled: true,
                 fillColor: AppColors.bgTertiary,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -170,7 +178,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                         borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
                         border: Border.all(color: !_isRepeat ? AppColors.accentPrimary : AppColors.borderSubtle),
                       ),
-                      child: Center(child: Text('一次性执行', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: !_isRepeat ? Colors.white : AppColors.textSecondary))),
+                      child: Center(child: Text(l.plusMenuOneTime, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: !_isRepeat ? Colors.white : AppColors.textSecondary))),
                     ),
                   ),
                 ),
@@ -184,7 +192,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                         borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
                         border: Border.all(color: _isRepeat ? AppColors.accentPrimary : AppColors.borderSubtle),
                       ),
-                      child: Center(child: Text('重复执行', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _isRepeat ? Colors.white : AppColors.textSecondary))),
+                      child: Center(child: Text(l.plusMenuRecurring, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _isRepeat ? Colors.white : AppColors.textSecondary))),
                     ),
                   ),
                 ),
@@ -193,11 +201,11 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
             // Repeat settings
             if (_isRepeat) ...[
               const SizedBox(height: 14),
-              const Text('重复频率', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              Text(l.plusMenuFrequency, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Text('每', style: TextStyle(fontSize: 14)),
+                  Text(l.plusMenuEvery, style: const TextStyle(fontSize: 14)),
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 56,
@@ -222,12 +230,12 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: _units.map((u) {
-                          final sel = _freq == u.$1;
+                        children: _unitKeys.map((key) {
+                          final sel = _freq == key;
                           return Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: GestureDetector(
-                              onTap: () => setState(() => _freq = u.$1),
+                              onTap: () => setState(() => _freq = key),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
@@ -235,7 +243,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(color: sel ? AppColors.accentPrimary : AppColors.borderSubtle),
                                 ),
-                                child: Text(u.$2, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
+                                child: Text(_unitLabel(l, key), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
                               ),
                             ),
                           );
@@ -249,7 +257,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Text('执行时间：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    Text(l.plusMenuExecuteTime, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                     GestureDetector(
                       onTap: () async {
                         final t = await showTimePicker(context: context, initialTime: _execTime);
@@ -263,7 +271,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                           children: [
                             Text("${_execTime.hour.toString().padLeft(2, '0')}:${_execTime.minute.toString().padLeft(2, '0')}", style: const TextStyle(fontSize: 14)),
                             const SizedBox(width: 6),
-                            const Icon(Icons.schedule, size: 16, color: AppColors.textTertiary),
+                            Icon(Icons.schedule, size: 16, color: AppColors.textTertiary),
                           ],
                         ),
                       ),
@@ -274,9 +282,9 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Text('截止时间：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  Text(l.plusMenuDeadline, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                   ChoiceChip(
-                    label: const Text('永不截止', style: TextStyle(fontSize: 12)),
+                    label: Text(l.plusMenuNoDeadline, style: const TextStyle(fontSize: 12)),
                     selected: !_hasDeadline,
                     onSelected: (_) => setState(() => _hasDeadline = false),
                     selectedColor: AppColors.accentPrimary,
@@ -285,7 +293,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                   ),
                   const SizedBox(width: 6),
                   ChoiceChip(
-                    label: const Text('设置截止', style: TextStyle(fontSize: 12)),
+                    label: Text(l.plusMenuSetDeadline, style: const TextStyle(fontSize: 12)),
                     selected: _hasDeadline,
                     onSelected: (_) => setState(() {
                       _hasDeadline = true;
@@ -308,7 +316,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.borderSubtle)),
                     child: Text(
-                      _deadline != null ? "${_deadline!.year}-${_deadline!.month.toString().padLeft(2, '0')}-${_deadline!.day.toString().padLeft(2, '0')}" : '选择日期',
+                      _deadline != null ? "${_deadline!.year}-${_deadline!.month.toString().padLeft(2, '0')}-${_deadline!.day.toString().padLeft(2, '0')}" : l.plusMenuSelectDate,
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
@@ -360,7 +368,7 @@ class _PlusMenuSheetState extends State<PlusMenuSheet> {
                       },
                 child: _creating
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('创建'),
+                    : Text(l.commonCreate),
               ),
             ),
             const SizedBox(height: 8),

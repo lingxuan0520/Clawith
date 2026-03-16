@@ -24,7 +24,7 @@ Future<String?> showPromptModal(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (message != null) ...[
-            Text(message, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text(message, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             const SizedBox(height: 12),
           ],
           TextField(
@@ -39,7 +39,7 @@ Future<String?> showPromptModal(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(null),
-          child: Text(cancelLabel, style: const TextStyle(color: AppColors.textTertiary)),
+          child: Text(cancelLabel, style: TextStyle(color: AppColors.textTertiary)),
         ),
         ElevatedButton(
           onPressed: () => Navigator.of(context).pop(controller.text),

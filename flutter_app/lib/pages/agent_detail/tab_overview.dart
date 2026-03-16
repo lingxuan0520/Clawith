@@ -6,6 +6,7 @@ part of 'agent_detail_page.dart';
 
 extension _OverviewTab on _AgentDetailPageState {
   Widget _buildOverviewTab(Map<String, dynamic> agent) {
+    final l = AppLocalizations.of(context)!;
     final createdAt = agent['created_at'];
     final lastActiveAt = agent['last_active_at'];
     final creatorName = agent['creator_username'] as String? ?? '';
@@ -32,22 +33,22 @@ extension _OverviewTab on _AgentDetailPageState {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SectionHeader(icon: Icons.analytics, label: '数据统计'),
+                SectionHeader(icon: Icons.analytics, label: l.overviewStats),
                 const SizedBox(height: 16),
-                _tokenBar('月度 Token', tokensUsed.toDouble(), tokensLimit > 0 ? tokensLimit.toDouble() : 100000),
+                _tokenBar(l.overviewMonthlyTokens, tokensUsed.toDouble(), tokensLimit > 0 ? tokensLimit.toDouble() : 100000),
                 const SizedBox(height: 12),
                 if (dailyLimit > 0)
-                  _tokenBar('每日 Token', dailyTokens.toDouble(), dailyLimit.toDouble()),
+                  _tokenBar(l.overviewDailyTokens, dailyTokens.toDouble(), dailyLimit.toDouble()),
                 if (dailyLimit > 0) const SizedBox(height: 12),
-                _tokenBar('今日 LLM 调用', llmCallsToday.toDouble(), maxLlmCalls.toDouble()),
+                _tokenBar(l.overviewTodayLlmCalls, llmCallsToday.toDouble(), maxLlmCalls.toDouble()),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: _metricTile('总任务', tasksTotal.toString(), Icons.assignment)),
+                    Expanded(child: _metricTile(l.overviewTotalTasks, tasksTotal.toString(), Icons.assignment)),
                     const SizedBox(width: 12),
-                    Expanded(child: _metricTile('已完成', tasksCompleted.toString(), Icons.check_circle)),
+                    Expanded(child: _metricTile(l.overviewCompleted, tasksCompleted.toString(), Icons.check_circle)),
                     const SizedBox(width: 12),
-                    Expanded(child: _metricTile('24h操作', actionsLast24h.toString(), Icons.trending_up)),
+                    Expanded(child: _metricTile(l.overviewOps24h, actionsLast24h.toString(), Icons.trending_up)),
                   ],
                 ),
               ],
@@ -61,7 +62,7 @@ extension _OverviewTab on _AgentDetailPageState {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SectionHeader(icon: Icons.history, label: '近期活动'),
+                  SectionHeader(icon: Icons.history, label: l.overviewRecentActivity),
                   const SizedBox(height: 12),
                   ..._recentActivity.take(5).map((a) {
                     final act = a as Map<String, dynamic>;
@@ -72,17 +73,17 @@ extension _OverviewTab on _AgentDetailPageState {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.circle, size: 6, color: AppColors.textTertiary),
+                          Icon(Icons.circle, size: 6, color: AppColors.textTertiary),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               msg,
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Text(_fmtRelative(ts), style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                          Text(_fmtRelative(ts), style: TextStyle(color: AppColors.textTertiary, fontSize: 10)),
                         ],
                       ),
                     );
@@ -98,13 +99,13 @@ extension _OverviewTab on _AgentDetailPageState {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SectionHeader(icon: Icons.info_outline, label: '基本信息'),
+                SectionHeader(icon: Icons.info_outline, label: l.overviewBasicInfo),
                 const SizedBox(height: 12),
                 _infoRow('Agent ID', widget.agentId),
-                _infoRow('创建时间', _fmtTs(createdAt)),
+                _infoRow(l.overviewCreatedAt, _fmtTs(createdAt)),
                 if (creatorName.isNotEmpty)
-                  _infoRow('创建者', '@$creatorName'),
-                _infoRow('最后活动', _fmtTs(lastActiveAt)),
+                  _infoRow(l.overviewCreator, '@$creatorName'),
+                _infoRow(l.overviewLastActivity, _fmtTs(lastActiveAt)),
               ],
             ),
           ),
@@ -122,10 +123,10 @@ extension _OverviewTab on _AgentDetailPageState {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            Text(label, style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             Text(
               '${used.toInt()} / ${limit.toInt()} ($pct%)',
-              style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+              style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
             ),
           ],
         ),
@@ -160,8 +161,8 @@ extension _OverviewTab on _AgentDetailPageState {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
-              Text(label, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+              Text(value, style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+              Text(label, style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
             ],
           ),
         ],
@@ -175,11 +176,11 @@ extension _OverviewTab on _AgentDetailPageState {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 90, child: Text(label, style: const TextStyle(color: AppColors.textTertiary, fontSize: 12))),
+          SizedBox(width: 90, child: Text(label, style: TextStyle(color: AppColors.textTertiary, fontSize: 12))),
           Expanded(
             child: SelectableText(
               value,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontFamily: 'monospace'),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontFamily: 'monospace'),
             ),
           ),
         ],

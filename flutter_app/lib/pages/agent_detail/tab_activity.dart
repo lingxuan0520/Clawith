@@ -6,16 +6,17 @@ part of 'agent_detail_page.dart';
 
 extension _ActivityTab on _AgentDetailPageState {
   Widget _buildActivityTab() {
+    final l = AppLocalizations.of(context)!;
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Row(
             children: [
-              const Icon(Icons.history, color: AppColors.textSecondary, size: 18),
+              Icon(Icons.history, color: AppColors.textSecondary, size: 18),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text('活动日志', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+              Expanded(
+                child: Text(l.activityTitle, style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               _segmentedControl(
                 options: const ['all', 'user', 'system', 'error'],
@@ -33,7 +34,7 @@ extension _ActivityTab on _AgentDetailPageState {
           child: _loadingActivity
               ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
               : _filteredActivities.isEmpty
-                  ? _emptyState('暂无活动', '该 Agent 尚未记录任何活动。')
+                  ? _emptyState(l.activityNoActivity, l.activityNoActivityHint)
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       itemCount: _filteredActivities.length,
@@ -166,14 +167,14 @@ extension _ActivityTab on _AgentDetailPageState {
                         child: Text(_activityTypeLabel(type), style: TextStyle(color: iconColor, fontSize: 10, fontWeight: FontWeight.w600)),
                       ),
                       const Spacer(),
-                      Text(_fmtTs(timestamp), style: const TextStyle(color: AppColors.textTertiary, fontSize: 10)),
+                      Text(_fmtTs(timestamp), style: TextStyle(color: AppColors.textTertiary, fontSize: 10)),
                     ],
                   ),
                   if (message.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       message,
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                       maxLines: isExpanded ? null : 3,
                       overflow: isExpanded ? null : TextOverflow.ellipsis,
                     ),
@@ -186,7 +187,7 @@ extension _ActivityTab on _AgentDetailPageState {
                       decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(6)),
                       child: SelectableText(
                         details,
-                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 11, fontFamily: 'monospace'),
+                        style: TextStyle(color: AppColors.textTertiary, fontSize: 11, fontFamily: 'monospace'),
                       ),
                     ),
                   ],
@@ -200,23 +201,24 @@ extension _ActivityTab on _AgentDetailPageState {
   }
 
   String _activityTypeLabel(String type) {
+    final l = AppLocalizations.of(context)!;
     switch (type) {
-      case 'chat_reply': return '聊天回复';
-      case 'web_msg_sent': return '网页消息';
-      case 'agent_msg_sent': return 'Agent 消息';
-      case 'feishu_msg_sent': return '飞书消息';
-      case 'tool_call': return '工具调用';
-      case 'task_created': return '任务创建';
-      case 'task_updated': return '任务更新';
-      case 'task_complete': case 'task_completed': return '任务完成';
-      case 'task_failed': return '任务失败';
-      case 'error': return '错误';
-      case 'heartbeat': return '心跳';
-      case 'schedule_run': return '定时任务';
-      case 'file_written': return '文件写入';
-      case 'plaza_post': return '广场动态';
-      case 'start': case 'started': return '启动';
-      case 'stop': case 'stopped': return '停止';
+      case 'chat_reply': return l.activityTypeChatReply;
+      case 'web_msg_sent': return l.activityTypeWebMessage;
+      case 'agent_msg_sent': return l.activityTypeAgentMessage;
+      case 'feishu_msg_sent': return l.activityTypeFeishuMessage;
+      case 'tool_call': return l.activityTypeToolCall;
+      case 'task_created': return l.activityTypeTaskCreate;
+      case 'task_updated': return l.activityTypeTaskUpdate;
+      case 'task_complete': case 'task_completed': return l.activityTypeTaskComplete;
+      case 'task_failed': return l.activityTypeTaskFail;
+      case 'error': return l.activityTypeError;
+      case 'heartbeat': return l.activityTypeHeartbeat;
+      case 'schedule_run': return l.activityTypeSchedule;
+      case 'file_written': return l.activityTypeFileWrite;
+      case 'plaza_post': return l.activityTypePlazaPost;
+      case 'start': case 'started': return l.activityTypeStart;
+      case 'stop': case 'stopped': return l.activityTypeStop;
       default: return type;
     }
   }
