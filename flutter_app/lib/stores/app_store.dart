@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,6 +41,10 @@ class AppNotifier extends StateNotifier<AppState> {
   AppNotifier() : super(const AppState()) {
     _loadPrefs();
   }
+
+  /// Test-only constructor that skips [_loadPrefs] and sets state directly.
+  @visibleForTesting
+  AppNotifier.seeded(super.initial);
 
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();

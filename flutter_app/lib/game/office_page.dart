@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../core/theme/app_theme.dart';
 import '../services/api.dart';
 import 'agent_npc.dart';
+import 'hud_button.dart';
 import 'office_map.dart';
 import 'office_player.dart';
 
@@ -179,7 +180,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            _HudButton(icon: Icons.arrow_back, onTap: () => context.pop()),
+            HudButton(icon: Icons.arrow_back, onTap: () => context.pop()),
             const SizedBox(width: 8),
             Container(
               padding:
@@ -479,34 +480,6 @@ class _OfficePageState extends ConsumerState<OfficePage> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-// HUD button
-// ─────────────────────────────────────────────
-
-class _HudButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _HudButton({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: Colors.black.withAlpha(160),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.borderSubtle),
-        ),
-        child: Icon(icon, color: Colors.white, size: 18),
       ),
     );
   }

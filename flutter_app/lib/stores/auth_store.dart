@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api.dart';
@@ -43,6 +44,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier() : super(const AuthState()) {
     _loadToken();
   }
+
+  /// Test-only constructor that skips [_loadToken] and sets state directly.
+  @visibleForTesting
+  AuthNotifier.seeded(super.initial);
 
   Future<void> _loadToken() async {
     final prefs = await SharedPreferences.getInstance();

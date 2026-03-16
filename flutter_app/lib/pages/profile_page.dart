@@ -64,9 +64,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final appState = ref.watch(appProvider);
-    final avatarUrl = (auth.user?['avatar_url'] as String?)?.isNotEmpty == true
+    String? avatarUrl = (auth.user?['avatar_url'] as String?)?.isNotEmpty == true
         ? auth.user!['avatar_url'] as String
-        : fb.FirebaseAuth.instance.currentUser?.photoURL;
+        : null;
+    if (avatarUrl == null) {
+      try {
+        avatarUrl = fb.FirebaseAuth.instance.currentUser?.photoURL;
+      } catch (_) {
+        // Firebase may not be initialized (e.g. in tests)
+      }
+    }
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 16),
