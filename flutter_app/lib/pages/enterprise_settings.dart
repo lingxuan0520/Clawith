@@ -22,7 +22,6 @@ class _EnterpriseSettingsPageState
   late TabController _tabController;
 
   static const _tabLabels = [
-    '公司信息',
     '模型池',
     '工具',
     'Skills',
@@ -50,7 +49,7 @@ class _EnterpriseSettingsPageState
       appBar: AppBar(
         backgroundColor: AppColors.bgPrimary,
         title: const Text(
-          '我的公司',
+          '设置',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -73,7 +72,6 @@ class _EnterpriseSettingsPageState
       body: TabBarView(
         controller: _tabController,
         children: const [
-          _CompanyInfoTab(),
           _LlmModelsTab(),
           _ToolsTab(),
           _SkillsTab(),

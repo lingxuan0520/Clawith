@@ -455,7 +455,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         _FieldLabel('主模型 *'),
         const SizedBox(height: 6),
         if (_llmModels.isEmpty)
-          const Text('提示：请先前往「我的公司 → 模型池」添加 LLM 模型',
+          const Text('提示：请先前往「设置 → 模型池」添加 LLM 模型',
               style: TextStyle(fontSize: 12, color: AppColors.textTertiary))
         else
         _buildDropdown<String>(

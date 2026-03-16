@@ -4147,10 +4147,10 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
         TextField(
           controller: ctrl,
           style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-          decoration: InputDecoration(labelText: label, hintText: '请先在企业设置中配置模型'),
+          decoration: InputDecoration(labelText: label, hintText: '请先在设置中配置模型'),
         ),
         const SizedBox(height: 4),
-        const Text('提示：请先前往「企业设置 → 模型池」添加 LLM 模型',
+        const Text('提示：请先前往「设置 → 模型池」添加 LLM 模型',
             style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
       ],
     );
