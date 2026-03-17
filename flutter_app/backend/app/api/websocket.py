@@ -189,8 +189,26 @@ async def call_llm(
         url = url_base
     else:
         url = f"{url_base}/chat/completions"
-    api_key = model.api_key_encrypted
+
+    # ── Resolve API key: platform key for system models, else model's own key ──
+    if model.is_system_model and not model.api_key_encrypted:
+        from app.config import get_settings as _get_settings
+        api_key = _get_settings().OPENROUTER_API_KEY
+        if not api_key:
+            return "[Error] Platform OpenRouter API key not configured"
+    else:
+        api_key = model.api_key_encrypted
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+
+    # ── Pre-flight balance check for system models ──
+    if model.is_system_model and user_id:
+        from app.services.billing import check_balance as _check_balance
+        if not await _check_balance(user_id):
+            return "⚠️ 额度已用完，请购买更多额度后再试。"
+
+    # Track total usage across all rounds for billing
+    _total_input_tokens = 0
+    _total_output_tokens = 0
 
     # Tool-calling loop (configurable per agent, default 50)
     for round_i in range(_max_tool_rounds):
@@ -220,6 +238,7 @@ async def call_llm(
             "max_tokens": get_max_tokens(model.provider, model.model),  # provider-safe limit
             "tools": tools_for_llm,
             "stream": True,
+            "stream_options": {"include_usage": True},  # get token counts in streaming
             **get_tool_params(model.provider),
         }
 
@@ -227,6 +246,8 @@ async def call_llm(
         full_content = ""
         tool_calls_data = []  # accumulate tool calls from stream
         last_finish_reason = None
+        _round_input_tokens = 0
+        _round_output_tokens = 0
         _max_retries = 3
 
         # ── Streaming <think> tag filter state ──
@@ -264,6 +285,12 @@ async def call_llm(
 
                             if "error" in chunk:
                                 return f"[LLM Error] {chunk['error'].get('message', str(chunk['error']))[:200]}"
+
+                            # Capture usage from streaming (final chunk has usage object)
+                            if "usage" in chunk and chunk["usage"]:
+                                _usage = chunk["usage"]
+                                _round_input_tokens = _usage.get("prompt_tokens", 0)
+                                _round_output_tokens = _usage.get("completion_tokens", 0)
 
                             choices = chunk.get("choices", [])
                             if not choices:
@@ -400,23 +427,40 @@ async def call_llm(
         if last_finish_reason == "length":
             print(f"[LLM-WARN] Stream ended with finish_reason='length' — output was likely truncated by max_tokens!", flush=True)
 
+        # Accumulate round usage
+        _total_input_tokens += _round_input_tokens
+        _total_output_tokens += _round_output_tokens
+
         # If no tool calls, return final text
         if not tool_calls_data:
             # Strip <think>...</think> from final content (reasoning models)
             import re as _re
             full_content = _re.sub(r'<think>[\s\S]*?</think>\s*', '', full_content).strip()
-            # Track token usage
+
+            # ── Billing: deduct credits using real token counts ──
+            if model.is_system_model and user_id and (_total_input_tokens + _total_output_tokens) > 0:
+                try:
+                    from app.services.billing import deduct_credits
+                    charged = await deduct_credits(user_id, model, _total_input_tokens, _total_output_tokens, agent_id=agent_id)
+                    print(f"[Billing] Charged {charged}¢ for {_total_input_tokens}in/{_total_output_tokens}out tokens", flush=True)
+                except Exception as _bill_err:
+                    print(f"[Billing] Error: {_bill_err}", flush=True)
+
+            # Track token usage on agent (keep legacy counter too)
             if agent_id:
                 try:
+                    _est_tokens = _total_input_tokens + _total_output_tokens
+                    if _est_tokens == 0:
+                        # Fallback: estimate from chars if streaming didn't provide usage
+                        total_chars = sum(len(m.get('content', '') or '') for m in api_messages) + len(full_content or '')
+                        _est_tokens = max(total_chars // 3, 1)
                     async with async_session() as _db:
                         from app.models.agent import Agent as AgentModel
                         _ar = await _db.execute(select(AgentModel).where(AgentModel.id == agent_id))
                         _agent = _ar.scalar_one_or_none()
                         if _agent:
-                            total_chars = sum(len(m.get('content', '') or '') for m in api_messages) + len(full_content or '')
-                            estimated_tokens = max(total_chars // 3, 1)
-                            _agent.tokens_used_today = (_agent.tokens_used_today or 0) + estimated_tokens
-                            _agent.tokens_used_month = (_agent.tokens_used_month or 0) + estimated_tokens
+                            _agent.tokens_used_today = (_agent.tokens_used_today or 0) + _est_tokens
+                            _agent.tokens_used_month = (_agent.tokens_used_month or 0) + _est_tokens
                             await _db.commit()
                 except Exception:
                     pass

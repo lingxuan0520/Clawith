@@ -84,6 +84,7 @@ async def lifespan(app: FastAPI):
         import app.models.participant    # noqa
         import app.models.chat_session   # noqa
         import app.models.trigger        # noqa
+        import app.models.billing        # noqa
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         print("[startup] ✅ Database tables ready", flush=True)
@@ -112,6 +113,8 @@ async def lifespan(app: FastAPI):
         await push_default_skills_to_existing_agents()
         from app.services.agent_seeder import seed_default_agents
         await seed_default_agents()
+        from app.services.model_seeder import seed_system_models
+        await seed_system_models()
     except Exception as e:
         print(f"[startup] ⚠️ Seeding failed (non-fatal): {e}", flush=True)
 
@@ -218,6 +221,7 @@ from app.api.slack import router as slack_router
 from app.api.discord_bot import router as discord_router
 from app.api.triggers import router as triggers_router
 from app.api.events import router as events_router
+from app.api.billing import router as billing_router
 
 app.include_router(auth_router, prefix=settings.API_PREFIX)
 app.include_router(agents_router, prefix=settings.API_PREFIX)
@@ -245,6 +249,7 @@ app.include_router(chat_sessions_router)
 app.include_router(plaza_router)
 app.include_router(ws_router)
 app.include_router(events_router)
+app.include_router(billing_router, prefix=settings.API_PREFIX)
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["health"])

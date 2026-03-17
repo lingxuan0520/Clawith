@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # Jina AI (Reader + Search APIs)
     JINA_API_KEY: str = ""
 
+    # OpenRouter (platform-level API key for system models)
+    OPENROUTER_API_KEY: str = ""
+
     model_config = {
         "env_file": [".env", "../.env"],
         "env_file_encoding": "utf-8",

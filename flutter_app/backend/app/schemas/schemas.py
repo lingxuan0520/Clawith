@@ -245,6 +245,10 @@ class LLMModelOut(BaseModel):
     max_tokens_per_day: int | None = None
     enabled: bool
     supports_vision: bool = False
+    is_system_model: bool = False
+    tier: str = "standard"
+    cost_per_input_token_million: float = 0
+    cost_per_output_token_million: float = 0
     created_at: datetime
 
     model_config = {"from_attributes": True}

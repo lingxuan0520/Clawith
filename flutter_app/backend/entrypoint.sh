@@ -34,6 +34,7 @@ async def main():
     import app.models.participant     # noqa
     import app.models.chat_session   # noqa
     import app.models.trigger        # noqa
+    import app.models.billing        # noqa
 
     # Create all tables that don't exist yet (safe to run on every startup)
     async with engine.begin() as conn:
@@ -60,6 +61,16 @@ async def main():
         "ALTER TABLE agent_tools ADD COLUMN IF NOT EXISTS installed_by_agent_id UUID",
         # chat_sessions channel tracking
         "ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS source_channel VARCHAR(20) NOT NULL DEFAULT 'web'",
+        # Billing / model pool fields
+        "ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS cost_per_input_token_million FLOAT DEFAULT 0",
+        "ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS cost_per_output_token_million FLOAT DEFAULT 0",
+        "ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS is_system_model BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'standard'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS credit_balance_cents INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_credits_purchased_cents INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_credits_used_cents INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(20) DEFAULT 'free'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ",
     ]
 
     from sqlalchemy import text

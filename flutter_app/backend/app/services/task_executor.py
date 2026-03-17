@@ -152,7 +152,27 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
     if base_url.rstrip('/').endswith('/chat/completions'):
         base_url = base_url.rstrip('/').rsplit('/chat/completions', 1)[0]
     url = f"{base_url.rstrip('/')}/chat/completions"
-    api_key = model.api_key_encrypted
+
+    # ── Resolve API key: platform key for system models ──
+    if model.is_system_model and not model.api_key_encrypted:
+        from app.config import get_settings as _get_settings
+        api_key = _get_settings().OPENROUTER_API_KEY
+        if not api_key:
+            await _log_error(task_id, "Platform OpenRouter API key not configured")
+            await _fail_task(task_id, task_type)
+            await _maybe_idle_agent(agent_id)
+            return
+    else:
+        api_key = model.api_key_encrypted
+
+    # ── Pre-flight balance check ──
+    if model.is_system_model and creator_id:
+        from app.services.billing import check_balance as _check_balance
+        if not await _check_balance(creator_id):
+            await _log_error(task_id, "额度已用完，请购买更多额度后再试")
+            await _fail_task(task_id, task_type)
+            await _maybe_idle_agent(agent_id)
+            return
 
     # Load tools (same as chat dialog)
     from app.services.agent_tools import execute_tool, get_agent_tools_for_llm
@@ -225,6 +245,20 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
             choice = choices[0]
             msg = choice.get("message", {})
             finish_reason = choice.get("finish_reason", "stop")
+
+            # ── Capture token usage for billing ──
+            _usage = data.get("usage", {})
+            _round_input = _usage.get("prompt_tokens", 0)
+            _round_output = _usage.get("completion_tokens", 0)
+
+            # Bill this round if system model
+            if model.is_system_model and creator_id and (_round_input + _round_output) > 0:
+                try:
+                    from app.services.billing import deduct_credits as _deduct
+                    _charged = await _deduct(creator_id, model, _round_input, _round_output, agent_id=agent_id)
+                    print(f"[TaskExec-Billing] Charged {_charged}¢ for {_round_input}in/{_round_output}out", flush=True)
+                except Exception as _bill_err:
+                    print(f"[TaskExec-Billing] Error: {_bill_err}", flush=True)
 
             # Handle tool calls
             if finish_reason == "tool_calls" and msg.get("tool_calls"):

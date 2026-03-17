@@ -81,7 +81,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
   Future<void> _loadResources() async {
     try {
       final results = await Future.wait([
-        ApiService.instance.listLlmModels(),
+        ApiService.instance.getBillingModels(),
         ApiService.instance.getTemplates(),
       ]);
       if (!mounted) return;
@@ -478,12 +478,13 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
             final label = (m['label'] as String?)?.isNotEmpty == true
                 ? m['label'] as String
                 : m['model']?.toString() ?? id;
-            final provider = m['provider']?.toString() ?? '';
-            final modelName = m['model']?.toString() ?? '';
-            final subtitle = provider.isNotEmpty ? ' ($provider/$modelName)' : '';
+            final tier = m['tier']?.toString() ?? 'standard';
+            final tierIcon = tier == 'premium' ? '💰💰💰' : (tier == 'standard' ? '💰💰' : '💰');
+            final outputPrice = m['cost_per_output_token_million'];
+            final priceHint = outputPrice != null ? ' ~\$${(outputPrice as num).toStringAsFixed(1)}/1M' : '';
             return DropdownMenuItem(
               value: id,
-              child: Text('$label$subtitle',
+              child: Text('$label  $tierIcon$priceHint',
                   style: const TextStyle(fontSize: 13),
                   overflow: TextOverflow.ellipsis),
             );
@@ -509,12 +510,13 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
             final label = (m['label'] as String?)?.isNotEmpty == true
                 ? m['label'] as String
                 : m['model']?.toString() ?? id;
-            final provider = m['provider']?.toString() ?? '';
-            final modelName = m['model']?.toString() ?? '';
-            final subtitle = provider.isNotEmpty ? ' ($provider/$modelName)' : '';
+            final tier = m['tier']?.toString() ?? 'standard';
+            final tierIcon = tier == 'premium' ? '💰💰💰' : (tier == 'standard' ? '💰💰' : '💰');
+            final outputPrice = m['cost_per_output_token_million'];
+            final priceHint = outputPrice != null ? ' ~\$${(outputPrice as num).toStringAsFixed(1)}/1M' : '';
             return DropdownMenuItem(
               value: id,
-              child: Text('$label$subtitle',
+              child: Text('$label  $tierIcon$priceHint',
                   style: const TextStyle(fontSize: 13),
                   overflow: TextOverflow.ellipsis),
             );
