@@ -91,6 +91,17 @@ MEESEEKS_SKILLS = [
 
 async def seed_default_agents():
     """Create Morty & Meeseeks if they don't already exist."""
+    # Use Redis lock to prevent duplicate seeding from multiple workers
+    try:
+        from app.core.events import get_redis
+        redis = await get_redis()
+        acquired = await redis.set("agent_seeder_lock", "1", nx=True, ex=60)
+        if not acquired:
+            print("[AgentSeeder] ⏳ Skipped (another worker is running it)", flush=True)
+            return
+    except Exception:
+        pass  # If Redis unavailable, proceed anyway
+
     async with async_session() as db:
         # Check if already seeded (presence of either agent by name)
         existing = await db.execute(
