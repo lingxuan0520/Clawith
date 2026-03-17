@@ -100,6 +100,14 @@ async def create_task(
             agent_obj.status = "running"
             await db.commit()
 
+            # Push status change to client (use creator_id for consistency with task_executor)
+            from app.services.event_bus import event_bus
+            await event_bus.publish(agent_obj.creator_id, {
+                "type": "agent_status",
+                "agent_id": str(agent_id),
+                "status": "running",
+            })
+
         import asyncio
         from app.services.task_executor import execute_task
         asyncio.create_task(execute_task(task.id, agent_id))

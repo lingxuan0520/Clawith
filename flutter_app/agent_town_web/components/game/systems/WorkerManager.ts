@@ -1,9 +1,29 @@
 import * as Phaser from "phaser";
-import { Worker, type POI } from "../entities/Worker";
+import { Worker, type POI, type WorkerStatus } from "../entities/Worker";
 import type { Direction } from "../config/animations";
 import type { Pathfinder } from "../utils/Pathfinder";
 import type { SeatDef } from "../utils/MapHelpers";
-import type { SeatState } from "@/types/game";
+import type { SeatState, SeatStatus } from "@/types/game";
+
+/**
+ * Map SeatState status → Worker visual status.
+ *
+ * SeatStatus: "empty" | "returning" | "running" | "done" | "failed"
+ * WorkerStatus: "idle" | "working" | "done" | "failed"
+ */
+function mapSeatToWorkerStatus(seatStatus: SeatStatus): WorkerStatus {
+  switch (seatStatus) {
+    case "running":
+    case "returning":
+      return "working";
+    case "done":
+      return "done";
+    case "failed":
+      return "failed";
+    default:
+      return "idle";
+  }
+}
 
 export class WorkerManager {
   private scene: Phaser.Scene;
@@ -36,6 +56,13 @@ export class WorkerManager {
     worker.setPOIs(this.pois);
     worker.setPathfinder(this.pathfinder);
     worker.sprite.setCollideWorldBounds(true);
+
+    // Set initial visual status from seat data
+    const workerStatus = mapSeatToWorkerStatus(seat.status);
+    if (workerStatus !== "idle") {
+      worker.setStatus(workerStatus);
+    }
+
     return worker;
   }
 
@@ -77,6 +104,12 @@ export class WorkerManager {
 
       nextWorkers.push(existing);
       existingBySeatId.delete(seatDef.seatId);
+
+      // Sync visual status for existing workers
+      const newWorkerStatus = mapSeatToWorkerStatus(seat.status);
+      if (existing.status !== newWorkerStatus) {
+        existing.setStatus(newWorkerStatus);
+      }
     }
 
     for (const stale of existingBySeatId.values()) {
