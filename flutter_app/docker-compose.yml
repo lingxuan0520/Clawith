@@ -22,6 +22,7 @@ services:
       FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
       DOCKER_NETWORK: clawith_network
       SS_CONFIG_FILE: /data/ss-nodes.json
+      WORKERS: "2"
     ports:
       - "8001:8000"
     volumes:

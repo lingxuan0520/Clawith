@@ -82,4 +82,6 @@ echo "[entrypoint] Step 2: Stamping alembic to latest revision..."
 alembic stamp head
 
 echo "[entrypoint] Step 3: Starting uvicorn..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Workers: default 1 for dev, set WORKERS env for production (e.g. WORKERS=4)
+WORKERS=${WORKERS:-1}
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "$WORKERS"

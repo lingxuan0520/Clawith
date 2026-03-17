@@ -115,31 +115,52 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[startup] ⚠️ Seeding failed (non-fatal): {e}", flush=True)
 
-    # Start background tasks (always, even if seeding failed)
+    # Start background tasks — use Redis lock so only ONE worker runs them
     try:
         print("[startup] starting background tasks...", flush=True)
         from app.services.audit_logger import write_audit_log
         await write_audit_log("server_startup", {"pid": os.getpid()})
 
-        def _bg_task_error(t):
-            """Callback to surface background task exceptions."""
-            try:
-                exc = t.exception()
-            except asyncio.CancelledError:
-                return
-            if exc:
-                print(f"[startup] ⚠️ Background task {t.get_name()} CRASHED: {exc}", flush=True)
-                import traceback
-                traceback.print_exception(type(exc), exc, exc.__traceback__)
+        # Try to acquire leader lock (only one worker wins)
+        from app.core.events import get_redis
+        _r = await get_redis()
+        _is_leader = await _r.set(
+            "worker_leader_lock", str(os.getpid()),
+            nx=True, ex=300  # expires in 5 min, renewed by heartbeat
+        )
 
-        for name, coro in [
-            ("trigger_daemon", start_trigger_daemon()),
-            ("heartbeat", start_heartbeat()),
-        ]:
-            task = asyncio.create_task(coro, name=name)
-            task.add_done_callback(_bg_task_error)
-            print(f"[startup] created bg task: {name}", flush=True)
-        print("[startup] all background tasks created!", flush=True)
+        if _is_leader:
+            def _bg_task_error(t):
+                """Callback to surface background task exceptions."""
+                try:
+                    exc = t.exception()
+                except asyncio.CancelledError:
+                    return
+                if exc:
+                    print(f"[startup] ⚠️ Background task {t.get_name()} CRASHED: {exc}", flush=True)
+                    import traceback
+                    traceback.print_exception(type(exc), exc, exc.__traceback__)
+
+            for name, coro in [
+                ("trigger_daemon", start_trigger_daemon()),
+                ("heartbeat", start_heartbeat()),
+            ]:
+                task = asyncio.create_task(coro, name=name)
+                task.add_done_callback(_bg_task_error)
+                print(f"[startup] created bg task: {name}", flush=True)
+            print("[startup] all background tasks created! (leader)", flush=True)
+
+            # Renew leader lock periodically
+            async def _renew_leader():
+                while True:
+                    await asyncio.sleep(120)
+                    try:
+                        await _r.set("worker_leader_lock", str(os.getpid()), ex=300)
+                    except Exception:
+                        pass
+            asyncio.create_task(_renew_leader(), name="leader_renew")
+        else:
+            print(f"[startup] background tasks skipped (not leader, pid={os.getpid()})", flush=True)
     except Exception as e:
         print(f"[startup] ⛔ Background tasks failed: {e}", flush=True)
         import traceback
