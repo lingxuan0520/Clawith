@@ -1873,7 +1873,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '# Skill: 新技能\n\n## 触发条件\n当用户请求...\n\n## 执行步骤\n1. ...\n2. ...\n\n## 注意事项\n- ...\n';
 
   @override
-  String get homeTabPlaza => '广场';
+  String get homeTabPlaza => '工作台';
 
   @override
   String get homeTabDashboard => '仪表盘';

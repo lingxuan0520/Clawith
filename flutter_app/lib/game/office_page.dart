@@ -29,22 +29,31 @@ class _OfficePageState extends ConsumerState<OfficePage> {
   // Created once after agents load — stable refs for BonfireWidget
   OfficePlayer? _player;
   List<AgentNpc>? _npcs;
+  List<GameDecoration>? _tileDecorations;
 
   @override
   void initState() {
     super.initState();
-    _loadAgents();
+    _loadAll();
   }
 
-  Future<void> _loadAgents() async {
+  Future<void> _loadAll() async {
     try {
-      final agents = await ApiService.instance.listAgents();
+      // Load agents and tile object decorations in parallel
+      final results = await Future.wait([
+        ApiService.instance.listAgents(),
+        loadTileObjectDecorations(),
+      ]);
       if (!mounted) return;
-      final agentList = List<Map<String, dynamic>>.from(agents);
+
+      final agentList = List<Map<String, dynamic>>.from(results[0]);
+      final decorations = results[1] as List<GameDecoration>;
+
       setState(() {
         _agents = agentList;
+        _tileDecorations = decorations;
         _player = OfficePlayer(
-          position: Vector2(16.0 * kRenderTileSize, 20.0 * kRenderTileSize),
+          position: Vector2(25.0 * kTileSize, 30.0 * kTileSize),
           onInteract: _onInteract,
         );
         _npcs = _createNpcs(agentList);
@@ -72,7 +81,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
         agentStatus: status,
         agentTask: taskHint,
         colorVariant: i % 16,
-        position: Vector2(p[0] * kRenderTileSize, p[1] * kRenderTileSize),
+        position: Vector2(p[0] * kTileSize, p[1] * kTileSize),
         onPlayerContact: (npc) {
           if (mounted) setState(() => _nearbyNpc = npc);
         },
@@ -101,7 +110,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading || _player == null || _npcs == null) {
+    if (_loading || _player == null || _npcs == null || _tileDecorations == null) {
       return Scaffold(
         backgroundColor: AppColors.bgPrimary,
         body: Center(
@@ -128,7 +137,7 @@ class _OfficePageState extends ConsumerState<OfficePage> {
           BonfireWidget(
             map: buildOfficeMap(),
             player: _player!,
-            components: _npcs!,
+            components: [..._tileDecorations!, ..._npcs!],
             playerControllers: [
               Joystick(
                 directional: JoystickDirectional(
@@ -149,11 +158,11 @@ class _OfficePageState extends ConsumerState<OfficePage> {
               ),
             ],
             cameraConfig: CameraConfig(
-              zoom: 1.2,
+              zoom: 2.0,
               moveOnlyMapArea: true,
               startFollowPlayer: true,
             ),
-            backgroundColor: const Color(0xFF101216),
+            backgroundColor: const Color(0xFFAEAEAE),
           ),
 
           // ---- HUD overlay ----

@@ -39,7 +39,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           .cast<Map<String, dynamic>>();
       if (!mounted) return;
 
-      // Load tasks and activities for all agents
       final tasks = <String, List<dynamic>>{};
       final activities = <String, List<dynamic>>{};
       final allActs = <Map<String, dynamic>>[];
@@ -93,14 +92,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return n.toString();
   }
 
-  String _greeting(AppLocalizations l) {
-    final h = DateTime.now().hour;
-    if (h < 6) return l.greetingLateNight;
-    if (h < 12) return l.greetingMorning;
-    if (h < 18) return l.greetingAfternoon;
-    return l.greetingEvening;
-  }
-
   Color _statusColor(String s) {
     switch (s) {
       case 'running': return AppColors.statusRunning;
@@ -126,97 +117,71 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));
     }
 
     final allTasks = _tasksByAgent.values.expand((t) => t).toList();
     final activeAgents = _agents.where((a) => a['status'] == 'running' || a['status'] == 'idle').length;
     final pendingTasks = allTasks.where((t) => t['status'] == 'pending' || t['status'] == 'doing').length;
     final totalTokensToday = _agents.fold<num>(0, (s, a) => s + (a['tokens_used_today'] ?? 0));
+    final recentActiveCount = _agents.where((a) {
+      final la = a['last_active_at'] as String?;
+      if (la == null) return false;
+      return DateTime.now().difference(DateTime.parse(la)).inHours < 1;
+    }).length;
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return RefreshIndicator(
+      color: AppColors.accentPrimary,
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_greeting(l), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                    Text(l.dashboardAgentCount(_agents.length), style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                  ],
+          // ── Stats grid (2x2) ──
+          if (_agents.isNotEmpty) ...[
+            Row(
+              children: [
+                _buildStatCard(
+                  icon: Icons.people_alt_rounded,
+                  iconColor: AppColors.accentPrimary,
+                  label: l.dashboardDigitalEmployees,
+                  value: '${_agents.length}',
+                  sub: l.dashboardOnlineCount(activeAgents),
                 ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => context.push('/agents/new'),
-                icon: const Icon(Icons.add, size: 16),
-                label: Text(l.dashboardNewAgent),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          if (_agents.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(60),
-                child: Column(
-                  children: [
-                    Icon(Icons.smart_toy, size: 48, color: AppColors.textTertiary),
-                    const SizedBox(height: 16),
-                    Text(l.dashboardNoAgents, style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () => context.push('/agents/new'),
-                      icon: const Icon(Icons.add, size: 16),
-                      label: Text(l.dashboardCreateFirst),
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  icon: Icons.assignment_rounded,
+                  iconColor: AppColors.warning,
+                  label: l.dashboardActiveTasks,
+                  value: '$pendingTasks',
+                  sub: l.dashboardProcessing,
                 ),
-              ),
-            )
-          else ...[
-            // Stats bar
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.borderSubtle),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  _statCard(l.dashboardDigitalEmployees, '${_agents.length}', l.dashboardOnlineCount(activeAgents)),
-                  _statCard(l.dashboardActiveTasks, '$pendingTasks', l.dashboardProcessing),
-                  _statCard(l.dashboardTodayTokens, _formatTokens(totalTokensToday), l.dashboardAllAgentsTotal),
-                  _statCard(l.dashboardRecentActive, '${_agents.where((a) {
-                    final la = a['last_active_at'] as String?;
-                    if (la == null) return false;
-                    return DateTime.now().difference(DateTime.parse(la)).inHours < 1;
-                  }).length}', l.dashboardLastHour),
-                ],
-              ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _buildStatCard(
+                  icon: Icons.token_rounded,
+                  iconColor: AppColors.success,
+                  label: l.dashboardTodayTokens,
+                  value: _formatTokens(totalTokensToday),
+                  sub: l.dashboardAllAgentsTotal,
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  icon: Icons.flash_on_rounded,
+                  iconColor: AppColors.statusIdle,
+                  label: l.dashboardRecentActive,
+                  value: '$recentActiveCount',
+                  sub: l.dashboardLastHour,
+                ),
+              ],
             ),
             const SizedBox(height: 24),
 
-            // Agent list header
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(flex: 3, child: Text(l.dashboardStaff, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
-                  Expanded(flex: 4, child: Text(l.dashboardRecentActivity, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
-                  Expanded(flex: 2, child: Text('TOKEN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
-                  SizedBox(width: 80, child: Text(l.dashboardActive, textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textTertiary, letterSpacing: 0.5))),
-                ],
-              ),
-            ),
-            const Divider(),
-
-            // Agent rows
+            // ── Agent list ──
+            Text(l.dashboardStaff, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            const SizedBox(height: 12),
             ...(_agents..sort((a, b) {
               final aActive = (a['status'] == 'running' || a['status'] == 'idle') ? 1 : 0;
               final bActive = (b['status'] == 'running' || b['status'] == 'idle') ? 1 : 0;
@@ -224,102 +189,58 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               final aTime = DateTime.tryParse(a['last_active_at'] as String? ?? '') ?? DateTime(2000);
               final bTime = DateTime.tryParse(b['last_active_at'] as String? ?? '') ?? DateTime(2000);
               return bTime.compareTo(aTime);
-            })).map((agent) => _agentRow(agent, l)),
+            })).map((agent) => _buildAgentCard(agent, l)),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
-            // Global activity
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.borderSubtle),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.show_chart, size: 16, color: AppColors.textTertiary),
-                            SizedBox(width: 6),
-                            Text(l.dashboardGlobalFeed, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                          ],
-                        ),
-                        Text(l.dashboardRecent20, style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  if (_allActivities.isEmpty)
-                    Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Text(l.dashboardNoFeed, style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
-                    )
-                  else
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 320),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        padding: const EdgeInsets.all(4),
-                        itemCount: _allActivities.length,
-                        itemBuilder: (context, i) {
-                          final act = _allActivities[i];
-                          final agentName = _agents.firstWhere(
-                            (a) => a['id'] == act['agent_id'],
-                            orElse: () => {'name': act['agent_id']?.toString().substring(0, 6) ?? '?'},
-                          )['name'] as String;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            child: Row(
-                              children: [
-                                SizedBox(width: 52, child: Text(_timeAgo(act['created_at'] as String?, l),
-                                    style: TextStyle(fontSize: 11, color: AppColors.textTertiary, fontFamily: 'monospace'))),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgTertiary,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(agentName, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(act['summary'] as String? ?? '',
-                                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                                      overflow: TextOverflow.ellipsis),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
+            // ── Global activity ──
+            _buildActivitySection(l),
+          ] else
+            _buildEmptyState(l),
         ],
       ),
     );
   }
 
-  Widget _statCard(String label, String value, String sub) {
+  // ── Stat card ──
+  Widget _buildStatCard({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required String sub,
+  }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.bgSecondary,
-          border: Border.all(color: AppColors.borderSubtle, width: 0.5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderSubtle),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-            const SizedBox(height: 4),
-            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
+            Row(
+              children: [
+                Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    color: iconColor.withAlpha(30),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 16, color: iconColor),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(label, style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.5)),
+            const SizedBox(height: 2),
             Text(sub, style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
           ],
         ),
@@ -327,99 +248,230 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  Widget _agentRow(Map<String, dynamic> agent, AppLocalizations l) {
+  // ── Agent card ──
+  Widget _buildAgentCard(Map<String, dynamic> agent, AppLocalizations l) {
     final id = agent['id'] as String;
     final name = agent['name'] as String? ?? 'Agent';
     final status = agent['status'] as String? ?? 'idle';
-    final roleDesc = agent['role_description'] as String? ?? '-';
+    final roleDesc = agent['role_description'] as String? ?? '';
     final usedTokens = agent['tokens_used_today'] as num? ?? 0;
     final maxTokens = agent['max_tokens_per_day'] as num? ?? 0;
     final activity = _activityByAgent[id]?.isNotEmpty == true ? _activityByAgent[id]!.first : null;
+    final statusCol = _statusColor(status);
 
-    return InkWell(
-      onTap: () => context.push('/agents/$id'),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
-          children: [
-            // Agent info
-            Expanded(
-              flex: 3,
-              child: Row(
-                children: [
-                  Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: AppColors.bgTertiary,
-                      border: Border.all(color: AppColors.borderSubtle),
-                    ),
-                    child: Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(child: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
-                            const SizedBox(width: 6),
-                            Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: _statusColor(status))),
-                            const SizedBox(width: 4),
-                            Text(_statusLabel(status, l), style: TextStyle(fontSize: 11, color: _statusColor(status))),
-                          ],
-                        ),
-                        Text(roleDesc, style: TextStyle(fontSize: 12, color: AppColors.textTertiary), overflow: TextOverflow.ellipsis),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: AppColors.bgSecondary,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: () => context.push('/agents/$id'),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderSubtle),
             ),
-            // Activity
-            Expanded(
-              flex: 4,
-              child: activity != null
-                  ? Text('${_timeAgo(activity['created_at'] as String?, l)}  ${activity['summary'] ?? ''}',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)
-                  : Text(l.dashboardNoActivity, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-            ),
-            // Tokens
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${_formatTokens(usedTokens)}${maxTokens > 0 ? ' / ${_formatTokens(maxTokens)}' : ''}',
-                      style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-                  if (maxTokens > 0)
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Row 1: avatar + name + status
+                Row(
+                  children: [
                     Container(
-                      margin: const EdgeInsets.only(top: 3),
-                      height: 3,
-                      decoration: BoxDecoration(color: AppColors.bgTertiary, borderRadius: BorderRadius.circular(2)),
-                      child: FractionallySizedBox(
-                        widthFactor: (usedTokens / maxTokens).clamp(0, 1).toDouble(),
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: (usedTokens / maxTokens) > 0.8 ? AppColors.error : AppColors.textTertiary,
-                            borderRadius: BorderRadius.circular(2),
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: AppColors.bgTertiary,
+                        border: Border.all(color: AppColors.borderSubtle),
+                      ),
+                      child: Icon(Icons.smart_toy_rounded, size: 20, color: AppColors.textTertiary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                              overflow: TextOverflow.ellipsis),
+                          if (roleDesc.isNotEmpty)
+                            Text(roleDesc, style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                                overflow: TextOverflow.ellipsis, maxLines: 1),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: statusCol.withAlpha(25),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(width: 6, height: 6,
+                              decoration: BoxDecoration(shape: BoxShape.circle, color: statusCol)),
+                          const SizedBox(width: 4),
+                          Text(_statusLabel(status, l),
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: statusCol)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Row 2: tokens + last activity
+                Row(
+                  children: [
+                    // Token usage
+                    Icon(Icons.token_rounded, size: 13, color: AppColors.textTertiary),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_formatTokens(usedTokens)}${maxTokens > 0 ? ' / ${_formatTokens(maxTokens)}' : ''}',
+                      style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                    ),
+                    if (maxTokens > 0) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 40, height: 3,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: (usedTokens / maxTokens).clamp(0, 1).toDouble(),
+                            backgroundColor: AppColors.bgTertiary,
+                            valueColor: AlwaysStoppedAnimation(
+                              (usedTokens / maxTokens) > 0.8 ? AppColors.error : AppColors.accentPrimary,
+                            ),
                           ),
                         ),
                       ),
+                    ],
+                    const Spacer(),
+                    // Last active
+                    Icon(Icons.schedule_rounded, size: 13, color: AppColors.textTertiary),
+                    const SizedBox(width: 4),
+                    Text(_timeAgo(agent['last_active_at'] as String?, l),
+                        style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                  ],
+                ),
+                // Row 3: recent activity summary
+                if (activity != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgTertiary,
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    child: Text(
+                      activity['summary'] as String? ?? '',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
-            // Last active
-            SizedBox(
-              width: 80,
-              child: Text(_timeAgo(agent['last_active_at'] as String?, l),
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Activity section ──
+  Widget _buildActivitySection(AppLocalizations l) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgSecondary,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.show_chart_rounded, size: 16, color: AppColors.accentPrimary),
+                    const SizedBox(width: 6),
+                    Text(l.dashboardGlobalFeed, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  ],
+                ),
+                Text(l.dashboardRecent20, style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+              ],
             ),
+          ),
+          const Divider(height: 20),
+          if (_allActivities.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
+              child: Text(l.dashboardNoFeed, style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              itemCount: _allActivities.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) {
+                final act = _allActivities[i];
+                final agentName = _agents.firstWhere(
+                  (a) => a['id'] == act['agent_id'],
+                  orElse: () => {'name': act['agent_id']?.toString().substring(0, 6) ?? '?'},
+                )['name'] as String;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 52,
+                      child: Text(_timeAgo(act['created_at'] as String?, l),
+                          style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentPrimary.withAlpha(20),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(agentName,
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.accentText)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(act['summary'] as String? ?? '',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Empty state ──
+  Widget _buildEmptyState(AppLocalizations l) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(60),
+        child: Column(
+          children: [
+            Icon(Icons.smart_toy_rounded, size: 56, color: AppColors.textTertiary),
+            const SizedBox(height: 16),
+            Text(l.dashboardNoAgents,
+                style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
+                textAlign: TextAlign.center),
           ],
         ),
       ),

@@ -46,8 +46,12 @@ dependencies:
   google_sign_in: ^7.2.0
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.7
-  # Game engine for virtual office
+  # Game engine for virtual office (kept for potential fallback)
   bonfire: ^3.16.0
+  # WebView for agent-town virtual office
+  webview_flutter: ^4.10.0
+  # Zip extraction for bundled web assets
+  archive: ^3.6.1
 
 dev_dependencies:
   flutter_test:
@@ -81,3 +85,4 @@ flutter:
     - assets/images/player/
     - assets/images/npc/
     - assets/images/tiled/
+    - assets/agent_town_web.zip

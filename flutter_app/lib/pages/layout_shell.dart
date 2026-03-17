@@ -4,8 +4,7 @@ import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../stores/app_store.dart';
-import '../services/api.dart';
-import '../core/theme/app_theme.dart';
+import '../services/api.dart';import '../core/theme/app_theme.dart';
 import '../core/app_lifecycle.dart';
 
 class LayoutShell extends ConsumerStatefulWidget {
@@ -60,7 +59,13 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
         ),
         child: BottomNavigationBar(
           currentIndex: _tabIndex,
-          onTap: (i) => widget.navigationShell.goBranch(i, initialLocation: i == widget.navigationShell.currentIndex),
+          onTap: (i) {
+            if (i == 2) {
+              // Notify office page to refresh agent data
+              ref.read(officeVisitCountProvider.notifier).state++;
+            }
+            widget.navigationShell.goBranch(i, initialLocation: i == widget.navigationShell.currentIndex);
+          },
           type: BottomNavigationBarType.fixed,
           backgroundColor: AppColors.bgSecondary,
           selectedItemColor: AppColors.accentPrimary,

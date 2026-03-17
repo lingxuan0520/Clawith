@@ -45,6 +45,13 @@ async def execute_task(task_id: uuid.UUID, agent_id: uuid.UUID) -> None:
         from sqlalchemy import delete as sql_delete
         await db.execute(sql_delete(TaskLog).where(TaskLog.task_id == task_id))
         db.add(TaskLog(task_id=task_id, content="🤖 开始执行任务..."))
+
+        # Mark agent as running
+        agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))
+        agent_obj = agent_result.scalar_one_or_none()
+        if agent_obj:
+            agent_obj.status = "running"
+
         await db.commit()
         task_title = task.title
         task_description = task.description or ""
@@ -247,6 +254,7 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
                 if task and task.status == "doing":
                     task.status = "pending"
                     await db.commit()
+        await _maybe_idle_agent(agent_id)
         return
 
     # Step 5: Save result and update status
@@ -264,6 +272,8 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
                 db.add(TaskLog(task_id=task_id, content=f"✅ 任务完成\n\n{reply}"))
             await db.commit()
             print(f"[TaskExec] Task {task_id} {'logged' if task_type == 'supervision' else 'completed'}!")
+
+    await _maybe_idle_agent(agent_id)
 
     # Log activity
     from app.services.activity_logger import log_activity
@@ -291,3 +301,22 @@ async def _restore_supervision_status(task_id: uuid.UUID) -> None:
         if task and task.status == "doing":
             task.status = "pending"
             await db.commit()
+
+
+async def _maybe_idle_agent(agent_id: uuid.UUID) -> None:
+    """Set agent status back to idle if no more 'doing' tasks remain."""
+    from sqlalchemy import func
+    async with async_session() as db:
+        count_result = await db.execute(
+            select(func.count(Task.id)).where(
+                Task.agent_id == agent_id,
+                Task.status == "doing",
+            )
+        )
+        doing_count = count_result.scalar() or 0
+        if doing_count == 0:
+            agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))
+            agent = agent_result.scalar_one_or_none()
+            if agent and agent.status == "running":
+                agent.status = "idle"
+                await db.commit()

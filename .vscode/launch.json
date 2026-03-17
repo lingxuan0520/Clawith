@@ -7,7 +7,8 @@
       "type": "dart",
       "program": "flutter_app/lib/main.dart",
       "flutterMode": "debug",
-      "deviceId": "22000188-307F-4488-BC7F-1D3C62F3B8E2"
+      "deviceId": "22000188-307F-4488-BC7F-1D3C62F3B8E2",
+      "preLaunchTask": "build-office-web"
     }
   ]
 }

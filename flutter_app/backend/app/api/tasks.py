@@ -90,6 +90,16 @@ async def create_task(
 
     # Fire background execution for todo tasks
     if data.type == "todo":
+        # Mark agent as running immediately so the status is visible
+        # before the background executor starts
+        from sqlalchemy import select as sa_select
+        from app.models.agent import Agent
+        agent_result = await db.execute(sa_select(Agent).where(Agent.id == agent_id))
+        agent_obj = agent_result.scalar_one_or_none()
+        if agent_obj and agent_obj.status != "running":
+            agent_obj.status = "running"
+            await db.commit()
+
         import asyncio
         from app.services.task_executor import execute_task
         asyncio.create_task(execute_task(task.id, agent_id))
