@@ -17,6 +17,7 @@ import '../../pages/invitation_codes.dart';
 import '../../game/office_webview_page.dart';
 import '../../pages/privacy_policy.dart';
 import '../../pages/onboarding.dart';
+import '../../pages/billing_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -77,6 +78,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/enterprise',
         builder: (context, state) => const EnterpriseSettingsPage(),
+      ),
+      GoRoute(
+        path: '/billing',
+        builder: (context, state) => const BillingPage(),
       ),
       // Bottom tab shell — StatefulShellRoute keeps tab pages alive
       StatefulShellRoute.indexedStack(

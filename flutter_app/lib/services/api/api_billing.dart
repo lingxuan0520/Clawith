@@ -7,6 +7,21 @@ extension ApiBilling on ApiService {
     return r.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getBillingPlans() async {
+    final r = await _apiDio.get('/billing/plans');
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> subscribe() async {
+    final r = await _apiDio.post('/billing/subscribe');
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> buyCredits() async {
+    final r = await _apiDio.post('/billing/buy-credits');
+    return r.data as Map<String, dynamic>;
+  }
+
   Future<List<dynamic>> getBillingUsage({int days = 30, String? agentId}) async {
     final params = <String, dynamic>{'days': days};
     if (agentId != null) params['agent_id'] = agentId;

@@ -426,6 +426,8 @@ async def firebase_login(data: FirebaseLoginRequest, db: AsyncSession = Depends(
             role="platform_admin",  # every user owns their own space
             firebase_uid=firebase_uid,
             tenant_id=default_tenant.id if default_tenant else None,
+            credit_balance_cents=200,  # $2 starter credits
+            total_credits_purchased_cents=200,
         )
         db.add(user)
         await db.flush()

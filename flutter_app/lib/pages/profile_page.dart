@@ -138,7 +138,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         if (_balance != null) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
+            child: GestureDetector(
+              onTap: () => context.push('/billing'),
+              child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -181,6 +183,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   ),
                 ],
               ),
+            ),
             ),
           ),
           const SizedBox(height: 16),

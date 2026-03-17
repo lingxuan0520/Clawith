@@ -1,4 +1,4 @@
-"""Billing API — balance, usage, models, and credit management."""
+"""Billing API — balance, usage, models, subscriptions, and credit packs."""
 
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -15,6 +15,20 @@ from app.models.llm import LLMModel
 from app.models.user import User
 
 router = APIRouter(prefix="/billing", tags=["billing"])
+
+
+# ── Plans ────────────────────────────────────────────────────────────
+
+SUBSCRIPTION_PLANS = {
+    "pro": {
+        "name": "Pro",
+        "price_cents": 2990,  # $29.9/month
+        "credit_cents": 2990,  # $29.9 worth of token credits
+        "period_days": 30,
+    },
+}
+
+CREDIT_PACK_CENTS = 2000  # $20 per pack
 
 
 # ── Schemas ──────────────────────────────────────────────────────────
@@ -40,6 +54,97 @@ async def get_balance(
             current_user.subscription_expires_at.isoformat()
             if current_user.subscription_expires_at else None
         ),
+    }
+
+
+@router.get("/plans")
+async def list_plans(current_user: User = Depends(get_current_user)):
+    """Return available subscription plans and credit packs."""
+    return {
+        "subscription_plans": [
+            {
+                "id": "pro",
+                "name": "Pro",
+                "price_cents": 2990,
+                "credit_cents": 2990,
+                "period_days": 30,
+                "description": "$29.9/月，含 $29.9 Token 额度，余额可累积",
+            },
+        ],
+        "credit_packs": [
+            {
+                "id": "pack_20",
+                "price_cents": 2000,
+                "credit_cents": 2000,
+                "description": "$20 额度包",
+            },
+        ],
+    }
+
+
+@router.post("/subscribe")
+async def subscribe(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Subscribe to Pro plan. Adds credits and extends subscription.
+
+    NOTE: In production this will be triggered by RevenueCat webhook
+    after IAP verification. For now it's a direct endpoint for testing.
+    """
+    plan = SUBSCRIPTION_PLANS["pro"]
+
+    # Refresh user from DB to get latest balance
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one()
+
+    now = datetime.now(timezone.utc)
+
+    # Extend subscription (from current expiry if still active, else from now)
+    if user.subscription_expires_at and user.subscription_expires_at > now:
+        new_expiry = user.subscription_expires_at + timedelta(days=plan["period_days"])
+    else:
+        new_expiry = now + timedelta(days=plan["period_days"])
+
+    # Add credits (rollover — don't reset existing balance)
+    user.credit_balance_cents = (user.credit_balance_cents or 0) + plan["credit_cents"]
+    user.total_credits_purchased_cents = (user.total_credits_purchased_cents or 0) + plan["credit_cents"]
+    user.subscription_tier = "pro"
+    user.subscription_expires_at = new_expiry
+
+    await db.commit()
+    await db.refresh(user)
+
+    return {
+        "subscription_tier": "pro",
+        "subscription_expires_at": new_expiry.isoformat(),
+        "credit_balance_cents": user.credit_balance_cents,
+        "added_credit_cents": plan["credit_cents"],
+    }
+
+
+@router.post("/buy-credits")
+async def buy_credits(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Buy a $20 credit pack. Credits are added to current balance (rollover).
+
+    NOTE: In production this will be triggered by RevenueCat webhook
+    after IAP verification. For now it's a direct endpoint for testing.
+    """
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one()
+
+    user.credit_balance_cents = (user.credit_balance_cents or 0) + CREDIT_PACK_CENTS
+    user.total_credits_purchased_cents = (user.total_credits_purchased_cents or 0) + CREDIT_PACK_CENTS
+
+    await db.commit()
+    await db.refresh(user)
+
+    return {
+        "credit_balance_cents": user.credit_balance_cents,
+        "added_credit_cents": CREDIT_PACK_CENTS,
     }
 
 
