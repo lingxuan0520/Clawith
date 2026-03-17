@@ -105,7 +105,7 @@ class AgentOut(BaseModel):
     expires_at: datetime | None = None
     is_expired: bool = False
     llm_calls_today: int = 0
-    max_llm_calls_per_day: int = 100
+    max_llm_calls_per_day: int | None = 100
     created_at: datetime
     last_active_at: datetime | None = None
 
