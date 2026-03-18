@@ -132,3 +132,7 @@ class AppNotifier extends StateNotifier<AppState> {
 final appProvider = StateNotifierProvider<AppNotifier, AppState>((ref) {
   return AppNotifier();
 });
+
+/// Incremented each time the office tab becomes active, so OfficeWebViewPage
+/// can refresh agent data.
+final officeVisitCountProvider = StateProvider<int>((ref) => 0);

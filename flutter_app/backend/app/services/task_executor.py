@@ -33,6 +33,7 @@ async def execute_task(task_id: uuid.UUID, agent_id: uuid.UUID) -> None:
     print(f"[TaskExec] Starting task {task_id} for agent {agent_id}")
 
     # Step 1: Mark as doing
+    creator_id_for_events = None
     async with async_session() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
@@ -45,7 +46,24 @@ async def execute_task(task_id: uuid.UUID, agent_id: uuid.UUID) -> None:
         from sqlalchemy import delete as sql_delete
         await db.execute(sql_delete(TaskLog).where(TaskLog.task_id == task_id))
         db.add(TaskLog(task_id=task_id, content="🤖 开始执行任务..."))
+
+        # Mark agent as running
+        agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))
+        agent_obj = agent_result.scalar_one_or_none()
+        if agent_obj:
+            agent_obj.status = "running"
+            creator_id_for_events = agent_obj.creator_id
+
         await db.commit()
+
+        # Notify client immediately
+        if creator_id_for_events:
+            from app.services.event_bus import event_bus
+            await event_bus.publish(creator_id_for_events, {
+                "type": "agent_status",
+                "agent_id": str(agent_id),
+                "status": "running",
+            })
         task_title = task.title
         task_description = task.description or ""
         task_type = task.type  # 'todo' or 'supervision'
@@ -57,15 +75,15 @@ async def execute_task(task_id: uuid.UUID, agent_id: uuid.UUID) -> None:
         agent = agent_result.scalar_one_or_none()
         if not agent:
             await _log_error(task_id, "数字员工未找到")
-            if task_type == 'supervision':
-                await _restore_supervision_status(task_id)
+            await _fail_task(task_id, task_type)
+            await _maybe_idle_agent(agent_id)
             return
 
         model_id = agent.primary_model_id or agent.fallback_model_id
         if not model_id:
             await _log_error(task_id, f"{agent.name} 未配置 LLM 模型，无法执行任务")
-            if task_type == 'supervision':
-                await _restore_supervision_status(task_id)
+            await _fail_task(task_id, task_type)
+            await _maybe_idle_agent(agent_id)
             return
 
         model_result = await db.execute(
@@ -74,8 +92,8 @@ async def execute_task(task_id: uuid.UUID, agent_id: uuid.UUID) -> None:
         model = model_result.scalar_one_or_none()
         if not model:
             await _log_error(task_id, "配置的模型不存在")
-            if task_type == 'supervision':
-                await _restore_supervision_status(task_id)
+            await _fail_task(task_id, task_type)
+            await _maybe_idle_agent(agent_id)
             return
 
         agent_name = agent.name
@@ -126,15 +144,35 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
 
     if not base_url:
         await _log_error(task_id, f"未配置 {model.provider} 的 API 地址")
-        if task_type == 'supervision':
-            await _restore_supervision_status(task_id)
+        await _fail_task(task_id, task_type)
+        await _maybe_idle_agent(agent_id)
         return
 
     # Normalize: strip /chat/completions if user accidentally included the full endpoint
     if base_url.rstrip('/').endswith('/chat/completions'):
         base_url = base_url.rstrip('/').rsplit('/chat/completions', 1)[0]
     url = f"{base_url.rstrip('/')}/chat/completions"
-    api_key = model.api_key_encrypted
+
+    # ── Resolve API key: platform key for system models ──
+    if model.is_system_model and not model.api_key_encrypted:
+        from app.config import get_settings as _get_settings
+        api_key = _get_settings().OPENROUTER_API_KEY
+        if not api_key:
+            await _log_error(task_id, "Platform OpenRouter API key not configured")
+            await _fail_task(task_id, task_type)
+            await _maybe_idle_agent(agent_id)
+            return
+    else:
+        api_key = model.api_key_encrypted
+
+    # ── Pre-flight balance check ──
+    if model.is_system_model and creator_id:
+        from app.services.billing import check_balance as _check_balance
+        if not await _check_balance(creator_id):
+            await _log_error(task_id, "额度已用完，请购买更多额度后再试")
+            await _fail_task(task_id, task_type)
+            await _maybe_idle_agent(agent_id)
+            return
 
     # Load tools (same as chat dialog)
     from app.services.agent_tools import execute_tool, get_agent_tools_for_llm
@@ -173,40 +211,54 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
             if proc.returncode != 0:
                 stderr_msg = stderr.decode().strip()[:200] if stderr else ''
                 await _log_error(task_id, f"调用模型失败 (curl exit {proc.returncode}) {stderr_msg}")
-                if task_type == 'supervision':
-                    await _restore_supervision_status(task_id)
+                await _fail_task(task_id, task_type)
+                await _maybe_idle_agent(agent_id)
                 return
 
             stdout_text = stdout.decode().strip()
             if not stdout_text:
                 await _log_error(task_id, "LLM 返回空响应（可能网络超时或服务不可用）")
-                if task_type == 'supervision':
-                    await _restore_supervision_status(task_id)
+                await _fail_task(task_id, task_type)
+                await _maybe_idle_agent(agent_id)
                 return
 
             data = json.loads(stdout_text)
             if not isinstance(data, dict):
                 await _log_error(task_id, f"LLM 返回非预期格式: {stdout_text[:300]}")
-                if task_type == 'supervision':
-                    await _restore_supervision_status(task_id)
+                await _fail_task(task_id, task_type)
+                await _maybe_idle_agent(agent_id)
                 return
             if "error" in data:
                 err_msg = data['error'].get('message', str(data['error']))[:200] if isinstance(data['error'], dict) else str(data['error'])[:200]
                 await _log_error(task_id, f"LLM 错误: {err_msg}")
-                if task_type == 'supervision':
-                    await _restore_supervision_status(task_id)
+                await _fail_task(task_id, task_type)
+                await _maybe_idle_agent(agent_id)
                 return
 
             choices = data.get("choices")
             if not choices or not isinstance(choices, list):
                 await _log_error(task_id, f"LLM 响应格式异常: {stdout_text[:300]}")
-                if task_type == 'supervision':
-                    await _restore_supervision_status(task_id)
+                await _fail_task(task_id, task_type)
+                await _maybe_idle_agent(agent_id)
                 return
 
             choice = choices[0]
             msg = choice.get("message", {})
             finish_reason = choice.get("finish_reason", "stop")
+
+            # ── Capture token usage for billing ──
+            _usage = data.get("usage", {})
+            _round_input = _usage.get("prompt_tokens", 0)
+            _round_output = _usage.get("completion_tokens", 0)
+
+            # Bill this round if system model
+            if model.is_system_model and creator_id and (_round_input + _round_output) > 0:
+                try:
+                    from app.services.billing import deduct_credits as _deduct
+                    _charged = await _deduct(creator_id, model, _round_input, _round_output, agent_id=agent_id)
+                    print(f"[TaskExec-Billing] Charged {_charged}¢ for {_round_input}in/{_round_output}out", flush=True)
+                except Exception as _bill_err:
+                    print(f"[TaskExec-Billing] Error: {_bill_err}", flush=True)
 
             # Handle tool calls
             if finish_reason == "tool_calls" and msg.get("tool_calls"):
@@ -237,16 +289,8 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
         error_msg = str(e) or repr(e)
         print(f"[TaskExec] Error: {error_msg}")
         await _log_error(task_id, f"执行出错: {error_msg[:150]}")
-        if task_type == 'supervision':
-            await _restore_supervision_status(task_id)
-        else:
-            # Restore todo task to pending so it can be retried
-            async with async_session() as db:
-                result = await db.execute(select(Task).where(Task.id == task_id))
-                task = result.scalar_one_or_none()
-                if task and task.status == "doing":
-                    task.status = "pending"
-                    await db.commit()
+        await _fail_task(task_id, task_type)
+        await _maybe_idle_agent(agent_id)
         return
 
     # Step 5: Save result and update status
@@ -264,6 +308,8 @@ You are now in TASK EXECUTION MODE (not a conversation). A task has been assigne
                 db.add(TaskLog(task_id=task_id, content=f"✅ 任务完成\n\n{reply}"))
             await db.commit()
             print(f"[TaskExec] Task {task_id} {'logged' if task_type == 'supervision' else 'completed'}!")
+
+    await _maybe_idle_agent(agent_id)
 
     # Log activity
     from app.services.activity_logger import log_activity
@@ -283,6 +329,20 @@ async def _log_error(task_id: uuid.UUID, message: str) -> None:
         await db.commit()
 
 
+async def _fail_task(task_id: uuid.UUID, task_type: str) -> None:
+    """Reset task status after a failed execution.
+
+    Supervision tasks go back to 'pending' (stay active for next run).
+    Todo tasks also go back to 'pending' so they can be retried.
+    """
+    async with async_session() as db:
+        result = await db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+        if task and task.status == "doing":
+            task.status = "pending"
+            await db.commit()
+
+
 async def _restore_supervision_status(task_id: uuid.UUID) -> None:
     """Restore supervision task status back to pending after a failed execution."""
     async with async_session() as db:
@@ -291,3 +351,32 @@ async def _restore_supervision_status(task_id: uuid.UUID) -> None:
         if task and task.status == "doing":
             task.status = "pending"
             await db.commit()
+
+
+async def _maybe_idle_agent(agent_id: uuid.UUID) -> None:
+    """Set agent status back to idle if no more 'doing' tasks remain."""
+    from sqlalchemy import func
+    async with async_session() as db:
+        count_result = await db.execute(
+            select(func.count(Task.id)).where(
+                Task.agent_id == agent_id,
+                Task.status == "doing",
+            )
+        )
+        doing_count = count_result.scalar() or 0
+        if doing_count == 0:
+            agent_result = await db.execute(select(Agent).where(Agent.id == agent_id))
+            agent = agent_result.scalar_one_or_none()
+            if agent and agent.status == "running":
+                agent.status = "idle"
+                creator_id = agent.creator_id
+                await db.commit()
+
+                # Notify client
+                if creator_id:
+                    from app.services.event_bus import event_bus
+                    await event_bus.publish(creator_id, {
+                        "type": "agent_status",
+                        "agent_id": str(agent_id),
+                        "status": "idle",
+                    })

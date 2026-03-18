@@ -14,7 +14,7 @@ class ApiClient {
   static String get baseUrl {
     if (kIsWeb) return '/api';
     // Default to localhost for development
-    return 'http://localhost:8001/api';
+    return 'http://47.251.71.144/api';
   }
 
   ApiClient._() {

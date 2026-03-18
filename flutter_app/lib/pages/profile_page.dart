@@ -16,6 +16,20 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
+  Map<String, dynamic>? _balance;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      final data = await ApiService.instance.getBillingBalance();
+      if (mounted) setState(() => _balance = data);
+    } catch (_) {}
+  }
   Future<void> _confirmDeleteAccount() async {
     final l = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
@@ -119,6 +133,64 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         ),
         const SizedBox(height: 24),
+
+        // Balance card
+        if (_balance != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: GestureDetector(
+              onTap: () async {
+                await context.push('/billing');
+                _loadBalance();
+              },
+              child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.accentPrimary.withValues(alpha: 0.15), AppColors.bgElevated],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.borderDefault),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet_outlined, color: AppColors.accentPrimary, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('余额',
+                            style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                        const SizedBox(height: 2),
+                        Text(
+                          '\$${((_balance!['credit_balance_cents'] as int? ?? 0) / 100).toStringAsFixed(2)}',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('已消费',
+                          style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                      Text(
+                        '\$${((_balance!['total_used_cents'] as int? ?? 0) / 100).toStringAsFixed(2)}',
+                        style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         // Settings section
         _sectionHeader(l.profileSettings),

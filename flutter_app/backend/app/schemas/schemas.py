@@ -105,7 +105,7 @@ class AgentOut(BaseModel):
     expires_at: datetime | None = None
     is_expired: bool = False
     llm_calls_today: int = 0
-    max_llm_calls_per_day: int = 100
+    max_llm_calls_per_day: int | None = 100
     created_at: datetime
     last_active_at: datetime | None = None
 
@@ -245,6 +245,10 @@ class LLMModelOut(BaseModel):
     max_tokens_per_day: int | None = None
     enabled: bool
     supports_vision: bool = False
+    is_system_model: bool = False
+    tier: str = "standard"
+    cost_per_input_token_million: float = 0
+    cost_per_output_token_million: float = 0
     created_at: datetime
 
     model_config = {"from_attributes": True}

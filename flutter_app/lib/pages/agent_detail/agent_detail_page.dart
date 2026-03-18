@@ -420,7 +420,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     setState(() => _loadingSettings = true);
     try {
       final results = await Future.wait([
-        _api.listLlmModels().catchError((_) => <dynamic>[]),
+        _api.getBillingModels().catchError((_) => <dynamic>[]),
         _api.getChannel(widget.agentId),
         _api.getTenantQuotas().catchError((_) => <String, dynamic>{}),
       ]);

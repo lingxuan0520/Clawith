@@ -52,6 +52,13 @@ class User(Base):
     quota_max_agents: Mapped[int] = mapped_column(Integer, default=2)
     quota_agent_ttl_hours: Mapped[int] = mapped_column(Integer, default=48)
 
+    # Billing / Credits
+    credit_balance_cents: Mapped[int] = mapped_column(Integer, default=0)  # USD cents
+    total_credits_purchased_cents: Mapped[int] = mapped_column(Integer, default=0)
+    total_credits_used_cents: Mapped[int] = mapped_column(Integer, default=0)
+    subscription_tier: Mapped[str] = mapped_column(String(20), default="free")  # free / basic / pro
+    subscription_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Relationships
     department: Mapped["Department | None"] = relationship(back_populates="members", foreign_keys=[department_id])
     created_agents: Mapped[list["Agent"]] = relationship(back_populates="creator", foreign_keys="Agent.creator_id")

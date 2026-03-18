@@ -412,7 +412,11 @@ async def firebase_login(data: FirebaseLoginRequest, db: AsyncSession = Depends(
             user_email = f"{local}+{provider_tag}@{domain}"
         _logger.warning(f"[FIREBASE] creating new user: username={username} email={user_email} provider={provider}")
 
-        # Create user (no tenant yet — user creates company in onboarding)
+        # Auto-assign to default tenant (every user gets one company)
+        from app.models.tenant import Tenant
+        default_result = await db.execute(select(Tenant).where(Tenant.slug == "default"))
+        default_tenant = default_result.scalar_one_or_none()
+
         user = User(
             username=username,
             email=user_email,
@@ -421,6 +425,9 @@ async def firebase_login(data: FirebaseLoginRequest, db: AsyncSession = Depends(
             avatar_url=avatar_url or None,
             role="platform_admin",  # every user owns their own space
             firebase_uid=firebase_uid,
+            tenant_id=default_tenant.id if default_tenant else None,
+            credit_balance_cents=200,  # $2 starter credits
+            total_credits_purchased_cents=200,
         )
         db.add(user)
         await db.flush()

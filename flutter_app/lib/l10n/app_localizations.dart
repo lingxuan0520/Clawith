@@ -3497,7 +3497,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeTabPlaza.
   ///
   /// In zh, this message translates to:
-  /// **'广场'**
+  /// **'工作台'**
   String get homeTabPlaza;
 
   /// No description provided for @homeTabDashboard.

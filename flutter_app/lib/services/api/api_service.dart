@@ -9,6 +9,7 @@ part 'api_chat.dart';
 part 'api_enterprise.dart';
 part 'api_plaza.dart';
 part 'api_tools.dart';
+part 'api_billing.dart';
 
 /// Shared Dio instance for all API extensions.
 /// Accessible from part files (same library scope).

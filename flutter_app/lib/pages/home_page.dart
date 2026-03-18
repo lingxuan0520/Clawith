@@ -16,42 +16,53 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final tabs = [l.homeTabPlaza, l.homeTabDashboard];
+
     return Column(
       children: [
+        // ── Tab switcher ──
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<int>(
-              segments: [
-                ButtonSegment(value: 0, label: Text(l.homeTabPlaza)),
-                ButtonSegment(value: 1, label: Text(l.homeTabDashboard)),
-              ],
-              selected: {_selectedIndex},
-              onSelectionChanged: (v) => setState(() => _selectedIndex = v.first),
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return AppColors.accentPrimary;
-                  }
-                  return AppColors.bgSecondary;
-                }),
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return Colors.white;
-                  }
-                  return AppColors.textSecondary;
-                }),
-                side: WidgetStateProperty.all(
-                  BorderSide(color: AppColors.borderDefault),
-                ),
-                shape: WidgetStateProperty.all(
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
+          child: Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.bgTertiary,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              children: List.generate(tabs.length, (i) {
+                final selected = _selectedIndex == i;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.accentPrimary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: selected
+                            ? [BoxShadow(color: AppColors.accentPrimary.withAlpha(60), blurRadius: 8, offset: const Offset(0, 2))]
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        tabs[i],
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                          color: selected ? Colors.white : AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
             ),
           ),
         ),
+        // ── Content ──
         Expanded(
           child: IndexedStack(
             index: _selectedIndex,

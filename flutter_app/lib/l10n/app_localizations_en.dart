@@ -1903,7 +1903,7 @@ class AppLocalizationsEn extends AppLocalizations {
       '# Skill: New Skill\n\n## Trigger Conditions\nWhen user requests...\n\n## Execution Steps\n1. ...\n2. ...\n\n## Notes\n- ...\n';
 
   @override
-  String get homeTabPlaza => 'Plaza';
+  String get homeTabPlaza => 'Workbench';
 
   @override
   String get homeTabDashboard => 'Dashboard';

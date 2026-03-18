@@ -442,12 +442,13 @@ extension _SettingsTab on _AgentDetailPageState {
             final displayLabel = (model['label'] as String?)?.isNotEmpty == true
                 ? model['label'] as String
                 : model['model']?.toString() ?? id;
-            final provider = model['provider']?.toString() ?? '';
-            final modelName = model['model']?.toString() ?? '';
-            final subtitle = provider.isNotEmpty ? ' ($provider/$modelName)' : '';
+            final tier = model['tier']?.toString() ?? 'standard';
+            final tierIcon = tier == 'premium' ? '💰💰💰' : (tier == 'standard' ? '💰💰' : '💰');
+            final outputPrice = model['cost_per_output_token_million'];
+            final priceHint = outputPrice != null ? ' ~\$${(outputPrice as num).toStringAsFixed(1)}/1M' : '';
             return DropdownMenuItem(
               value: id,
-              child: Text('$displayLabel$subtitle',
+              child: Text('$displayLabel  $tierIcon$priceHint',
                   style: const TextStyle(fontSize: 13),
                   overflow: TextOverflow.ellipsis),
             );

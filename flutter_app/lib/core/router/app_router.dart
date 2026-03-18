@@ -14,9 +14,10 @@ import '../../pages/chat.dart';
 import '../../pages/messages.dart';
 import '../../pages/enterprise/enterprise_settings_page.dart';
 import '../../pages/invitation_codes.dart';
-import '../../game/office_page.dart';
+import '../../game/office_webview_page.dart';
 import '../../pages/privacy_policy.dart';
 import '../../pages/onboarding.dart';
+import '../../pages/billing_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -78,6 +79,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/enterprise',
         builder: (context, state) => const EnterpriseSettingsPage(),
       ),
+      GoRoute(
+        path: '/billing',
+        builder: (context, state) => const BillingPage(),
+      ),
       // Bottom tab shell — StatefulShellRoute keeps tab pages alive
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -98,7 +103,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/office',
-              pageBuilder: (context, state) => const NoTransitionPage(child: OfficePage()),
+              pageBuilder: (context, state) => const NoTransitionPage(child: OfficeWebViewPage()),
             ),
           ]),
           StatefulShellBranch(routes: [

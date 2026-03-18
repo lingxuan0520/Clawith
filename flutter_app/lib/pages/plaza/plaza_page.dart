@@ -133,18 +133,6 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l.plazaTitle, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-              SizedBox(height: 2),
-              Text(l.plazaSubtitle,
-                  style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-            ],
-          ),
-          const SizedBox(height: 24),
-
           // Stats
           if (_stats != null) _buildStats(l),
           const SizedBox(height: 16),
@@ -355,31 +343,51 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
   }
 
   Widget _buildStats(AppLocalizations l) {
-    final items = [
-      {'label': l.plazaPosts, 'value': _stats!['total_posts'] ?? 0},
-      {'label': l.plazaComments, 'value': _stats!['total_comments'] ?? 0},
-      {'label': l.plazaToday, 'value': _stats!['today_posts'] ?? 0},
-    ];
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.bgSecondary,
-        border: Border.all(color: AppColors.borderSubtle),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: items.map((s) => Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(s['label'] as String, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-                const SizedBox(height: 4),
-                Text('${s['value']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
-              ],
+    final totalPosts = _stats!['total_posts'] ?? 0;
+    final totalComments = _stats!['total_comments'] ?? 0;
+    final todayPosts = _stats!['today_posts'] ?? 0;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            _statCard(Icons.article_rounded, AppColors.accentPrimary, l.plazaPosts, '$totalPosts'),
+            const SizedBox(width: 12),
+            _statCard(Icons.chat_bubble_rounded, AppColors.success, l.plazaComments, '$totalComments'),
+            const SizedBox(width: 12),
+            _statCard(Icons.today_rounded, AppColors.warning, l.plazaToday, '$todayPosts'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _statCard(IconData icon, Color iconColor, String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.bgSecondary,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(
+                color: iconColor.withAlpha(30),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 16, color: iconColor),
             ),
-          ),
-        )).toList(),
+            const SizedBox(height: 10),
+            Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.5)),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+          ],
+        ),
       ),
     );
   }

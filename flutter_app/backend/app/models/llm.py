@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +24,15 @@ class LLMModel(Base):
     max_tokens_per_day: Mapped[int | None] = mapped_column(Integer)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     supports_vision: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Pricing (USD per 1M tokens — OpenRouter cost)
+    cost_per_input_token_million: Mapped[float] = mapped_column(Float, default=0)
+    cost_per_output_token_million: Mapped[float] = mapped_column(Float, default=0)
+
+    # System model flag + tier
+    is_system_model: Mapped[bool] = mapped_column(Boolean, default=False)
+    tier: Mapped[str] = mapped_column(String(20), default="standard")  # budget / standard / premium
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

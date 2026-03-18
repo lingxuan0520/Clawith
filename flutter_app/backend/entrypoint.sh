@@ -34,6 +34,7 @@ async def main():
     import app.models.participant     # noqa
     import app.models.chat_session   # noqa
     import app.models.trigger        # noqa
+    import app.models.billing        # noqa
 
     # Create all tables that don't exist yet (safe to run on every startup)
     async with engine.begin() as conn:
@@ -63,6 +64,28 @@ async def main():
         # Agent template columns for new template system
         "ALTER TABLE agent_templates ADD COLUMN IF NOT EXISTS recommended_model_tier VARCHAR(20) DEFAULT 'standard'",
         "ALTER TABLE agent_templates ADD COLUMN IF NOT EXISTS display_name VARCHAR(100) DEFAULT ''",
+        # Billing / model pool fields
+        "ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS cost_per_input_token_million FLOAT DEFAULT 0",
+        "ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS cost_per_output_token_million FLOAT DEFAULT 0",
+        "ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS is_system_model BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE llm_models ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'standard'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS credit_balance_cents INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_credits_purchased_cents INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_credits_used_cents INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(20) DEFAULT 'free'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ",
+        # Purchase records table for IAP idempotency
+        """CREATE TABLE IF NOT EXISTS purchase_records (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id),
+            platform VARCHAR(20),
+            product_id VARCHAR(100),
+            transaction_id VARCHAR(200) UNIQUE,
+            receipt_data TEXT,
+            amount_cents INTEGER DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'completed',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
     ]
 
     from sqlalchemy import text
@@ -85,4 +108,6 @@ echo "[entrypoint] Step 2: Stamping alembic to latest revision..."
 alembic stamp head
 
 echo "[entrypoint] Step 3: Starting uvicorn..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Workers: default 1 for dev, set WORKERS env for production (e.g. WORKERS=4)
+WORKERS=${WORKERS:-1}
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "$WORKERS"

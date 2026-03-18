@@ -84,6 +84,7 @@ async def lifespan(app: FastAPI):
         import app.models.participant    # noqa
         import app.models.chat_session   # noqa
         import app.models.trigger        # noqa
+        import app.models.billing        # noqa
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         print("[startup] ✅ Database tables ready", flush=True)
@@ -110,36 +111,57 @@ async def lifespan(app: FastAPI):
         from app.services.skill_seeder import seed_skills, push_default_skills_to_existing_agents
         await seed_skills()
         await push_default_skills_to_existing_agents()
-        from app.services.agent_seeder import seed_default_agents
-        await seed_default_agents()
+        from app.services.model_seeder import seed_system_models
+        await seed_system_models()
     except Exception as e:
         print(f"[startup] ⚠️ Seeding failed (non-fatal): {e}", flush=True)
 
-    # Start background tasks (always, even if seeding failed)
+    # Start background tasks — use Redis lock so only ONE worker runs them
     try:
         print("[startup] starting background tasks...", flush=True)
         from app.services.audit_logger import write_audit_log
         await write_audit_log("server_startup", {"pid": os.getpid()})
 
-        def _bg_task_error(t):
-            """Callback to surface background task exceptions."""
-            try:
-                exc = t.exception()
-            except asyncio.CancelledError:
-                return
-            if exc:
-                print(f"[startup] ⚠️ Background task {t.get_name()} CRASHED: {exc}", flush=True)
-                import traceback
-                traceback.print_exception(type(exc), exc, exc.__traceback__)
+        # Try to acquire leader lock (only one worker wins)
+        from app.core.events import get_redis
+        _r = await get_redis()
+        _is_leader = await _r.set(
+            "worker_leader_lock", str(os.getpid()),
+            nx=True, ex=300  # expires in 5 min, renewed by heartbeat
+        )
 
-        for name, coro in [
-            ("trigger_daemon", start_trigger_daemon()),
-            ("heartbeat", start_heartbeat()),
-        ]:
-            task = asyncio.create_task(coro, name=name)
-            task.add_done_callback(_bg_task_error)
-            print(f"[startup] created bg task: {name}", flush=True)
-        print("[startup] all background tasks created!", flush=True)
+        if _is_leader:
+            def _bg_task_error(t):
+                """Callback to surface background task exceptions."""
+                try:
+                    exc = t.exception()
+                except asyncio.CancelledError:
+                    return
+                if exc:
+                    print(f"[startup] ⚠️ Background task {t.get_name()} CRASHED: {exc}", flush=True)
+                    import traceback
+                    traceback.print_exception(type(exc), exc, exc.__traceback__)
+
+            for name, coro in [
+                ("trigger_daemon", start_trigger_daemon()),
+                ("heartbeat", start_heartbeat()),
+            ]:
+                task = asyncio.create_task(coro, name=name)
+                task.add_done_callback(_bg_task_error)
+                print(f"[startup] created bg task: {name}", flush=True)
+            print("[startup] all background tasks created! (leader)", flush=True)
+
+            # Renew leader lock periodically
+            async def _renew_leader():
+                while True:
+                    await asyncio.sleep(120)
+                    try:
+                        await _r.set("worker_leader_lock", str(os.getpid()), ex=300)
+                    except Exception:
+                        pass
+            asyncio.create_task(_renew_leader(), name="leader_renew")
+        else:
+            print(f"[startup] background tasks skipped (not leader, pid={os.getpid()})", flush=True)
     except Exception as e:
         print(f"[startup] ⛔ Background tasks failed: {e}", flush=True)
         import traceback
@@ -196,6 +218,8 @@ from app.api.chat_sessions import router as chat_sessions_router
 from app.api.slack import router as slack_router
 from app.api.discord_bot import router as discord_router
 from app.api.triggers import router as triggers_router
+from app.api.events import router as events_router
+from app.api.billing import router as billing_router
 
 app.include_router(auth_router, prefix=settings.API_PREFIX)
 app.include_router(agents_router, prefix=settings.API_PREFIX)
@@ -222,6 +246,8 @@ app.include_router(triggers_router)
 app.include_router(chat_sessions_router)
 app.include_router(plaza_router)
 app.include_router(ws_router)
+app.include_router(events_router)
+app.include_router(billing_router, prefix=settings.API_PREFIX)
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["health"])
