@@ -32,9 +32,11 @@ async def list_templates(
         {
             "id": str(t.id),
             "name": t.name,
+            "display_name": t.display_name or t.name,
             "description": t.description,
             "icon": t.icon,
             "category": t.category,
+            "recommended_model_tier": t.recommended_model_tier or "standard",
             "is_builtin": t.is_builtin,
             "soul_template": t.soul_template,
             "default_skills": t.default_skills,
@@ -105,15 +107,53 @@ async def create_agent(
     except QuotaExceeded as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
 
+    # Auto-fill from template if template_id is provided
+    template_obj = None
+    if data.template_id:
+        from app.models.agent import AgentTemplate
+        tmpl_result = await db.execute(
+            select(AgentTemplate).where(AgentTemplate.id == data.template_id)
+        )
+        template_obj = tmpl_result.scalar_one_or_none()
+
+    # Auto-fill name from template display_name if not provided
+    agent_name = data.name.strip() if data.name else ""
+    if not agent_name and template_obj:
+        agent_name = template_obj.display_name or template_obj.name
+    if not agent_name:
+        agent_name = "My Agent"
+
+    # Auto-select model by template tier if not explicitly provided
+    selected_model_id = data.primary_model_id
+    if not selected_model_id and template_obj:
+        from app.models.llm import LLMModel
+        tier = template_obj.recommended_model_tier or "standard"
+        model_result = await db.execute(
+            select(LLMModel).where(
+                LLMModel.enabled == True,
+                LLMModel.tier == tier,
+            ).order_by(LLMModel.cost_per_output_token_million.asc()).limit(1)
+        )
+        matched_model = model_result.scalar_one_or_none()
+        if not matched_model:
+            model_result = await db.execute(
+                select(LLMModel).where(LLMModel.enabled == True).order_by(
+                    LLMModel.cost_per_output_token_million.asc()
+                ).limit(1)
+            )
+            matched_model = model_result.scalar_one_or_none()
+        if matched_model:
+            selected_model_id = matched_model.id
+
     # 2C app: agents never expire, no default LLM call limit
     agent = Agent(
-        name=data.name,
+        name=agent_name,
         role_description=data.role_description,
         bio=data.bio,
         avatar_url=data.avatar_url,
         creator_id=current_user.id,
         tenant_id=current_user.tenant_id,
-        primary_model_id=data.primary_model_id,
+        primary_model_id=selected_model_id,
         fallback_model_id=data.fallback_model_id,
         max_tokens_per_day=data.max_tokens_per_day,
         max_tokens_per_month=data.max_tokens_per_month,

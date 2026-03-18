@@ -7,6 +7,7 @@ import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../core/theme/app_theme.dart';
 import '../../core/network/websocket_client.dart';
 import '../../core/network/api_client.dart';
@@ -53,6 +54,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   // Vision model support
   bool _supportsVision = false;
 
+  // Voice input (speech-to-text)
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _speechAvailable = false;
+  bool _isListening = false;
+
   // Streaming accumulators
   String _streamContent = '';
   String _thinkingContent = '';
@@ -70,6 +76,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _loadAgent();
     _loadSessions();
     _checkVisionSupport();
+    _initSpeech();
   }
 
   void _onScroll() {
@@ -519,6 +526,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final text = _inputCtrl.text.trim();
     if (text.isEmpty && _attachedFile == null) return;
 
+    // Stop listening if voice input was active
+    if (_isListening) {
+      _speech.stop();
+      _isListening = false;
+    }
+
     final l = AppLocalizations.of(context)!;
 
     _pendingToolCalls.clear();
@@ -880,11 +893,87 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  // ── Voice input (STT) ──────────────────────────────────────────────
+
+  Future<void> _initSpeech() async {
+    _speechAvailable = await _speech.initialize(
+      onError: (e) {
+        if (!mounted) return;
+        setState(() => _isListening = false);
+      },
+      onStatus: (status) {
+        if (!mounted) return;
+        if (status == 'done' || status == 'notListening') {
+          setState(() => _isListening = false);
+        }
+      },
+    );
+    if (mounted) setState(() {});
+  }
+
+  void _toggleListening() {
+    final l = AppLocalizations.of(context)!;
+    if (!_speechAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.chatVoiceNotAvailable)),
+      );
+      return;
+    }
+
+    if (_isListening) {
+      _speech.stop();
+      setState(() => _isListening = false);
+    } else {
+      setState(() => _isListening = true);
+      _speech.listen(
+        onResult: (result) {
+          if (!mounted) return;
+          setState(() {
+            _inputCtrl.text = result.recognizedWords;
+            _inputCtrl.selection = TextSelection.collapsed(
+              offset: _inputCtrl.text.length,
+            );
+          });
+        },
+        listenOptions: stt.SpeechListenOptions(
+          listenMode: stt.ListenMode.dictation,
+          cancelOnError: true,
+          partialResults: true,
+        ),
+      );
+    }
+  }
+
   Widget _buildInputArea() {
     final l = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Voice listening indicator
+        if (_isListening)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withValues(alpha: 0.1),
+              border: Border(top: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3))),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 12, height: 12,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(l.chatVoiceListening,
+                    style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
+              ],
+            ),
+          ),
         // Attached file preview
         if (_attachedFile != null)
           Container(
@@ -973,14 +1062,34 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _connected &&
-                        !_isReadOnly &&
-                        (_inputCtrl.text.trim().isNotEmpty || _attachedFile != null)
-                    ? _sendMessage
-                    : null,
-                child: Text(l.chatSend),
-              ),
+              // Voice input / Send button — show mic when empty, send when has text
+              if (_inputCtrl.text.trim().isEmpty && _attachedFile == null)
+                GestureDetector(
+                  onTap: _connected && !_isReadOnly ? _toggleListening : null,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _isListening
+                          ? Colors.redAccent
+                          : (_connected && !_isReadOnly
+                              ? Theme.of(context).colorScheme.primary
+                              : AppColors.bgTertiary),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isListening ? Icons.stop : Icons.mic,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                )
+              else
+                ElevatedButton(
+                  onPressed: _connected && !_isReadOnly ? _sendMessage : null,
+                  child: Text(l.chatSend),
+                ),
             ],
           ),
         ),
@@ -1400,6 +1509,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   void dispose() {
+    _speech.stop();
     _eventSub?.cancel();
     _connSub?.cancel();
     _closeCodeSub?.cancel();

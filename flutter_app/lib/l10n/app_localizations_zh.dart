@@ -561,6 +561,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatSend => '发送';
 
   @override
+  String get chatVoiceListening => '正在聆听...';
+
+  @override
+  String get chatVoiceNoPermission => '麦克风权限被拒绝';
+
+  @override
+  String get chatVoiceNotAvailable => '语音识别不可用';
+
+  @override
   String get chatSessions => '会话';
 
   @override

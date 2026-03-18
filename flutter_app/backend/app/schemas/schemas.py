@@ -56,7 +56,7 @@ class UserUpdate(BaseModel):
 # ─── Agent ──────────────────────────────────────────────
 
 class AgentCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: str = Field(default="", max_length=100)
     role_description: str = Field(default="", max_length=500)
     bio: str | None = None
     avatar_url: str | None = None

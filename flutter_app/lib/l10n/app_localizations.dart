@@ -1106,6 +1106,24 @@ abstract class AppLocalizations {
   /// **'发送'**
   String get chatSend;
 
+  /// No description provided for @chatVoiceListening.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在聆听...'**
+  String get chatVoiceListening;
+
+  /// No description provided for @chatVoiceNoPermission.
+  ///
+  /// In zh, this message translates to:
+  /// **'麦克风权限被拒绝'**
+  String get chatVoiceNoPermission;
+
+  /// No description provided for @chatVoiceNotAvailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'语音识别不可用'**
+  String get chatVoiceNotAvailable;
+
   /// No description provided for @chatSessions.
   ///
   /// In zh, this message translates to:

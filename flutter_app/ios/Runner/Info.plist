@@ -64,6 +64,10 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>OhClaw needs speech recognition to convert your voice to text messages.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>OhClaw needs microphone access for voice input.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

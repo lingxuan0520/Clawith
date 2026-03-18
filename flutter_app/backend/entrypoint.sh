@@ -60,6 +60,9 @@ async def main():
         "ALTER TABLE agent_tools ADD COLUMN IF NOT EXISTS installed_by_agent_id UUID",
         # chat_sessions channel tracking
         "ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS source_channel VARCHAR(20) NOT NULL DEFAULT 'web'",
+        # Agent template columns for new template system
+        "ALTER TABLE agent_templates ADD COLUMN IF NOT EXISTS recommended_model_tier VARCHAR(20) DEFAULT 'standard'",
+        "ALTER TABLE agent_templates ADD COLUMN IF NOT EXISTS display_name VARCHAR(100) DEFAULT ''",
     ]
 
     from sqlalchemy import text

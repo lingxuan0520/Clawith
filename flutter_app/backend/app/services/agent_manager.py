@@ -68,18 +68,33 @@ class AgentManager:
         creator = result.scalar_one_or_none()
         creator_name = creator.display_name if creator else "Unknown"
 
-        soul_content = f"# Personality\n\nI'm {agent.name}, {agent.role_description or 'a digital assistant'}.\n"
-        if soul_path.exists():
-            template_content = soul_path.read_text()
-            soul_content = template_content.replace("{{agent_name}}", agent.name)
-            soul_content = soul_content.replace("{{role_description}}", agent.role_description or "通用助手")
-            soul_content = soul_content.replace("{{creator_name}}", creator_name)
-            soul_content = soul_content.replace("{{created_at}}", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        # Load soul_template from the agent's template (if any)
+        soul_content = ""
+        if agent.template_id:
+            from app.models.agent import AgentTemplate
+            tmpl_result = await db.execute(
+                select(AgentTemplate).where(AgentTemplate.id == agent.template_id)
+            )
+            template = tmpl_result.scalar_one_or_none()
+            if template and template.soul_template:
+                soul_content = template.soul_template.replace("{name}", agent.name)
 
+        # Fallback: if no template soul, try file-based template or generate basic one
+        if not soul_content:
+            if soul_path.exists():
+                template_content = soul_path.read_text()
+                soul_content = template_content.replace("{{agent_name}}", agent.name)
+                soul_content = soul_content.replace("{{role_description}}", agent.role_description or "General Assistant")
+                soul_content = soul_content.replace("{{creator_name}}", creator_name)
+                soul_content = soul_content.replace("{{created_at}}", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+            else:
+                soul_content = f"# Soul — {agent.name}\n\n## Identity\n- **Role**: {agent.role_description or 'General Assistant'}\n"
+
+        # Append user customizations if any
         if personality:
-            soul_content += f"\n\n## Personality\n{personality}\n"
+            soul_content += f"\n## Additional Personality\n{personality}\n"
         if boundaries:
-            soul_content += f"\n## Boundaries\n{boundaries}\n"
+            soul_content += f"\n## Additional Boundaries\n{boundaries}\n"
 
         soul_path.write_text(soul_content, encoding="utf-8")
 

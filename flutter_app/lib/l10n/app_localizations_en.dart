@@ -565,6 +565,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatSend => 'Send';
 
   @override
+  String get chatVoiceListening => 'Listening...';
+
+  @override
+  String get chatVoiceNoPermission => 'Microphone permission denied';
+
+  @override
+  String get chatVoiceNotAvailable => 'Speech recognition not available';
+
+  @override
   String get chatSessions => 'Sessions';
 
   @override

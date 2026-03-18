@@ -1,18 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../services/api.dart';
-import 'step_card.dart';
 
-/// 2-step agent creation wizard.
-///
-/// Steps:
-///   0 - Basic Info & Model
-///   1 - Personality & Boundaries
+/// One-click agent creation from template picker.
 class AgentCreatePage extends ConsumerStatefulWidget {
   const AgentCreatePage({super.key});
 
@@ -21,602 +14,423 @@ class AgentCreatePage extends ConsumerStatefulWidget {
 }
 
 class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
-  // ── Wizard state ──────────────────────────────────────────
-  int _currentStep = 0;
-  bool _submitting = false;
-  bool _loadingResources = true;
-  String? _errorMessage;
-
-  // ── External data loaded from API ─────────────────────────
-  List<dynamic> _llmModels = [];
+  bool _loading = true;
+  String? _error;
   List<dynamic> _templates = [];
 
-  // ── Form state (mirrors the React form fields) ────────────
-  final Map<String, dynamic> _form = {
-    'name': '',
-    'role_description': '',
-    'personality': '',
-    'boundaries': '',
-    'primary_model_id': '',
-    'fallback_model_id': '',
-    'template_id': '',
-    'max_tokens_per_day': 100000,
-    'max_tokens_per_month': 3000000,
-  };
-
-  // ── Text editing controllers (for fields that need them) ──
-  final _nameCtrl = TextEditingController();
-  final _roleDescCtrl = TextEditingController();
-  final _personalityCtrl = TextEditingController();
-  final _boundariesCtrl = TextEditingController();
-  final _maxDayCtrl = TextEditingController(text: '100000');
-  final _maxMonthCtrl = TextEditingController(text: '3000000');
-
-  static const _stepCount = 2;
-
-  List<String> _stepLabels(AppLocalizations l) => [
-    l.agentCreateStepBasic,
-    l.agentCreateStepPersonality,
-  ];
-
-  // ── Lifecycle ─────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
-    _loadResources();
+    _loadTemplates();
   }
 
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _roleDescCtrl.dispose();
-    _personalityCtrl.dispose();
-    _boundariesCtrl.dispose();
-    _maxDayCtrl.dispose();
-    _maxMonthCtrl.dispose();
-    super.dispose();
-  }
-
-  // ── Data loading ──────────────────────────────────────────
-  Future<void> _loadResources() async {
+  Future<void> _loadTemplates() async {
     try {
-      final results = await Future.wait([
-        ApiService.instance.listLlmModels(),
-        ApiService.instance.getTemplates(),
-      ]);
+      final templates = await ApiService.instance.getTemplates();
       if (!mounted) return;
       setState(() {
-        _llmModels = results[0];
-        _templates = results[1];
-        _loadingResources = false;
+        _templates = templates;
+        _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = AppLocalizations.of(context)!.agentCreateLoadFailed(e.toString());
-        _loadingResources = false;
+        _error = e.toString();
+        _loading = false;
       });
     }
   }
 
-  // ── Sync text controllers -> form map ─────────────────────
-  void _syncFormFromControllers() {
-    _form['name'] = _nameCtrl.text.trim();
-    _form['role_description'] = _roleDescCtrl.text.trim();
-    _form['personality'] = _personalityCtrl.text.trim();
-    _form['boundaries'] = _boundariesCtrl.text.trim();
-    _form['max_tokens_per_day'] =
-        int.tryParse(_maxDayCtrl.text.trim()) ?? 100000;
-    _form['max_tokens_per_month'] =
-        int.tryParse(_maxMonthCtrl.text.trim()) ?? 3000000;
+  void _onTemplateTap(Map<String, dynamic> template) {
+    final nameCtrl = TextEditingController(
+      text: template['display_name'] ?? template['name'] ?? '',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _TemplateBottomSheet(
+        template: template,
+        nameController: nameCtrl,
+        onSubmit: (name) {
+          Navigator.pop(ctx);
+          _createAgent(template, name);
+        },
+      ),
+    );
   }
 
-  // ── Validation per step ───────────────────────────────────
-  bool _validateCurrentStep() {
-    _syncFormFromControllers();
-    final l = AppLocalizations.of(context)!;
-    switch (_currentStep) {
-      case 0:
-        if ((_form['name'] as String).isEmpty) {
-          _showError(l.agentCreateNameRequired);
-          return false;
-        }
-        if ((_form['primary_model_id'] as String).isEmpty) {
-          _showError(l.agentCreateModelRequired);
-          return false;
-        }
-        return true;
-      case 1:
-        return true;
-      default:
-        return true;
-    }
-  }
-
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  // ── Navigation ────────────────────────────────────────────
-  void _goNext() {
-    if (!_validateCurrentStep()) return;
-    if (_currentStep < _stepCount - 1) {
-      setState(() => _currentStep++);
-    }
-  }
-
-  void _goPrevious() {
-    if (_currentStep > 0) {
-      setState(() => _currentStep--);
-    }
-  }
-
-  // ── Submit ────────────────────────────────────────────────
-  Future<void> _handleFinish() async {
-    if (!_validateCurrentStep()) return;
-    _syncFormFromControllers();
-
-    setState(() {
-      _submitting = true;
-      _errorMessage = null;
-    });
+  Future<void> _createAgent(Map<String, dynamic> template, String name) async {
+    // Show loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
-      // Build payload — only include non-empty optional fields.
       final data = <String, dynamic>{
-        'name': _form['name'],
-        'role_description': _form['role_description'],
-        'primary_model_id': _form['primary_model_id'],
+        'template_id': template['id'],
+        'name': name.trim(),
       };
-
-      _addIfNotEmpty(data, 'personality', _form['personality']);
-      _addIfNotEmpty(data, 'boundaries', _form['boundaries']);
-      _addIfNotEmpty(data, 'fallback_model_id', _form['fallback_model_id']);
-      _addIfNotEmpty(data, 'template_id', _form['template_id']);
-      data['max_tokens_per_day'] = _form['max_tokens_per_day'];
-      data['max_tokens_per_month'] = _form['max_tokens_per_month'];
-
       final result = await ApiService.instance.createAgent(data);
       if (!mounted) return;
-
+      Navigator.pop(context); // dismiss loading
       final newId = result['id'] as String;
       context.push('/agents/$newId/chat');
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _submitting = false;
-        _errorMessage = AppLocalizations.of(context)!.agentCreateFailed(e.toString());
-      });
+      Navigator.pop(context); // dismiss loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Creation failed: $e')),
+      );
     }
   }
 
-  void _addIfNotEmpty(Map<String, dynamic> map, String key, dynamic value) {
-    if (value is String && value.isNotEmpty) {
-      map[key] = value;
-    }
-  }
-
-  // ────────────────────────────────────────────────────────────
-  //  BUILD
-  // ────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: Text(l.agentCreateTitle),
+        title: const Text('Hire AI Employee'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
       ),
-      body: _loadingResources
+      body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _buildBody(),
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Failed to load templates',
+                          style: TextStyle(color: AppColors.error)),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _loading = true;
+                            _error = null;
+                          });
+                          _loadTemplates();
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : _buildBody(),
     );
   }
 
   Widget _buildBody() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Error banner
-        if (_errorMessage != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: AppColors.error.withValues(alpha: 0.15),
-            child: Row(
-              children: [
-                const Icon(Icons.error_outline,
-                    color: AppColors.error, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(_errorMessage!,
-                      style: const TextStyle(
-                          color: AppColors.error, fontSize: 13)),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close,
-                      size: 16, color: AppColors.error),
-                  onPressed: () => setState(() => _errorMessage = null),
-                ),
-              ],
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Text(
+            'Pick a template to get started',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
             ),
-          ),
-
-        // Step indicator
-        _buildStepIndicator(),
-
-        const Divider(height: 1),
-
-        // Step content
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: _buildCurrentStep(),
           ),
         ),
 
-        // Bottom navigation buttons
-        const Divider(height: 1),
-        _buildBottomButtons(),
+        // Template grid
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.95,
+            ),
+            itemCount: _templates.length,
+            itemBuilder: (context, index) {
+              final t = _templates[index] as Map<String, dynamic>;
+              return _TemplateCard(
+                template: t,
+                onTap: () => _onTemplateTap(t),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
+}
 
-  // ── Step Indicator ────────────────────────────────────────
-  Widget _buildStepIndicator() {
-    final l = AppLocalizations.of(context)!;
-    final labels = _stepLabels(l);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      color: AppColors.bgSecondary,
-      child: Row(
-        children: List.generate(labels.length, (i) {
-          final isActive = i == _currentStep;
-          final isCompleted = i < _currentStep;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                // Allow jumping to completed steps only.
-                if (i < _currentStep) {
-                  setState(() => _currentStep = i);
-                }
-              },
-              child: Row(
-                children: [
-                  // Circle
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isActive
-                          ? AppColors.accentPrimary
-                          : isCompleted
-                              ? AppColors.success
-                              : AppColors.bgTertiary,
-                      border: Border.all(
-                        color: isActive
-                            ? AppColors.accentPrimary
-                            : isCompleted
-                                ? AppColors.success
-                                : AppColors.borderDefault,
-                        width: 1.5,
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: isCompleted
-                        ? const Icon(Icons.check,
-                            size: 14, color: Colors.white)
-                        : Text(
-                            '${i + 1}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isActive
-                                  ? Colors.white
-                                  : AppColors.textTertiary,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 6),
-                  // Label — only show on wider screens
-                  Flexible(
-                    child: Text(
-                      labels[i],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            isActive ? FontWeight.w600 : FontWeight.w400,
-                        color: isActive
-                            ? AppColors.textPrimary
-                            : isCompleted
-                                ? AppColors.textSecondary
-                                : AppColors.textTertiary,
-                      ),
-                    ),
-                  ),
-                  // Connector line between steps
-                  if (i < labels.length - 1)
-                    Expanded(
-                      child: Container(
-                        height: 1,
-                        margin: const EdgeInsets.symmetric(horizontal: 6),
-                        color: isCompleted
-                            ? AppColors.success
-                            : AppColors.borderSubtle,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
+// ─── Template Card ─────────────────────────────────────────
 
-  // ── Bottom navigation buttons ─────────────────────────────
-  Widget _buildBottomButtons() {
-    final l = AppLocalizations.of(context)!;
-    final isFirst = _currentStep == 0;
-    final isLast = _currentStep == _stepCount - 1;
+class _TemplateCard extends StatelessWidget {
+  const _TemplateCard({required this.template, required this.onTap});
 
-    return Container(
-      color: AppColors.bgSecondary,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        children: [
-          if (!isFirst)
-            OutlinedButton.icon(
-              onPressed: _goPrevious,
-              icon: const Icon(Icons.chevron_left, size: 18),
-              label: Text(l.agentCreatePrevStep),
-            ),
-          const Spacer(),
-          if (!isLast)
-            ElevatedButton.icon(
-              onPressed: _goNext,
-              icon: const Icon(Icons.chevron_right, size: 18),
-              label: Text(l.agentCreateNextStep),
-            ),
-          if (isLast)
-            ElevatedButton.icon(
-              onPressed: _submitting ? null : _handleFinish,
-              icon: _submitting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.check, size: 18),
-              label: Text(_submitting ? l.agentCreateCreating : l.agentCreateSubmit),
-            ),
-        ],
-      ),
-    );
-  }
+  final Map<String, dynamic> template;
+  final VoidCallback onTap;
 
-  // ── Route to current step widget ──────────────────────────
-  Widget _buildCurrentStep() {
-    switch (_currentStep) {
-      case 0:
-        return _buildStepBasicInfo();
-      case 1:
-        return _buildStepPersonality();
-      default:
-        return const SizedBox.shrink();
-    }
-  }
+  @override
+  Widget build(BuildContext context) {
+    final icon = template['icon'] ?? '🤖';
+    final name = template['display_name'] ?? template['name'] ?? 'Agent';
+    final description = template['description'] ?? '';
+    final tier = template['recommended_model_tier'] ?? 'standard';
 
-  // ────────────────────────────────────────────────────────────
-  //  STEP 0 — Basic Info & Model
-  // ────────────────────────────────────────────────────────────
-  Widget _buildStepBasicInfo() {
-    final l = AppLocalizations.of(context)!;
-    return StepCard(
-      title: l.agentCreateBasicTitle,
-      subtitle: l.agentCreateBasicSubtitle,
-      children: [
-        // Name
-        FieldLabel(l.agentCreateNameLabel),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _nameCtrl,
-          decoration: InputDecoration(hintText: l.agentCreateNameHint),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.borderSubtle, width: 1),
         ),
-        const SizedBox(height: 18),
-
-        // Role description
-        FieldLabel(l.agentCreateRoleLabel),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _roleDescCtrl,
-          maxLines: 3,
-          decoration: InputDecoration(
-              hintText: l.agentCreateRoleHint),
-        ),
-        const SizedBox(height: 18),
-
-        // Template
-        FieldLabel(l.agentCreateTemplateLabel),
-        const SizedBox(height: 6),
-        _buildDropdown<String>(
-          value: (_form['template_id'] as String).isEmpty
-              ? null
-              : _form['template_id'] as String,
-          hint: l.agentCreateTemplateHint,
-          items: _templates.map((t) {
-            final id = t['id']?.toString() ?? '';
-            final name = t['name']?.toString() ?? id;
-            return DropdownMenuItem(value: id, child: Text(name));
-          }).toList(),
-          onChanged: (v) => setState(() => _form['template_id'] = v ?? ''),
-        ),
-        const SizedBox(height: 18),
-
-        // Primary model
-        FieldLabel(l.agentCreatePrimaryModelLabel),
-        const SizedBox(height: 6),
-        if (_llmModels.isEmpty)
-          Text(l.agentCreateModelTip,
-              style: TextStyle(fontSize: 12, color: AppColors.textTertiary))
-        else
-        _buildDropdown<String>(
-          value: (_form['primary_model_id'] as String).isEmpty
-              ? null
-              : _form['primary_model_id'] as String,
-          hint: l.agentCreatePrimaryModelHint,
-          items: _llmModels.map((m) {
-            final id = m['id']?.toString() ?? '';
-            final label = (m['label'] as String?)?.isNotEmpty == true
-                ? m['label'] as String
-                : m['model']?.toString() ?? id;
-            final provider = m['provider']?.toString() ?? '';
-            final modelName = m['model']?.toString() ?? '';
-            final subtitle = provider.isNotEmpty ? ' ($provider/$modelName)' : '';
-            return DropdownMenuItem(
-              value: id,
-              child: Text('$label$subtitle',
-                  style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis),
-            );
-          }).toList(),
-          onChanged: (v) =>
-              setState(() => _form['primary_model_id'] = v ?? ''),
-        ),
-        const SizedBox(height: 18),
-
-        // Fallback model
-        FieldLabel(l.agentCreateFallbackModelLabel),
-        const SizedBox(height: 6),
-        if (_llmModels.isEmpty)
-          const SizedBox.shrink()
-        else
-        _buildDropdown<String>(
-          value: (_form['fallback_model_id'] as String).isEmpty
-              ? null
-              : _form['fallback_model_id'] as String,
-          hint: l.agentCreateFallbackModelHint,
-          items: _llmModels.map((m) {
-            final id = m['id']?.toString() ?? '';
-            final label = (m['label'] as String?)?.isNotEmpty == true
-                ? m['label'] as String
-                : m['model']?.toString() ?? id;
-            final provider = m['provider']?.toString() ?? '';
-            final modelName = m['model']?.toString() ?? '';
-            final subtitle = provider.isNotEmpty ? ' ($provider/$modelName)' : '';
-            return DropdownMenuItem(
-              value: id,
-              child: Text('$label$subtitle',
-                  style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis),
-            );
-          }).toList(),
-          onChanged: (v) =>
-              setState(() => _form['fallback_model_id'] = v ?? ''),
-        ),
-        const SizedBox(height: 18),
-
-        // Token limits
-        Row(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Emoji icon
+            Text(icon, style: const TextStyle(fontSize: 32)),
+            const SizedBox(height: 10),
+
+            // Name
+            Text(
+              name,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+
+            // Description (2 lines)
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FieldLabel(l.agentCreateDailyTokenLimit),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _maxDayCtrl,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration:
-                        const InputDecoration(hintText: '100000'),
-                  ),
-                ],
+              child: Text(
+                description,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textTertiary,
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FieldLabel(l.agentCreateMonthlyTokenLimit),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _maxMonthCtrl,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration:
-                        const InputDecoration(hintText: '3000000'),
-                  ),
-                ],
-              ),
-            ),
+
+            // Tier badge
+            _TierBadge(tier: tier),
           ],
         ),
-      ],
+      ),
     );
   }
+}
 
-  // ────────────────────────────────────────────────────────────
-  //  STEP 1 — Personality & Boundaries
-  // ────────────────────────────────────────────────────────────
-  Widget _buildStepPersonality() {
-    final l = AppLocalizations.of(context)!;
-    return StepCard(
-      title: l.agentCreatePersonalityTitle,
-      subtitle: l.agentCreatePersonalitySubtitle,
-      children: [
-        FieldLabel(l.agentCreatePersonalityLabel),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _personalityCtrl,
-          maxLines: 6,
-          decoration: InputDecoration(
-            hintText: l.agentCreatePersonalityHint,
-          ),
-        ),
-        const SizedBox(height: 20),
-        FieldLabel(l.agentCreateBoundariesLabel),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _boundariesCtrl,
-          maxLines: 6,
-          decoration: InputDecoration(
-            hintText: l.agentCreateBoundariesHint,
-          ),
-        ),
-      ],
+// ─── Tier Badge ────────────────────────────────────────────
+
+class _TierBadge extends StatelessWidget {
+  const _TierBadge({required this.tier});
+  final String tier;
+
+  @override
+  Widget build(BuildContext context) {
+    final String label;
+    final Color bgColor;
+    final Color textColor;
+
+    switch (tier) {
+      case 'budget':
+        label = '💰 Budget';
+        bgColor = AppColors.success.withValues(alpha: 0.15);
+        textColor = AppColors.success;
+      case 'premium':
+        label = '👑 Premium';
+        bgColor = AppColors.warning.withValues(alpha: 0.15);
+        textColor = AppColors.warning;
+      default:
+        label = '⭐ Standard';
+        bgColor = AppColors.accentPrimary.withValues(alpha: 0.15);
+        textColor = AppColors.accentPrimary;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: textColor),
+      ),
     );
   }
+}
 
-  // ── Shared helpers ────────────────────────────────────────
-  Widget _buildDropdown<T>({
-    required T? value,
-    required String hint,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return DropdownButtonFormField<T>(
-      value: value,
-      hint: Text(hint,
-          style:
-              TextStyle(color: AppColors.textTertiary, fontSize: 13)),
-      decoration: const InputDecoration(),
-      dropdownColor: AppColors.bgElevated,
-      borderRadius: BorderRadius.circular(12),
-      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
-      isExpanded: true,
-      items: items,
-      onChanged: onChanged,
+// ─── Bottom Sheet ──────────────────────────────────────────
+
+class _TemplateBottomSheet extends StatefulWidget {
+  const _TemplateBottomSheet({
+    required this.template,
+    required this.nameController,
+    required this.onSubmit,
+  });
+
+  final Map<String, dynamic> template;
+  final TextEditingController nameController;
+  final void Function(String name) onSubmit;
+
+  @override
+  State<_TemplateBottomSheet> createState() => _TemplateBottomSheetState();
+}
+
+class _TemplateBottomSheetState extends State<_TemplateBottomSheet> {
+  @override
+  void initState() {
+    super.initState();
+    widget.nameController.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.nameController.removeListener(_onTextChanged);
+    super.dispose();
+  }
+
+  void _onTextChanged() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    final template = widget.template;
+    final icon = template['icon'] ?? '🤖';
+    final name = template['display_name'] ?? template['name'] ?? 'Agent';
+    final description = template['description'] ?? '';
+    final tier = template['recommended_model_tier'] ?? 'standard';
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 20, 24, 20 + bottomPadding),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle bar
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.borderDefault,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Icon + Name
+          Row(
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 36)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _TierBadge(tier: tier),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Description
+          Text(
+            description,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Name field
+          Text(
+            'Name',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: widget.nameController,
+            decoration: InputDecoration(
+              hintText: 'Give your agent a name',
+              filled: true,
+              fillColor: AppColors.bgSecondary,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.borderSubtle),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.borderSubtle),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.accentPrimary, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Create button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: widget.nameController.text.trim().isEmpty
+                  ? null
+                  : () => widget.onSubmit(widget.nameController.text),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accentPrimary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                disabledBackgroundColor: AppColors.bgTertiary,
+              ),
+              child: const Text(
+                'Create Now',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

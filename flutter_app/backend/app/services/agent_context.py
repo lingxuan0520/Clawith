@@ -187,11 +187,14 @@ async def build_agent_context(agent_id: uuid.UUID, agent_name: str, role_descrip
     from datetime import datetime, timezone, timedelta
     cst = timezone(timedelta(hours=8))
     now_str = datetime.now(cst).strftime("%Y-%m-%d %H:%M:%S (CST, UTC+8)")
-    parts = [f"You are {agent_name}, an enterprise digital employee."]
-    parts.append(f"\n## Current Time\n{now_str}")
 
-    if role_description:
-        parts.append(f"\n## Role\n{role_description}")
+    # Use soul.md as the prompt foundation (contains full identity/mission/rules from template)
+    if soul and soul not in ("_描述你的角色和职责。_", "_Describe your role and responsibilities._"):
+        parts = [soul]
+    else:
+        parts = [f"You are {agent_name}."]
+
+    parts.append(f"\n## Current Time\n{now_str}")
 
     # --- Company Intro (from system settings) ---
     try:
@@ -209,9 +212,6 @@ async def build_agent_context(agent_id: uuid.UUID, agent_name: str, role_descrip
                     parts.append(f"\n## Company Information\n{company_intro}")
     except Exception:
         pass  # Don't break agent if DB is unavailable
-
-    if soul and soul not in ("_描述你的角色和职责。_", "_Describe your role and responsibilities._"):
-        parts.append(f"\n## Personality\n{soul}")
 
     if memory and memory not in ("_这里记录重要的信息和学到的知识。_", "_Record important information and knowledge here._"):
         parts.append(f"\n## Memory\n{memory}")
