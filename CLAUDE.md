@@ -54,6 +54,9 @@ opc_ref/
 
 ## Flutter 后端
 
+- **生产环境**：阿里云 47.251.71.144，项目路径 `/opt/Clawith/flutter_app/`
+- **本地不跑后端**：本地开发时 Flutter App 直接连阿里云后端
+- **部署流程**：本地改代码 → 测通 → 立即上传阿里云 → 重启生产后端
 - **端口**：8001（区别于原版 8000）
 - **数据库**：PostgreSQL 端口 5434，数据库名 `clawith`，用户 `clawith`
 - **Redis**：端口 6380
@@ -61,9 +64,13 @@ opc_ref/
 - **JWT 有效期**：1 年
 - **新用户默认角色**：`platform_admin`（每个用户都是自己公司的老板）
 
-启动命令（在 `flutter_app/` 目录下）：
+部署命令：
 ```bash
-docker compose up -d
+# 上传代码到阿里云
+sshpass -p '910520clX' scp -r flutter_app/backend/ root@47.251.71.144:/opt/Clawith/flutter_app/backend/
+
+# SSH 上去重启
+sshpass -p '910520clX' ssh root@47.251.71.144 "cd /opt/Clawith/flutter_app && docker compose restart backend"
 ```
 
 ---
@@ -113,7 +120,7 @@ Cmd+Shift+F5（VS Code）或模拟器内 Shift+R
 
 **每次改完代码，必须自己先测试一遍，确认没问题了再交给用户。**
 
-- 改了后端代码 → 先 `docker compose restart backend`，看日志确认无报错
+- 改了后端代码 → 本地测通后，立即上传阿里云并重启生产后端，看日志确认无报错
 - 改了前端代码 → 先 `flutter analyze lib/` 确认 0 errors
 - 涉及 API 交互的功能 → 用 `curl` 或查日志验证完整流程（创建 → 执行 → 状态变更）
 - 不要只改代码就交给用户，用户不是你的测试工程师

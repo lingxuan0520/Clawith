@@ -38,4 +38,18 @@ extension ApiBilling on ApiService {
     final r = await _apiDio.post('/billing/add-credits', data: {'amount_cents': amountCents});
     return r.data as Map<String, dynamic>;
   }
+
+  /// Send Apple IAP receipt to backend for verification.
+  Future<Map<String, dynamic>> verifyAppleReceipt({
+    required String receiptData,
+    required String productId,
+    required String transactionId,
+  }) async {
+    final r = await _apiDio.post('/billing/verify-apple-receipt', data: {
+      'receipt_data': receiptData,
+      'product_id': productId,
+      'transaction_id': transactionId,
+    });
+    return r.data as Map<String, dynamic>;
+  }
 }

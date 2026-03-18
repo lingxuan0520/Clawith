@@ -71,6 +71,18 @@ async def main():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_credits_used_cents INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(20) DEFAULT 'free'",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ",
+        # Purchase records table for IAP idempotency
+        """CREATE TABLE IF NOT EXISTS purchase_records (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id),
+            platform VARCHAR(20),
+            product_id VARCHAR(100),
+            transaction_id VARCHAR(200) UNIQUE,
+            receipt_data TEXT,
+            amount_cents INTEGER DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'completed',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
     ]
 
     from sqlalchemy import text

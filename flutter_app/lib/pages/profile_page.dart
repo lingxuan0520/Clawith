@@ -139,7 +139,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: GestureDetector(
-              onTap: () => context.push('/billing'),
+              onTap: () async {
+                await context.push('/billing');
+                _loadBalance();
+              },
               child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),

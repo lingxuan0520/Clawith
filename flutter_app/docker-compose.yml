@@ -23,6 +23,7 @@ services:
       DOCKER_NETWORK: clawith_network
       SS_CONFIG_FILE: /data/ss-nodes.json
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      APPLE_SHARED_SECRET: ${APPLE_SHARED_SECRET:-}
       WORKERS: "5"
     ports:
       - "8001:8000"

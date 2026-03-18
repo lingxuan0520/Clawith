@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # OpenRouter (platform-level API key for system models)
     OPENROUTER_API_KEY: str = ""
 
+    # Apple IAP (receipt verification)
+    APPLE_SHARED_SECRET: str = ""
+    APPLE_BUNDLE_ID: str = "com.soloship.app"
+
     model_config = {
         "env_file": [".env", "../.env"],
         "env_file_encoding": "utf-8",
