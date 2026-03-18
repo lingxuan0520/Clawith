@@ -136,3 +136,6 @@ final appProvider = StateNotifierProvider<AppNotifier, AppState>((ref) {
 /// Incremented each time the office tab becomes active, so OfficeWebViewPage
 /// can refresh agent data.
 final officeVisitCountProvider = StateProvider<int>((ref) => 0);
+
+/// Incremented after agent create/delete so list pages can refresh immediately.
+final agentListRefreshProvider = StateProvider<int>((ref) => 0);

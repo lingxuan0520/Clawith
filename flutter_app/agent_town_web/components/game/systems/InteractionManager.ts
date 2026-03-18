@@ -112,26 +112,29 @@ export class InteractionManager {
 
     const options: MenuOption[] = [
       {
-        label: "对话",
+        label: "Chat",
         enabled: !!agentId,
         action: () => {
           this.menuOpen = false;
+          this.interactionMenu.onClose?.();
           if (agentId) notifyFlutter("chat", agentId);
         },
       },
       {
-        label: "详情",
+        label: "Detail",
         enabled: !!agentId,
         action: () => {
           this.menuOpen = false;
+          this.interactionMenu.onClose?.();
           if (agentId) notifyFlutter("detail", agentId);
         },
       },
       {
-        label: "取消",
+        label: "Cancel",
         enabled: true,
         action: () => {
           this.menuOpen = false;
+          this.interactionMenu.onClose?.();
         },
       },
     ];

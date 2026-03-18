@@ -10,7 +10,6 @@ interface BottomBarProps {
 }
 
 export default function BottomBar({ seats }: BottomBarProps) {
-  const totalSeats = seats.length;
   const assignedSeats = seats.filter((s) => s.assigned).length;
   const workingCount = seats.filter(
     (s) => s.assigned && (s.status === "running" || s.status === "returning"),
@@ -25,13 +24,13 @@ export default function BottomBar({ seats }: BottomBarProps) {
       <div className="hud-pill hud-pill--metric">
         <Users size={10} />
         <span>
-          {assignedSeats}/{totalSeats} seat
+          {assignedSeats} Agent{assignedSeats !== 1 ? "s" : ""}
         </span>
       </div>
       <div className="hud-pill hud-pill--metric">
         <Sparkles size={10} />
         <span>
-          {workingCount}/{assignedSeats} busy
+          {workingCount} Busy
         </span>
       </div>
     </div>

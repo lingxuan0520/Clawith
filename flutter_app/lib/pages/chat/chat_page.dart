@@ -12,6 +12,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/network/websocket_client.dart';
 import '../../core/network/api_client.dart';
 import '../../services/api.dart';
+import '../../services/chat_cache.dart';
 import '../../stores/auth_store.dart';
 import '../../components/markdown_renderer.dart';
 import 'plus_menu_sheet.dart';
@@ -46,7 +47,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   // Session state
   final List<Map<String, dynamic>> _sessions = [];
   Map<String, dynamic>? _activeSession;
-  bool _sessionsLoading = false;
+  bool _sessionsLoading = true;
   bool _hasMoreMessages = false;
   bool _loadingMore = false;
   String? _oldestMessageTs;
@@ -73,10 +74,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     super.initState();
     _inputCtrl.addListener(() { if (mounted) setState(() {}); });
     _scrollCtrl.addListener(_onScroll);
+    _loadCachedMessagesImmediately();
     _loadAgent();
     _loadSessions();
     _checkVisionSupport();
     _initSpeech();
+  }
+
+  /// Show cached messages instantly before any API call
+  Future<void> _loadCachedMessagesImmediately() async {
+    final cached = await ChatCache.instance.loadMessages(widget.agentId);
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _messages.addAll(cached.map((m) => ChatMessage(
+          role: m['role'] as String? ?? 'assistant',
+          content: m['content'] as String? ?? '',
+          thinking: m['thinking'] as String?,
+          imageUrl: m['imageUrl'] as String?,
+        )));
+      });
+    }
   }
 
   void _onScroll() {
@@ -154,8 +171,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> _selectSession(Map<String, dynamic> sess) async {
+    final hadCachedMessages = _messages.isNotEmpty;
     setState(() {
-      _messages.clear();
+      // Don't clear messages if we already have cached ones from initState
+      if (!hadCachedMessages) _messages.clear();
       _historyMsgs.clear();
       _activeSession = sess;
       _isReadOnly = false;
@@ -182,13 +201,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           !isAgentSession && (sess['user_id'] as String?) == auth.userId;
 
       if (isOwnSession) {
+        final freshMsgs = msgs.map((m) => _parseHistoryMessage(m as Map<String, dynamic>)).toList();
         setState(() {
-          _messages.addAll(msgs.map((m) => _parseHistoryMessage(m as Map<String, dynamic>)));
+          _messages.clear();
+          _messages.addAll(freshMsgs);
           _isReadOnly = false;
         });
+        // Save to cache
+        _saveMsgsToCache();
         _reconnectWs();
       } else {
         setState(() {
+          _historyMsgs.clear();
           _historyMsgs.addAll(msgs.map((m) => _parseHistoryMessage(m as Map<String, dynamic>)));
           _isReadOnly = true;
         });
@@ -206,6 +230,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if (isOwnSession) _reconnectWs();
     }
     _scrollToBottom(force: true);
+  }
+
+  void _saveMsgsToCache() {
+    final data = _messages.map((m) => {
+      'role': m.role,
+      'content': m.content,
+      'thinking': m.thinking,
+      'imageUrl': m.imageUrl,
+    }).toList();
+    ChatCache.instance.saveMessages(widget.agentId, data);
   }
 
   Future<void> _loadMoreMessages() async {
@@ -370,6 +404,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           }
           // Silently refresh session list to update last_message_at
           _loadSessions(silent: true);
+          // Save to local cache
+          ChatCache.instance.updateLastMessage(widget.agentId, event.content ?? '', 'assistant');
+          _saveMsgsToCache();
           break;
         case WsEventType.error:
         case WsEventType.quotaExceeded:
@@ -591,6 +628,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       _waitingForResponse = true;
     });
     _scrollToBottom(force: true);
+    // Update cache with user message
+    ChatCache.instance.updateLastMessage(widget.agentId, userMsg, 'user');
+    _saveMsgsToCache();
   }
 
   String _fileEmoji(String fileName) {
@@ -636,7 +676,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         backgroundColor: AppColors.bgSecondary,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.go('/chat-list');
+            }
+          },
         ),
         title: Row(
           children: [

@@ -33,11 +33,6 @@ export default function TopBar({
 
   return (
     <div className="layout-top">
-      {/* Left: logo */}
-      <div className="layout-topbar__title">
-        <span className="layout-topbar__logo">AGENT TOWN</span>
-      </div>
-
       {/* Center: agent pills (each pill is its own floating element) */}
       <div className="layout-topbar__agents">
         {assignedSeats.map((seat) => (

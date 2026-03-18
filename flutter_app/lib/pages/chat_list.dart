@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../stores/app_store.dart';
+import '../services/chat_cache.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
 import '../core/app_lifecycle.dart';
+import '../stores/app_store.dart';
 
 class ChatListPage extends ConsumerStatefulWidget {
   const ChatListPage({super.key});
@@ -31,11 +32,8 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
 
   Future<void> _loadAgents() async {
     try {
-      final tenantId = ref.read(appProvider).currentTenantId;
-      final data = await ApiService.instance
-          .listAgents(tenantId: tenantId.isEmpty ? null : tenantId);
+      final data = await ApiService.instance.listAgents();
       final agents = data.cast<Map<String, dynamic>>();
-      // Sort by updated_at descending (most recent first)
       agents.sort((a, b) {
         final aTime =
             DateTime.tryParse(a['updated_at'] as String? ?? '') ?? DateTime(2000);
@@ -71,6 +69,9 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Auto-refresh when agents are created/deleted
+    ref.listen(agentListRefreshProvider, (_, __) => _loadAgents());
+
     final l = AppLocalizations.of(context)!;
     return Column(
       children: [
@@ -103,18 +104,22 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
     }
 
     if (_agents.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      return RefreshIndicator(
+        onRefresh: _loadAgents,
+        color: AppColors.accentPrimary,
+        child: ListView(
           children: [
+            SizedBox(height: MediaQuery.of(context).size.height * 0.25),
             Icon(Icons.chat_bubble_outline, size: 48, color: AppColors.textTertiary),
             const SizedBox(height: 12),
-            Text(l.chatListNoAgents, style: TextStyle(color: AppColors.textTertiary, fontSize: 14)),
+            Center(child: Text(l.chatListNoAgents, style: TextStyle(color: AppColors.textTertiary, fontSize: 14))),
             const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () => context.push('/agents/new'),
-              icon: const Icon(Icons.add, size: 16),
-              label: Text(l.chatListCreateFirst),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => context.push('/agents/new'),
+                icon: const Icon(Icons.add, size: 16),
+                label: Text(l.chatListCreateFirst),
+              ),
             ),
           ],
         ),
@@ -134,7 +139,14 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
           final name = agent['name'] as String? ?? 'Agent';
           final status = agent['status'] as String? ?? 'idle';
           final updatedAt = agent['updated_at'] as String?;
-          final role = agent['role'] as String? ?? '';
+          final role = agent['role_description'] as String? ?? '';
+
+          final lastMsg = ChatCache.instance.getLastMessage(id);
+          final subtitle = lastMsg != null && lastMsg.content.isNotEmpty
+              ? lastMsg.content
+              : _statusLabel(status, l);
+
+          final displayTitle = role.isNotEmpty ? '$name — $role' : name;
 
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -167,9 +179,9 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
                 ),
               ],
             ),
-            title: Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+            title: Text(displayTitle, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
             subtitle: Text(
-              role.isNotEmpty ? role : _statusLabel(status, l),
+              subtitle,
               style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

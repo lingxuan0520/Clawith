@@ -4,9 +4,9 @@ import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/app_lifecycle.dart';
-import '../stores/app_store.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
+import '../stores/app_store.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -34,8 +34,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   Future<void> _loadData() async {
     try {
-      final tenantId = ref.read(appProvider).currentTenantId;
-      final agents = (await ApiService.instance.listAgents(tenantId: tenantId.isEmpty ? null : tenantId))
+      final agents = (await ApiService.instance.listAgents())
           .cast<Map<String, dynamic>>();
       if (!mounted) return;
 
@@ -115,6 +114,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(agentListRefreshProvider, (_, __) => _loadData());
     final l = AppLocalizations.of(context)!;
     if (_loading) {
       return Center(child: CircularProgressIndicator(color: AppColors.accentPrimary));

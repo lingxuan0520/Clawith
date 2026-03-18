@@ -173,8 +173,11 @@ export class InteractionMenu {
     const localX = screenX - this.container.x;
     const localY = screenY - this.container.y;
 
+    console.log(`[Menu] handlePointerAt screen=(${screenX.toFixed(0)},${screenY.toFixed(0)}) local=(${localX.toFixed(0)},${localY.toFixed(0)}) bounds=(${MENU_WIDTH},${this.totalHeight})`);
+
     // Outside menu bounds → close
     if (localX < 0 || localX > MENU_WIDTH || localY < 0 || localY > this.totalHeight) {
+      console.log("[Menu] Click outside → close");
       this.hide();
       this.onClose?.();
       return true;
@@ -182,8 +185,10 @@ export class InteractionMenu {
 
     // Inside menu → find which option
     const optIndex = Math.floor((localY - PAD_Y) / ITEM_HEIGHT);
+    console.log(`[Menu] optIndex=${optIndex} (options count=${this.options.length})`);
     if (optIndex >= 0 && optIndex < this.options.length) {
       const opt = this.options[optIndex];
+      console.log(`[Menu] Clicked option: ${opt.label} enabled=${opt.enabled}`);
       if (opt.enabled) {
         this.hide();
         opt.action();

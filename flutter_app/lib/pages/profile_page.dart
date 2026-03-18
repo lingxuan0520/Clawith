@@ -101,8 +101,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       }
     }
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+    return RefreshIndicator(
+      onRefresh: _loadBalance,
+      color: AppColors.accentPrimary,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 16),
       children: [
         // User header
         Padding(
@@ -238,6 +242,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           onTap: _confirmDeleteAccount,
         ),
       ],
+    ),
     );
   }
 

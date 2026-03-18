@@ -11,6 +11,7 @@ import 'package:ohclaw/l10n/app_localizations.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/app_lifecycle.dart';
 import '../../services/api.dart';
+import '../../stores/app_store.dart';
 import 'shared_widgets.dart';
 
 part 'tab_overview.dart';
@@ -461,7 +462,8 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       await _api.deleteAgent(widget.agentId);
       if (!mounted) return;
-      context.go('/dashboard');
+      ref.read(agentListRefreshProvider.notifier).state++;
+      context.go('/chat-list');
       _showSnack(l.agentDetailDeleted);
     } catch (e) {
       _showSnack(AppLocalizations.of(context)!.agentDetailDeleteFailed(_errMsg(e)));

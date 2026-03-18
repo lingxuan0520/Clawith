@@ -128,8 +128,12 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
     }
     final trendingTags = tagMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: AppColors.accentPrimary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -164,6 +168,7 @@ class _PlazaPageState extends ConsumerState<PlazaPage> {
           ),
         ],
       ),
+    ),
     );
   }
 
