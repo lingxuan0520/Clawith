@@ -63,7 +63,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/agents/:id',
         builder: (context, state) =>
-            AgentDetailPage(agentId: state.pathParameters['id']!),
+            AgentDetailPage(
+              agentId: state.pathParameters['id']!,
+              initialTab: int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0,
+            ),
       ),
       GoRoute(
         path: '/agents/:id/chat',

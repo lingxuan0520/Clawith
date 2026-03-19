@@ -38,7 +38,7 @@ class AgentManager:
         return Path(settings.AGENT_TEMPLATE_DIR)
 
     async def initialize_agent_files(self, db: AsyncSession, agent: Agent,
-                                      personality: str = "", boundaries: str = "") -> None:
+                                      personality: str = "") -> None:
         """Copy template files and customize for this agent."""
         agent_dir = self._agent_dir(agent.id)
         template_dir = self._template_dir()
@@ -93,8 +93,6 @@ class AgentManager:
         # Append user customizations if any
         if personality:
             soul_content += f"\n## Additional Personality\n{personality}\n"
-        if boundaries:
-            soul_content += f"\n## Additional Boundaries\n{boundaries}\n"
 
         soul_path.write_text(soul_content, encoding="utf-8")
 

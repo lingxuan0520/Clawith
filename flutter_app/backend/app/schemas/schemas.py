@@ -62,7 +62,6 @@ class AgentCreate(BaseModel):
     avatar_url: str | None = None
     # Soul
     personality: str = ""
-    boundaries: str = ""
     # Model
     primary_model_id: uuid.UUID | None = None
     fallback_model_id: uuid.UUID | None = None

@@ -4,6 +4,7 @@ import 'package:ohclaw/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../services/chat_cache.dart';
+import '../services/avatar_service.dart';
 import '../services/api.dart';
 import '../core/theme/app_theme.dart';
 import '../core/app_lifecycle.dart';
@@ -17,6 +18,7 @@ class ChatListPage extends ConsumerStatefulWidget {
 
 class _ChatListPageState extends ConsumerState<ChatListPage> {
   List<Map<String, dynamic>> _agents = [];
+  Map<String, int> _avatars = {};
   bool _loading = true;
   Timer? _refreshTimer;
 
@@ -42,6 +44,10 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
         return bTime.compareTo(aTime);
       });
       if (mounted) setState(() { _agents = agents; _loading = false; });
+      // Load avatars
+      final ids = agents.map((a) => a['id'] as String).toList();
+      final avatars = await AvatarService.instance.getAvatars(ids);
+      if (mounted) setState(() => _avatars = avatars);
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -148,6 +154,8 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
 
           final displayTitle = role.isNotEmpty ? '$name — $role' : name;
 
+          final avatarIdx = _avatars[id];
+
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             leading: Stack(
@@ -159,12 +167,22 @@ class _ChatListPageState extends ConsumerState<ChatListPage> {
                     color: AppColors.bgTertiary,
                     border: Border.all(color: AppColors.borderSubtle),
                   ),
-                  child: Center(
-                    child: Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                    ),
-                  ),
+                  child: avatarIdx != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(11),
+                          child: Image.asset(
+                            AvatarService.assetPath(avatarIdx),
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                          ),
+                        ),
                 ),
                 Positioned(
                   right: 0, bottom: 0,

@@ -11,6 +11,7 @@ import 'package:ohclaw/l10n/app_localizations.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/app_lifecycle.dart';
 import '../../services/api.dart';
+import '../../services/avatar_service.dart';
 import '../../stores/app_store.dart';
 import 'shared_widgets.dart';
 
@@ -30,7 +31,8 @@ part 'tab_settings.dart';
 
 class AgentDetailPage extends ConsumerStatefulWidget {
   final String agentId;
-  const AgentDetailPage({super.key, required this.agentId});
+  final int initialTab;
+  const AgentDetailPage({super.key, required this.agentId, this.initialTab = 0});
 
   @override
   ConsumerState<AgentDetailPage> createState() => _AgentDetailPageState();
@@ -47,6 +49,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   bool _loading = true;
   String? _error;
   Timer? _pollTimer;
+  int? _avatarIndex;
 
   // ── Overview ─────────────────────────────────────────────
   List<dynamic> _recentActivity = [];
@@ -152,7 +155,7 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this);
+    _tabController = TabController(length: 8, vsync: this, initialIndex: widget.initialTab);
     _tabController.addListener(_onTabChanged);
     _fetchAgent();
     _pollTimer = Timer.periodic(
@@ -234,8 +237,11 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       final agent = await _api.getAgent(widget.agentId);
       if (!mounted) return;
+      final avatarIdx = await AvatarService.instance.getAvatar(widget.agentId);
+      if (!mounted) return;
       setState(() {
         _agent = agent;
+        _avatarIndex = avatarIdx;
         _loading = false;
       });
       _fetchOverviewData();
@@ -252,7 +258,12 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
     try {
       final agent = await _api.getAgent(widget.agentId);
       if (!mounted) return;
-      setState(() => _agent = agent);
+      final avatarIdx = await AvatarService.instance.getAvatar(widget.agentId);
+      if (!mounted) return;
+      setState(() {
+        _agent = agent;
+        _avatarIndex = avatarIdx;
+      });
     } catch (_) {}
   }
 
@@ -1332,6 +1343,29 @@ class _AgentDetailPageState extends ConsumerState<AgentDetailPage>
               )
             : Row(
                 children: [
+                  Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: AppColors.bgTertiary,
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: _avatarIndex != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(7),
+                            child: Image.asset(
+                              AvatarService.assetPath(_avatarIndex!),
+                              width: 32, height: 32, fit: BoxFit.cover,
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : '?',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 10),
                   Flexible(
                     child: GestureDetector(
                       onTap: () {

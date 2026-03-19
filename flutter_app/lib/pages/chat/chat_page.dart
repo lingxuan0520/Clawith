@@ -13,7 +13,9 @@ import '../../core/network/websocket_client.dart';
 import '../../core/network/api_client.dart';
 import '../../services/api.dart';
 import '../../services/chat_cache.dart';
+import '../../services/avatar_service.dart';
 import '../../stores/auth_store.dart';
+import '../agent_detail/agent_detail_page.dart';
 import '../../components/markdown_renderer.dart';
 import 'plus_menu_sheet.dart';
 import 'typing_dots.dart';
@@ -42,6 +44,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _isReadOnly = false;
   bool _agentExpired = false;
   Map<String, dynamic>? _agent;
+  int? _avatarIndex;
   _AttachedFile? _attachedFile;
 
   // Session state
@@ -114,7 +117,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Future<void> _loadAgent() async {
     try {
       final agent = await ApiService.instance.getAgent(widget.agentId);
-      if (mounted) setState(() => _agent = agent);
+      if (!mounted) return;
+      final avatarIdx = await AvatarService.instance.getAvatar(widget.agentId);
+      if (!mounted) return;
+      setState(() {
+        _agent = agent;
+        _avatarIndex = avatarIdx;
+      });
     } catch (_) {}
   }
 
@@ -139,11 +148,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     try {
       final data = await ApiService.instance.listSessions(widget.agentId, scope: 'mine');
       if (!mounted) return;
+      final needsAutoCreate = !silent && _activeSession == null && data.isEmpty;
       setState(() {
         _sessions
           ..clear()
           ..addAll(data.cast<Map<String, dynamic>>());
-        _sessionsLoading = false;
+        // Keep loading state if we need to auto-create a session next
+        if (!needsAutoCreate) _sessionsLoading = false;
       });
       // Auto-select first session, or auto-create if none exist
       if (!silent && _activeSession == null) {
@@ -164,10 +175,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if (!mounted) return;
       setState(() {
         _sessions.insert(0, newSess);
+        _sessionsLoading = false;
       });
       await _selectSession(newSess);
       _scaffoldKey.currentState?.closeEndDrawer();
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _sessionsLoading = false);
+    }
   }
 
   Future<void> _selectSession(Map<String, dynamic> sess) async {
@@ -686,14 +700,34 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ),
         title: Row(
           children: [
-            Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: AppColors.bgTertiary,
-                border: Border.all(color: AppColors.borderSubtle),
+            GestureDetector(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AgentDetailPage(agentId: widget.agentId, initialTab: 7),
+                  ),
+                );
+                if (!mounted) return;
+                final idx = await AvatarService.instance.getAvatar(widget.agentId);
+                if (mounted) setState(() => _avatarIndex = idx);
+              },
+              child: Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.bgTertiary,
+                  border: Border.all(color: AppColors.borderSubtle),
+                ),
+                child: _avatarIndex != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: Image.asset(
+                          AvatarService.assetPath(_avatarIndex!),
+                          width: 32, height: 32, fit: BoxFit.cover,
+                        ),
+                      )
+                    : Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
               ),
-              child: Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -792,26 +826,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   Widget _buildChatView() {
     final l = AppLocalizations.of(context)!;
-    if (_activeSession == null && !_sessionsLoading) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 28, color: AppColors.textTertiary),
-            const SizedBox(height: 12),
-            Text(
-              l.chatStartConversation(_agent?['name'] ?? 'Agent'),
-              style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _createSession,
-              icon: const Icon(Icons.add, size: 16),
-              label: Text(l.chatNewSession),
-            ),
-          ],
-        ),
-      );
+    // Show nothing while sessions are loading or being auto-created
+    if (_sessionsLoading || _activeSession == null) {
+      return const SizedBox.shrink();
     }
 
     return _messages.isEmpty && !_waitingForResponse
@@ -875,21 +892,33 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           );
   }
 
+  Widget _agentAvatarWidget() {
+    return Container(
+      width: 32, height: 32,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: AppColors.bgTertiary,
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: _avatarIndex != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: Image.asset(
+                AvatarService.assetPath(_avatarIndex!),
+                width: 32, height: 32, fit: BoxFit.cover,
+              ),
+            )
+          : Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
+    );
+  }
+
   Widget _buildTypingIndicator() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: AppColors.bgTertiary,
-              border: Border.all(color: AppColors.borderSubtle),
-            ),
-            child: Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
-          ),
+          _agentAvatarWidget(),
           const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1521,15 +1550,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: AppColors.bgTertiary,
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Icon(Icons.smart_toy, size: 18, color: AppColors.textTertiary),
-            ),
+            _agentAvatarWidget(),
             const SizedBox(width: 10),
             Flexible(
               flex: 9,

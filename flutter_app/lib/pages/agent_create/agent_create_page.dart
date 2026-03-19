@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../services/api.dart';
+import '../../services/avatar_service.dart';
 import '../../stores/app_store.dart';
 
 /// One-click agent creation from template picker.
@@ -117,9 +118,9 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
         nameController: nameCtrl,
         models: _models,
         initialModelId: defaultModelId,
-        onSubmit: (name, modelId) {
+        onSubmit: (name, modelId, avatarIndex) {
           Navigator.pop(ctx);
-          _createAgent(template, name, modelId);
+          _createAgent(template, name, modelId, avatarIndex);
         },
       ),
     );
@@ -129,6 +130,7 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
     Map<String, dynamic> template,
     String name,
     String? modelId,
+    int? avatarIndex,
   ) async {
     showDialog(
       context: context,
@@ -151,6 +153,11 @@ class _AgentCreatePageState extends ConsumerState<AgentCreatePage> {
       // Signal agent list to refresh
       ref.read(agentListRefreshProvider.notifier).state++;
       final newId = result['id'] as String;
+      // Save avatar selection
+      if (avatarIndex != null) {
+        await AvatarService.instance.setAvatar(newId, avatarIndex);
+      }
+      if (!mounted) return;
       context.pushReplacement('/agents/$newId/chat');
     } catch (e) {
       if (!mounted) return;
@@ -353,7 +360,7 @@ class _TemplateBottomSheet extends StatefulWidget {
   final TextEditingController nameController;
   final List<Map<String, dynamic>> models;
   final String? initialModelId;
-  final void Function(String name, String? modelId) onSubmit;
+  final void Function(String name, String? modelId, int? avatarIndex) onSubmit;
 
   @override
   State<_TemplateBottomSheet> createState() => _TemplateBottomSheetState();
@@ -361,6 +368,7 @@ class _TemplateBottomSheet extends StatefulWidget {
 
 class _TemplateBottomSheetState extends State<_TemplateBottomSheet> {
   String? _selectedModelId;
+  int? _selectedAvatar;
 
   @override
   void initState() {
@@ -474,6 +482,54 @@ class _TemplateBottomSheetState extends State<_TemplateBottomSheet> {
           ),
           const SizedBox(height: 16),
 
+          // Avatar picker
+          Text(
+            'Avatar',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 56,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: AvatarService.avatarCount,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (_, i) {
+                final idx = i + 1;
+                final selected = _selectedAvatar == idx;
+                return GestureDetector(
+                  onTap: () => setState(() =>
+                      _selectedAvatar = selected ? null : idx),
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: selected
+                            ? AppColors.accentPrimary
+                            : AppColors.borderSubtle,
+                        width: selected ? 2.5 : 1,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        AvatarService.assetPath(idx),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Model picker
           if (widget.models.isNotEmpty) ...[
             Text(
@@ -537,6 +593,7 @@ class _TemplateBottomSheetState extends State<_TemplateBottomSheet> {
                   : () => widget.onSubmit(
                         widget.nameController.text,
                         _selectedModelId,
+                        _selectedAvatar,
                       ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accentPrimary,

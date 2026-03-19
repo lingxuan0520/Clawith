@@ -7,6 +7,7 @@ import 'core/app_lifecycle.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
+import 'services/chat_cache.dart';
 import 'services/purchase_service.dart';
 import 'stores/app_store.dart';
 
@@ -18,6 +19,8 @@ void main() async {
   );
   // Initialize In-App Purchase listener (non-blocking)
   PurchaseService.instance.init();
+  // Initialize chat cache (non-blocking)
+  ChatCache.instance.init();
   runApp(const ProviderScope(child: OhClawApp()));
 }
 

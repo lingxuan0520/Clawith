@@ -2,8 +2,8 @@ part of 'api_service.dart';
 
 // ─── Agents ───────────────────────────────────────────
 extension ApiAgents on ApiService {
-  Future<List<dynamic>> listAgents({String? tenantId}) async {
-    final r = await _apiDio.get('/agents/', queryParameters: tenantId != null ? {'tenant_id': tenantId} : null);
+  Future<List<dynamic>> listAgents() async {
+    final r = await _apiDio.get('/agents/');
     return r.data as List<dynamic>;
   }
 

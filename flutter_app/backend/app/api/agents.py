@@ -48,48 +48,13 @@ async def list_templates(
 
 @router.get("/", response_model=list[AgentOut])
 async def list_agents(
-    tenant_id: uuid.UUID | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all agents the current user has access to."""
     # 2C model: every user only sees their own agents (filtered by creator_id)
-    if current_user.role in ("platform_admin", "org_admin"):
-        stmt = select(Agent).where(Agent.creator_id == current_user.id)
-        if tenant_id:
-            stmt = stmt.where(Agent.tenant_id == tenant_id)
-        result = await db.execute(stmt.order_by(Agent.created_at.desc()))
-        return [AgentOut.model_validate(a) for a in result.scalars().all()]
-
-    # agent_admin sees their own created agents + permitted
-    # member sees only permitted
-    # All scoped to user's tenant
-    user_tenant = current_user.tenant_id
-
-    # Get agents user created (within their tenant)
-    created = select(Agent).where(Agent.creator_id == current_user.id, Agent.tenant_id == user_tenant)
-
-    # Get agents user has permission to (within their tenant)
-    permitted_ids = (
-        select(AgentPermission.agent_id)
-        .where(
-            (AgentPermission.scope_type == "company")
-            | ((AgentPermission.scope_type == "user") & (AgentPermission.scope_id == current_user.id))
-            | (
-                (AgentPermission.scope_type == "department")
-                & (AgentPermission.scope_id == current_user.department_id)
-            )
-        )
-    )
-    permitted = select(Agent).where(Agent.id.in_(permitted_ids), Agent.tenant_id == user_tenant)
-
-    # Union
-    from sqlalchemy import union_all
-
-    combined = union_all(created, permitted).subquery()
-    result = await db.execute(
-        select(Agent).where(Agent.id.in_(select(combined.c.id))).order_by(Agent.created_at.desc())
-    )
+    stmt = select(Agent).where(Agent.creator_id == current_user.id)
+    result = await db.execute(stmt.order_by(Agent.created_at.desc()))
     return [AgentOut.model_validate(a) for a in result.scalars().all()]
 
 
@@ -195,7 +160,6 @@ async def create_agent(
     await agent_manager.initialize_agent_files(
         db, agent,
         personality=data.personality,
-        boundaries=data.boundaries,
     )
 
     # Copy selected skills + mandatory default skills into agent workspace

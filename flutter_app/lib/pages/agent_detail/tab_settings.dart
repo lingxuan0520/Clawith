@@ -16,6 +16,58 @@ extension _SettingsTab on _AgentDetailPageState {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Avatar ──
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(icon: Icons.face, label: 'Avatar'),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 64,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: AvatarService.avatarCount,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (_, i) {
+                      final idx = i + 1;
+                      final selected = _avatarIndex == idx;
+                      return GestureDetector(
+                        onTap: () async {
+                          final newIdx = selected ? null : idx;
+                          setState(() => _avatarIndex = newIdx);
+                          if (newIdx != null) {
+                            await AvatarService.instance.setAvatar(widget.agentId, newIdx);
+                          } else {
+                            await AvatarService.instance.removeAvatar(widget.agentId);
+                          }
+                        },
+                        child: Container(
+                          width: 64, height: 64,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: selected ? AppColors.accentPrimary : AppColors.borderSubtle,
+                              width: selected ? 2.5 : 1,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.asset(
+                              AvatarService.assetPath(idx),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // ── Model Configuration ──
           _card(
             child: Column(
